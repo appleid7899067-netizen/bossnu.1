@@ -13,6 +13,7 @@ const SANDBOX_LANGUAGES = [
   { id: "cpp", label: "C++", file: "main.cpp" },
   { id: "java", label: "Java", file: "Main.java" },
   { id: "bash", label: "Bash", file: "main.sh" },
+  { id: "html", label: "HTML", file: "index.html" },
   { id: "json", label: "JSON", file: "data.json" },
 ] as const;
 
@@ -22,6 +23,7 @@ const SANDBOX_DEFAULTS: Record<string,string> = {
   cpp: '#include <iostream>\\nint main(){ std::cout << "Hello from C++\\n"; }',
   java: 'public class Main { public static void main(String[] args) { System.out.println("Hello from Java"); } }',
   bash: 'echo "Hello from Bash"',
+  html: '<!doctype html>\n<html lang="th">\n<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui;padding:24px}button{padding:10px 14px;border:0;border-radius:10px;background:#111;color:#fff}</style></head>\n<body><h1>HTML Preview OK</h1><button onclick="document.querySelector("#out").textContent = "ทำงานแล้ว ✓"">ทดสอบ</button><p id="out">พร้อม</p></body>\n</html>',
   json: '{\\n  "hello": "world",\\n  "ok": true\\n}',
 };
 
@@ -36,6 +38,7 @@ export function SettingsView() {
   const [sandboxInput, setSandboxInput] = useState("");
   const [sandboxOutput, setSandboxOutput] = useState("พร้อมรันโค้ด");
   const [sandboxBusy, setSandboxBusy] = useState(false);
+  const [sandboxPreview, setSandboxPreview] = useState(false);
   const skills = store.agentSkills;
   const enabledCount = useMemo(() => skills.filter(s => s.enabled).length, [skills]);
 
@@ -49,6 +52,11 @@ export function SettingsView() {
     setSandboxBusy(true);
     setSandboxOutput("กำลังเปิด sandbox และรันโค้ด…");
     try {
+      if (sandboxLanguage === "html") {
+        setSandboxPreview(true);
+        setSandboxOutput("✓ HTML พร้อมแสดงผลใน Live Preview");
+        return;
+      }
       if (sandboxLanguage === "json") {
         const value = JSON.parse(sandboxCode);
         setSandboxOutput(JSON.stringify(value, null, 2) + "\n\n✓ JSON valid");
@@ -72,6 +80,7 @@ export function SettingsView() {
   const changeSandboxLanguage = (language: string) => {
     setSandboxLanguage(language);
     setSandboxCode(SANDBOX_DEFAULTS[language] ?? "");
+    setSandboxPreview(false);
     setSandboxOutput("พร้อมรัน " + language);
   };
 
@@ -113,10 +122,12 @@ export function SettingsView() {
             <div className="border-b border-border px-3 py-2 text-xs font-medium">Output / Console</div>
             <textarea value={sandboxInput} onChange={e=>setSandboxInput(e.target.value)} placeholder="stdin (ถ้ามี)" className="m-3 min-h-16 rounded-xl bg-bg p-3 font-mono text-xs outline-none"/>
             <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-3 pb-3 font-mono text-xs leading-5 text-muted">{sandboxOutput}</pre>
+            {sandboxLanguage === "html" ? <button type="button" onClick={()=>setSandboxPreview(v=>!v)} className="mx-3 mb-3 rounded-xl bg-bg px-3 py-2 text-xs text-muted hover:text-fg">{sandboxPreview ? "ซ่อน Live Preview" : "เปิด Live Preview"}</button> : null}
             <div className="p-3"><Button className="w-full" disabled={sandboxBusy} onClick={()=>void runSandbox()}><Play className="size-4"/>{sandboxBusy?"กำลังรัน…":"Run code"}</Button></div>
           </div>
         </div>
-        <p className="mt-3 text-xs text-subtle">Python / JavaScript / C++ / Java ใช้ isolated runner; JSON ตรวจ syntax ในเครื่อง. Bash พร้อมต่อ self-hosted sandbox runner เพื่อไม่ให้ shell แตะเซิร์ฟเวอร์หลัก</p>
+        {sandboxLanguage === "html" && sandboxPreview ? <div className="mt-4 overflow-hidden rounded-2xl bg-clay"><div className="border-b border-border px-3 py-2 text-xs font-medium">Live Preview</div><iframe title="HTML Live Preview" sandbox="allow-scripts" srcDoc={sandboxCode} className="h-[420px] w-full bg-white" /></div> : null}
+        <p className="mt-3 text-xs text-subtle">HTML แสดงผลด้วย Live Preview ใน sandbox ของ iframe; Python / JavaScript / C++ / Java ใช้ isolated runner; JSON ตรวจ syntax ในเครื่อง. Bash ยังล็อกไว้จนกว่าจะมี isolated shell runner เพื่อไม่ให้คำสั่งแตะเซิร์ฟเวอร์หลัก</p>
       </Panel> : null}
     </div>
   </section>;
