@@ -10,9 +10,9 @@ export type VoiceSettings = {
 
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   enabled: true,
-  rate: 0.9,
-  pitch: 1.08,
-  volume: 0.95,
+  rate: 1,
+  pitch: 1.3,
+  volume: 1,
   voiceName: "",
 };
 
@@ -46,7 +46,9 @@ function pickThaiVoice() {
     const selected = voices.find((v) => v.name === settings.voiceName);
     if (selected) return selected;
   }
-  return voices.find((v) => /^th(-|_)/i.test(v.lang)) ?? voices.find((v) => /thai/i.test(v.name)) ?? null;
+  return voices.find((v) => /^th(-|_)/i.test(v.lang))
+    ?? voices.find((v) => /thai/i.test(v.name))
+    ?? null;
 }
 
 function cleanSpeechText(value: string) {
@@ -61,20 +63,32 @@ function cleanSpeechText(value: string) {
 
 function speakNext() {
   if (!hasSpeech || !settings.enabled || speaking || !pending.trim()) return;
+
   const match = pending.match(/^(.{40,220}?[.!?。！？\n])(?:\s+|$)/);
   if (!match) return;
+
   const text = cleanSpeechText(match[1]);
   pending = pending.slice(match[0].length);
+
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "th-TH";
   utterance.rate = settings.rate;
   utterance.pitch = settings.pitch;
   utterance.volume = settings.volume;
+
   const voice = pickThaiVoice();
   if (voice) utterance.voice = voice;
+
   speaking = true;
-  utterance.onend = () => { speaking = false; speakNext(); };
-  utterance.onerror = () => { speaking = false; speakNext(); };
+  utterance.onend = () => {
+    speaking = false;
+    speakNext();
+  };
+  utterance.onerror = () => {
+    speaking = false;
+    speakNext();
+  };
+
   window.speechSynthesis.resume();
   window.speechSynthesis.speak(utterance);
 }
@@ -85,8 +99,10 @@ function createUtterance(text: string) {
   utterance.rate = settings.rate;
   utterance.pitch = settings.pitch;
   utterance.volume = settings.volume;
+
   const voice = pickThaiVoice();
   if (voice) utterance.voice = voice;
+
   return utterance;
 }
 
@@ -100,12 +116,16 @@ export function getVoiceSettings(): VoiceSettings {
 
 export function getAvailableVoices(): { name: string; lang: string }[] {
   if (!hasSpeech) return [];
-  return window.speechSynthesis.getVoices().map((voice) => ({ name: voice.name, lang: voice.lang }));
+  return window.speechSynthesis.getVoices().map((voice) => ({
+    name: voice.name,
+    lang: voice.lang,
+  }));
 }
 
 export function updateVoiceSettings(patch: Partial<VoiceSettings>) {
   settings = { ...settings, ...patch };
   saveSettings();
+
   if (!settings.enabled && hasSpeech) {
     window.speechSynthesis.cancel();
     pending = "";
@@ -130,13 +150,20 @@ export function speakRealtime(text: string) {
 
 export function finishVoice() {
   if (!hasSpeech || !settings.enabled) return;
+
   const tail = pending.trim();
   pending = "";
   if (!tail) return;
+
   const utterance = createUtterance(tail);
   speaking = true;
-  utterance.onend = () => { speaking = false; };
-  utterance.onerror = () => { speaking = false; };
+  utterance.onend = () => {
+    speaking = false;
+  };
+  utterance.onerror = () => {
+    speaking = false;
+  };
+
   window.speechSynthesis.speak(utterance);
 }
 
