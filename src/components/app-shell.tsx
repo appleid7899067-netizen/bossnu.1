@@ -24,6 +24,7 @@ export function AppShell({ search }: { search: Search }) {
   const navigate = useNavigate();
   const store = useAppStore();
   const [drawer, setDrawer] = useState(false);
+  const [agentSettingsOpen, setAgentSettingsOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [mapTopic, setMapTopic] = useState("");
   const [studioPrompt, setStudioPrompt] = useState("");
@@ -222,7 +223,14 @@ export function AppShell({ search }: { search: Search }) {
           maps={store.maps}
           activeChatId={search.c ?? null}
           activeMapId={search.m ?? activeMap?.id ?? null}
-          onView={(v) => go({ view: v, c: v === "chat" ? search.c : search.c })}
+          onView={(v) => {
+            if (v === "settings") {
+              setAgentSettingsOpen(true);
+              setDrawer(false);
+              return;
+            }
+            go({ view: v, c: v === "chat" ? search.c : search.c });
+          }}
           onNewChat={() => {
             const id = store.newChat(mode);
             go({ view: "chat", c: id });
@@ -251,7 +259,14 @@ export function AppShell({ search }: { search: Search }) {
               maps={store.maps}
               activeChatId={search.c ?? null}
               activeMapId={search.m ?? activeMap?.id ?? null}
-              onView={(v) => go({ view: v })}
+              onView={(v) => {
+                if (v === "settings") {
+                  setAgentSettingsOpen(true);
+                  setDrawer(false);
+                  return;
+                }
+                go({ view: v });
+              }}
               onNewChat={() => {
                 const id = store.newChat(mode);
                 go({ view: "chat", c: id });
@@ -373,6 +388,18 @@ export function AppShell({ search }: { search: Search }) {
           </>
         )}
       </main>
+      {agentSettingsOpen ? (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-fg/25 p-0 backdrop-blur-[2px] sm:items-center sm:p-5" role="dialog" aria-modal="true" aria-label="ตั้งค่าตัวแทน AI">
+          <button type="button" className="absolute inset-0 cursor-default" aria-label="ปิดหน้าต่างตั้งค่าตัวแทน" onClick={() => setAgentSettingsOpen(false)} />
+          <div className="relative z-10 flex max-h-[94dvh] w-full max-w-[1180px] flex-col overflow-hidden rounded-t-3xl bg-bg shadow-2xl sm:rounded-3xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:px-5">
+              <div><p className="text-sm font-semibold">🤖 ตัวแทน AI</p><p className="text-[11px] text-muted">ตั้งค่าบุคลิก • สกิล • ตัวแทน • ความจำ • Sandbox</p></div>
+              <button type="button" onClick={() => setAgentSettingsOpen(false)} className="grid size-9 place-items-center rounded-xl bg-clay text-muted hover:text-fg" aria-label="ปิด"><X className="size-4" /></button>
+            </div>
+            <div className="min-h-0 flex-1"><SettingsView /></div>
+          </div>
+        </div>
+      ) : null}
       <Toaster
         position="bottom-right"
         toastOptions={{
