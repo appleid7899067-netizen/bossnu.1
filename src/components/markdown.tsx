@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -80,7 +81,7 @@ function MdBlock({ text }: { text: string }) {
     if (!para.length) return;
     const body = para.join(" ");
     blocks.push(
-      <p key={`p-${blocks.length}`} className="leading-relaxed">
+      <p key={`p-${blocks.length}`} className="leading-[1.55]">
         {inline(body, `p${blocks.length}`)}
       </p>,
     );
@@ -117,7 +118,7 @@ function MdBlock({ text }: { text: string }) {
       blocks.push(
         <Tag
           key={`h-${blocks.length}`}
-          className="font-display text-[1.05em] font-medium tracking-tight"
+          className="font-display text-[1.02em] font-medium tracking-tight"
         >
           {inline(heading[2], `h${blocks.length}`)}
         </Tag>,
@@ -147,6 +148,24 @@ function MdBlock({ text }: { text: string }) {
   return <>{blocks}</>;
 }
 
+function CodeBlock({ code, lang }: { code: string; lang?: string }) {
+  const isHtml = lang === "html" || lang === "htm";
+  const [preview, setPreview] = useState(isHtml);
+  return (
+    <div className="overflow-hidden rounded-lg bg-ink-soft">
+      <div className="flex h-7 items-center justify-between border-b border-white/8 px-2.5 text-[10px] font-medium uppercase tracking-wide text-white/45">
+        <span>{lang || "code"}</span>
+        {isHtml ? <button type="button" onClick={() => setPreview(v => !v)} className="rounded px-1.5 py-0.5 text-[10px] text-white/60 hover:bg-white/8 hover:text-white">{preview ? "Code" : "Preview"}</button> : null}
+      </div>
+      {preview && isHtml ? (
+        <iframe title="HTML preview" sandbox="allow-scripts" srcDoc={code} className="h-[360px] w-full bg-white" />
+      ) : (
+        <pre className="overflow-x-auto px-3 py-2.5 font-mono text-[11px] leading-[1.45] text-primary-fg"><code>{code}</code></pre>
+      )}
+      {isHtml ? <div className="border-t border-white/8 px-2.5 py-1 text-[10px] text-white/35">HTML • Live Preview</div> : null}
+    </div>
+  );
+}
 export function Markdown({
   text,
   className,
@@ -156,15 +175,10 @@ export function Markdown({
 }) {
   const parts = splitFences(text);
   return (
-    <div className={cn("flex flex-col gap-3 text-[0.975rem]", className)}>
+    <div className={cn("flex flex-col gap-2 text-[0.9rem] leading-[1.55]", className)}>
       {parts.map((part, i) =>
         part.type === "code" ? (
-          <pre
-            key={i}
-            className="overflow-x-auto rounded-xl bg-ink-soft px-4 py-3 font-mono text-[0.8rem] leading-relaxed text-primary-fg"
-          >
-            <code>{part.value}</code>
-          </pre>
+          <CodeBlock key={i} code={part.value} lang={part.lang} />
         ) : (
           <MdBlock key={i} text={part.value} />
         ),
