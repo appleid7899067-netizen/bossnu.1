@@ -1,4 +1,4 @@
-import { Bot, GitBranch, ImageIcon, MessageSquare, Plus, Trash2 } from "lucide-react";
+import { Bot, GitBranch, ImageIcon, MessageSquare, Plus, Settings, Trash2 } from "lucide-react";
 import { LuminaWordmark } from "@/components/lumina-mark";
 import { Button } from "@/components/ui/button";
 import type { AppView, Conversation, SavedMap } from "@/lib/types";
@@ -22,6 +22,7 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
       <NavItem active={view === "maps"} icon={GitBranch} label="Mind maps" onClick={() => onView("maps")} />
       <NavItem active={view === "studio"} icon={ImageIcon} label="Studio" onClick={() => onView("studio")} />
       <NavItem active={view === "builder"} icon={Bot} label="AI Builder" onClick={() => onView("builder")} />
+      <NavItem active={view === "settings"} icon={Settings} label="Agent settings" onClick={() => onView("settings")} />
     </nav>
     <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-3 pb-4 no-scrollbar">
       {view === "maps" ? <ListBlock title="Saved maps" empty="Maps you build will live here." items={maps.map((m) => ({ id: m.id, label: m.data.topic, active: m.id === activeMapId, onOpen: () => onOpenMap(m.id) }))} />
