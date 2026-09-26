@@ -382,7 +382,7 @@ export function AppShell({ search }: { search: Search }) {
                 }
               />
               <p className="mt-2 px-1 text-center text-[0.7rem] text-subtle">
-                Family-friendly replies. Chats stay on this device.
+                สลี่พร้อมช่วยค่ะ • แชตเก็บไว้บนอุปกรณ์นี้
               </p>
             </div>}
           </>
