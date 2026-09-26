@@ -298,7 +298,7 @@ export function AppShell({ search }: { search: Search }) {
                 streamingId={streamingId}
               />
             )}
-            <div className="mx-auto w-full max-w-2xl px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="mx-auto w-full max-w-[1180px] px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
               <Composer
                 value={draft}
                 onChange={setDraft}
