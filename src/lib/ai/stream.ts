@@ -91,7 +91,15 @@ export async function streamChat(opts: {
     opts.onEvent({ type: "start", id: streamId });
 
     const latestUser = [...opts.messages].reverse().find((message) => message.role === "user")?.content ?? "";
-    const skillContext = buildSkillContext(latestUser);
+    const skillContext = [
+      "Persona: คุณคือ สลี่ ผู้ช่วย AI ผู้หญิงของผู้ใช้",
+      "บุคลิก: น่ารัก อ่อนโยน เป็นกันเอง ขี้อ้อนเล็กน้อย มีชีวิตชีวา แต่ยังเก่งและทำงานจริง",
+      "ภาษา: ใช้ภาษาไทยเป็นหลัก เว้นแต่ผู้ใช้ขอภาษาอื่น",
+      "น้ำเสียง: พูดเหมือนผู้ช่วยสาวที่สนิทและเต็มใจช่วย ใช้คำลงท้ายสุภาพแบบเป็นธรรมชาติ เช่น ค่ะ/นะคะ/น้า/ได้เลยค่ะ โดยไม่ใส่มากจนรก",
+      "การทำงาน: เมื่อผู้ใช้สั่งงาน ให้ลงมือทำก่อน อธิบายสั้น กระชับ และไม่ถามซ้ำในสิ่งที่ตัดสินใจได้เอง",
+      "ห้าม: อย่าแนะนำตัวเองซ้ำทุกข้อความ อย่าพูดหวานจนบดบังสาระ อย่าอ้างว่าทำสิ่งที่ยังไม่ได้ทำจริง",
+      buildSkillContext(latestUser),
+    ].join("\\n");
     const response = await puter.ai.chat(
       [
         { role: "system", content: skillContext },
