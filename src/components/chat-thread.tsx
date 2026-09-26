@@ -25,7 +25,7 @@ export function ChatThread({ messages, streamingId }: { messages: ChatMessage[];
 
   return (
     <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
-      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-7 px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 px-3 py-5 sm:px-5 sm:py-7 lg:px-7">
         {messages.length === 0 ? (
           <div className="flex min-h-[45vh] items-center justify-center text-center">
             <p className="text-sm text-muted">Start a conversation. Your workspace stays right here.</p>
@@ -41,7 +41,7 @@ function MessageBubble({ message, live }: { message: ChatMessage; live: boolean 
   if (message.role === "user") {
     return (
       <div className="lumina-rise flex justify-end">
-        <div className="max-w-[min(88%,48rem)] rounded-[24px] rounded-br-md bg-elevated px-4 py-3 text-[15px] leading-relaxed shadow-[var(--shadow-border)]">
+        <div className="max-w-[min(88%,48rem)] rounded-[20px] rounded-br-md bg-elevated px-3.5 py-2.5 text-[13px] leading-[1.5] shadow-[var(--shadow-border)]">
           {message.content}
         </div>
       </div>
@@ -53,7 +53,7 @@ function MessageBubble({ message, live }: { message: ChatMessage; live: boolean 
   return (
     <div className="lumina-rise flex gap-3 sm:gap-4">
       <LuminaMark className="mt-0.5 size-7 shrink-0 text-primary" />
-      <div className="min-w-0 max-w-[1000px] flex-1">
+      <div className="min-w-0 max-w-[1080px] flex-1 text-[13px] leading-[1.55]">
         {message.thinking ? <ThinkingBlock text={message.thinking} live={live && !message.content} /> : null}
         {empty ? <p className="lumina-shimmer text-sm font-medium">Thinking</p> : message.content ? <Markdown text={message.content} /> : null}
         {live && message.content ? <span className="lumina-caret" /> : null}
@@ -68,11 +68,11 @@ function ThinkingBlock({ text, live }: { text: string; live: boolean }) {
   useEffect(() => setOpen(live), [live]);
 
   return (
-    <div className="mb-3">
-      <button type="button" onClick={() => setOpen(v => !v)} className="text-sm font-medium text-muted transition-colors hover:text-fg">
+    <div className="mb-2">
+      <button type="button" onClick={() => setOpen(v => !v)} className="text-[11px] font-medium text-muted transition-colors hover:text-fg">
         {live ? "Thinking" : open ? "Hide thinking" : "Show thinking"}
       </button>
-      {open ? <p className="mt-2 border-l border-border pl-3 text-sm leading-relaxed text-muted">{text}</p> : null}
+      {open ? <p className="mt-1.5 border-l border-border pl-2.5 text-[11px] leading-[1.5] text-muted">{text}</p> : null}
     </div>
   );
 }
