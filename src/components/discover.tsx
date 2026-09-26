@@ -1,4 +1,4 @@
-import { GitBranch, ImageIcon, MessageSquare } from "lucide-react";
+import { Bot, GitBranch, ImageIcon, MessageSquare } from "lucide-react";
 import { greetingForHour } from "@/lib/utils";
 import type { AppView } from "@/lib/types";
 
@@ -64,7 +64,7 @@ export function Discover({
         ))}
       </div>
 
-      <div className="mt-8 grid w-full grid-cols-3 gap-2">
+      <div className="mt-8 grid w-full grid-cols-2 gap-2 sm:grid-cols-4">
         <ModeCard
           icon={MessageSquare}
           title="Chat"
@@ -76,6 +76,12 @@ export function Discover({
           title="Mind maps"
           copy="See a topic as a picture."
           onClick={() => onView("maps")}
+        />
+        <ModeCard
+          icon={Bot}
+          title="AI Builder"
+          copy="Build an app from a prompt."
+          onClick={() => onView("builder")}
         />
         <ModeCard
           icon={ImageIcon}
