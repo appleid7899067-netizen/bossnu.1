@@ -1,78 +1,128 @@
 const hasSpeech = typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 
-let enabled = true;
+export type VoiceSettings = {
+  enabled: boolean;
+  rate: number;
+  pitch: number;
+  volume: number;
+  voiceName: string;
+};
+
+const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
+  enabled: true,
+  rate: 0.96,
+  pitch: 1.18,
+  volume: 0.95,
+  voiceName: "",
+};
+
+let settings: VoiceSettings = DEFAULT_VOICE_SETTINGS;
 let pending = "";
 let speaking = false;
+
+function loadSettings() {
+  if (!hasSpeech) return;
+  try {
+    const raw = window.localStorage.getItem("bossnu-voice-settings");
+    if (raw) settings = { ...DEFAULT_VOICE_SETTINGS, ...JSON.parse(raw) };
+  } catch {
+    settings = DEFAULT_VOICE_SETTINGS;
+  }
+}
+
+loadSettings();
+
+function saveSettings() {
+  if (!hasSpeech) return;
+  try {
+    window.localStorage.setItem("bossnu-voice-settings", JSON.stringify(settings));
+  } catch {}
+}
 
 function pickThaiVoice() {
   if (!hasSpeech) return null;
   const voices = window.speechSynthesis.getVoices();
+  if (settings.voiceName) {
+    const selected = voices.find((v) => v.name === settings.voiceName);
+    if (selected) return selected;
+  }
   return voices.find((v) => /^th(-|_)/i.test(v.lang)) ?? voices.find((v) => /thai/i.test(v.name)) ?? null;
 }
 
 function speakNext() {
-  if (!hasSpeech || !enabled || speaking || !pending.trim()) return;
-  const match = pending.match(/^(.{40,220}?[.!?。！？\n])(?:\s+|$)/);
+  if (!hasSpeech || !settings.enabled || speaking || !pending.trim()) return;
+  const match = pending.match(/^(.{40,220}?[.!?。！？\\n])(?:\\s+|$)/);
   if (!match) return;
   const text = match[1].trim();
   pending = pending.slice(match[0].length);
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "th-TH";
-  utterance.rate = 1.02;
-  utterance.pitch = 1.08;
-  utterance.volume = 1;
+  utterance.rate = settings.rate;
+  utterance.pitch = settings.pitch;
+  utterance.volume = settings.volume;
   const voice = pickThaiVoice();
   if (voice) utterance.voice = voice;
   speaking = true;
-  utterance.onend = () => {
-    speaking = false;
-    speakNext();
-  };
-  utterance.onerror = () => {
-    speaking = false;
-    speakNext();
-  };
+  utterance.onend = () => { speaking = false; speakNext(); };
+  utterance.onerror = () => { speaking = false; speakNext(); };
   window.speechSynthesis.speak(utterance);
+}
+
+function createUtterance(text: string) {
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "th-TH";
+  utterance.rate = settings.rate;
+  utterance.pitch = settings.pitch;
+  utterance.volume = settings.volume;
+  const voice = pickThaiVoice();
+  if (voice) utterance.voice = voice;
+  return utterance;
 }
 
 export function isVoiceSupported() {
   return hasSpeech;
 }
 
-export function setVoiceEnabled(value: boolean) {
-  enabled = value;
-  if (!value && hasSpeech) {
+export function getVoiceSettings(): VoiceSettings {
+  return { ...settings };
+}
+
+export function getAvailableVoices(): { name: string; lang: string }[] {
+  if (!hasSpeech) return [];
+  return window.speechSynthesis.getVoices().map((voice) => ({ name: voice.name, lang: voice.lang }));
+}
+
+export function updateVoiceSettings(patch: Partial<VoiceSettings>) {
+  settings = { ...settings, ...patch };
+  saveSettings();
+  if (!settings.enabled && hasSpeech) {
     window.speechSynthesis.cancel();
     pending = "";
     speaking = false;
-  } else {
-    speakNext();
   }
 }
 
+export function setVoiceEnabled(value: boolean) {
+  updateVoiceSettings({ enabled: value });
+  if (value) speakNext();
+}
+
 export function isVoiceEnabled() {
-  return enabled;
+  return settings.enabled;
 }
 
 export function speakRealtime(text: string) {
-  if (!hasSpeech || !enabled) return;
+  if (!hasSpeech || !settings.enabled) return;
   pending += text;
-  // Speak sentence-sized chunks while the model is still streaming.
   speakNext();
 }
 
 export function finishVoice() {
-  if (!hasSpeech || !enabled) return;
+  if (!hasSpeech || !settings.enabled) return;
   const tail = pending.trim();
   pending = "";
   if (!tail) return;
-  const utterance = new SpeechSynthesisUtterance(tail);
-  utterance.lang = "th-TH";
-  utterance.rate = 1.02;
-  utterance.pitch = 1.08;
-  utterance.volume = 1;
-  const voice = pickThaiVoice();
-  if (voice) utterance.voice = voice;
+  const utterance = createUtterance(tail);
   speaking = true;
   utterance.onend = () => { speaking = false; };
   utterance.onerror = () => { speaking = false; };
