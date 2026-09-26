@@ -107,6 +107,9 @@ export async function streamChat(opts: {
 
     let activeBlock: number | null = null;
     let activeKind: "thinking" | "text" | "tool" | null = null;
+    let started = false;
+    let finished = false;
+    let finalStopReason = "end_turn";
 
     const openBlock = (index: number, kind: "thinking" | "text" | "tool") => {
       if (activeBlock === index && activeKind === kind) return;
@@ -126,7 +129,10 @@ export async function streamChat(opts: {
       }
 
       if (chunk.eventType === "message_start") {
-        opts.onEvent({ type: "start", id: chunk.id || streamId });
+        if (!started) {
+          started = true;
+          opts.onEvent({ type: "start", id: chunk.id || streamId });
+        }
         continue;
       }
 
@@ -159,7 +165,7 @@ export async function streamChat(opts: {
       }
 
       if (chunk.eventType === "message_delta") {
-        opts.onEvent({ type: "done", stopReason: chunk.stopReason });
+        finalStopReason = chunk.stopReason;
       }
 
       if (chunk.eventType === "message_stop") {
@@ -168,12 +174,19 @@ export async function streamChat(opts: {
           activeBlock = null;
           activeKind = null;
         }
-        opts.onEvent({ type: "done", stopReason: chunk.stopReason });
+        finalStopReason = chunk.stopReason;
+        if (!finished) {
+          finished = true;
+          opts.onEvent({ type: "done", stopReason: finalStopReason });
+        }
       }
     }
 
     if (activeBlock !== null) opts.onEvent({ type: "block_stop", index: activeBlock });
-    opts.onEvent({ type: "done", stopReason: "end_turn" });
+    if (!finished) {
+      finished = true;
+      opts.onEvent({ type: "done", stopReason: finalStopReason });
+    }
   } catch (err) {
     if (opts.signal?.aborted) return;
     const e = err as { message?: string };
