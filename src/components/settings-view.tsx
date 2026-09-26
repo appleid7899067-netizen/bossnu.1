@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Bot, Brain, FolderOpen, Play, Plus, Save, Sparkles, Trash2, UserRound, WandSparkles } from "lucide-react";
-import type { AgentProfile, AgentSkill, MemoryItem, PersonalitySettings } from "@/lib/types";
+import { Bot, Brain, FolderOpen, Play, Plus, Sparkles, Trash2, UserRound, WandSparkles } from "lucide-react";
+import type { PersonalitySettings } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,7 +15,6 @@ export function SettingsView() {
   const [saved, setSaved] = useState(false);
   const skills = store.agentSkills;
 
-  const activeAgent = store.agentProfiles[0];
   const enabledCount = useMemo(() => skills.filter(s => s.enabled).length, [skills]);
 
   const save = (patch: Partial<PersonalitySettings>) => {
