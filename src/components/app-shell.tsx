@@ -10,6 +10,7 @@ import { LuminaWordmark } from "@/components/lumina-mark";
 import { MindMapView } from "@/components/mind-map-view";
 import { Sidebar } from "@/components/sidebar";
 import { StudioView } from "@/components/studio-view";
+import { SettingsView } from "@/components/settings-view";
 import { Button } from "@/components/ui/button";
 import { generateMindMap, generateStudioImage } from "@/lib/ai/client";
 import { streamChat } from "@/lib/ai/stream";
@@ -316,7 +317,8 @@ export function AppShell({ search }: { search: Search }) {
           />
         ) : (
           <>
-            {showDiscover ? (
+            {view === "settings" ? <SettingsView /> : null}
+            {view === "settings" ? null : showDiscover ? (
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <Discover
                   onPrompt={(text) => void send(text)}
@@ -329,7 +331,7 @@ export function AppShell({ search }: { search: Search }) {
                 streamingId={streamingId}
               />
             )}
-            <div className="mx-auto w-full max-w-[1180px] px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
+            {view === "settings" ? null : <div className="mx-auto w-full max-w-[1180px] px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
               <Composer
                 value={draft}
                 onChange={setDraft}
@@ -367,7 +369,7 @@ export function AppShell({ search }: { search: Search }) {
               <p className="mt-2 px-1 text-center text-[0.7rem] text-subtle">
                 Family-friendly replies. Chats stay on this device.
               </p>
-            </div>
+            </div>}
           </>
         )}
       </main>
