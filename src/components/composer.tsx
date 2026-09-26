@@ -1,11 +1,11 @@
 import { useEffect, useRef, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { ArrowUp, Paperclip, Square } from "lucide-react";
+import { ArrowUp, Paperclip, Square, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function Composer({ value, onChange, onSubmit, onStop, placeholder, disabled, busy, extra }: {
   value: string; onChange: (next: string) => void; onSubmit: () => void; onStop?: () => void;
-  placeholder: string; disabled?: boolean; busy?: boolean; extra?: ReactNode;
+  placeholder: string; disabled?: boolean; busy?: boolean; extra?: ReactNode;\n  contextualActions?: string[]; onContextAction?: (action: string) => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { const el = ref.current; if (!el) return; el.style.height = "0px"; el.style.height = `${Math.min(el.scrollHeight, 180)}px`; }, [value]);
@@ -15,7 +15,7 @@ export function Composer({ value, onChange, onSubmit, onStop, placeholder, disab
     <div className={cn("rounded-[28px] bg-surface p-2.5 shadow-[var(--shadow-prompt)] transition-[box-shadow,transform] duration-200", "focus-within:shadow-[var(--shadow-prompt-focus)]")}>
       <textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown} placeholder={placeholder} rows={1} disabled={disabled} maxLength={12000}
         className="block min-h-12 w-full resize-none bg-transparent px-3 py-2.5 text-[15px] leading-relaxed text-fg placeholder:text-subtle outline-none disabled:opacity-60" />
-      <div className="flex items-center gap-1.5 px-1 pb-0.5 pt-1">
+      {contextualActions?.length ? (\n        <div className="flex items-center gap-1.5 overflow-x-auto px-1 pb-1 pt-0.5 no-scrollbar">\n          <Sparkles className="size-3.5 shrink-0 text-primary" aria-hidden="true" />\n          {contextualActions.slice(0, 4).map((action) => (\n            <button key={action} type="button" onClick={() => onContextAction?.(action)} disabled={busy}\n              className="shrink-0 rounded-full bg-clay px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-hover hover:text-fg disabled:opacity-50">\n              {action}\n            </button>\n          ))}\n        </div>\n      ) : null}\n      <div className="flex items-center gap-1.5 px-1 pb-0.5 pt-1">
         <button type="button" aria-label="Attach" className="grid size-10 place-items-center rounded-xl text-muted transition-colors hover:bg-hover hover:text-fg"><Paperclip className="size-4" /></button>
         <div className="min-w-0">{extra}</div>
         <div className="ml-auto">
