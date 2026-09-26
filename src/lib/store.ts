@@ -40,8 +40,8 @@ deleteChat:id=>set(s=>({conversations:s.conversations.filter(c=>c.id!==id),activ
 addMap:map=>set(s=>({maps:[map,...s.maps].slice(0,MAX_MAPS),activeMapId:map.id})),setActiveMap:id=>set({activeMapId:id}),deleteMap:id=>set(s=>({maps:s.maps.filter(m=>m.id!==id),activeMapId:s.activeMapId===id?null:s.activeMapId})),
 addImage:image=>set(s=>({images:[image,...s.images].slice(0,MAX_IMAGES)})),deleteImage:id=>set(s=>({images:s.images.filter(img=>img.id!==id)})),
 updatePersonality:patch=>set(s=>({personality:{...s.personality,...patch}})),toggleAgentSkill:id=>set(s=>({agentSkills:s.agentSkills.map(skill=>skill.id===id?{...skill,enabled:!skill.enabled}:skill)})),
-addAgentProfile:profile=>set(s=>({agentProfiles:[...s.agentProfiles,profile]})),deleteAgentProfile:id=>set(s=>({agentProfiles:s.agentProfiles.filter(a=>a.id!==id})),
-addMemory:content=>set(s=>({memory:[{id:uid("mem"),content,createdAt:Date.now()},...s.memory].slice(0,100)})),deleteMemory:id=>set(s=>({memory:s.memory.filter(m=>m.id!==id})),
+addAgentProfile:profile=>set(s=>({agentProfiles:[...s.agentProfiles,profile]})),deleteAgentProfile:id=>set(s=>({agentProfiles:s.agentProfiles.filter(a=>a.id!==id)})),
+addMemory:content=>set(s=>({memory:[{id:uid("mem"),content,createdAt:Date.now()},...s.memory].slice(0,100)})),deleteMemory:id=>set(s=>({memory:s.memory.filter(m=>m.id!==id)})),
 }),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({conversations:s.conversations,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory})}));
 
 export function getConversation(id:string|null){if(!id)return undefined;return useAppStore.getState().conversations.find(c=>c.id===id);}
