@@ -58,3 +58,38 @@ export async function generateStudioImage(input: { prompt: string; aspect: strin
     };
   }
 }
+
+
+const BUILDER_SCHEMA = `
+Return ONLY valid JSON:
+{"title":"string","description":"string","entry":"index.html","files":[{"path":"index.html","content":"complete HTML"},{"path":"styles.css","content":"CSS"},{"path":"script.js","content":"vanilla JS"}]}
+Build a self-contained browser app. Use semantic HTML, accessible controls, responsive CSS, polished visual hierarchy, and real client-side interactions. No external dependencies, no remote assets, no markdown fences.
+`;
+
+export async function generateAppBuilder(input: { request: string; project: import("@/lib/types").BuilderProject }) {
+  const request = input.request.trim().slice(0, 3000);
+  if (!request) return { ok: false as const, error: "Describe the app you want to build." };
+  try {
+    const puter = await ensurePuterSignedIn();
+    const existing = input.project.files.map((f) => "\n--- " + f.path + " ---\n" + f.content.slice(0, 14000)).join("");
+    const prompt = "You are an expert AI app builder. " + BUILDER_SCHEMA +
+      "\nCurrent project: " + input.project.title + "\nExisting files:" + existing +
+      "\nUser instruction: " + request +
+      "\nIf this is an iteration, preserve useful existing behavior and improve it. Return complete replacement files, not patches.";
+    const response = await puter.ai.chat(prompt, {
+      model: "gpt-5.6-luna",
+      temperature: 0.35,
+      max_tokens: 9000,
+      normalize: true,
+    });
+    const raw = String((response as { message?: { content?: unknown } }).message?.content ?? response);
+    const clean = raw.replace(/^\`\`\`json\s*/i, "").replace(/\s*\`\`\`$/i, "").trim();
+    const parsed = JSON.parse(clean) as import("@/lib/types").BuilderProject;
+    if (!parsed.title || !parsed.entry || !Array.isArray(parsed.files) || parsed.files.length < 1) throw new Error("Builder returned an invalid project.");
+    const files = parsed.files.filter((f) => f && typeof f.path === "string" && typeof f.content === "string").slice(0, 30);
+    if (!files.some((f) => f.path === parsed.entry)) throw new Error("Builder did not return the entry file.");
+    return { ok: true as const, project: { id: input.project.id, title: String(parsed.title).slice(0,100), description: String(parsed.description ?? "").slice(0,500), entry: parsed.entry, files, updatedAt: Date.now() } };
+  } catch (err) {
+    return { ok: false as const, error: err instanceof Error ? err.message : "The AI Builder could not finish." };
+  }
+}
