@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Lumina",
+      "hasCanvas": false,
+      "bodyTextLen": 681,
+      "bodyTextHash": "f79e186fc339b2a6af3cf59614ecdd65ad8a81a9d72cc397376e6693080ae018",
+      "bodyTextPrefix": "Lumina New chat Chat Mind maps Studio RECENT Your conversations ",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Lumina",
+      "hasCanvas": false,
+      "bodyTextLen": 596,
+      "bodyTextHash": "bcb2fdec0228c6771000bf883b411f922a79e33dd2e429369349957a0e1beb6f",
+      "bodyTextPrefix": "Good evening What shall we think through? Chat, map an idea, or ",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
