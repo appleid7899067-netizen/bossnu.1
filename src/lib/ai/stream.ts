@@ -1,4 +1,5 @@
 import type { ChatMode } from "@/lib/types";
+import { buildSkillContext } from "@/lib/skills";
 
 export type StreamEvent =
   | { type: "start"; id: string }
@@ -89,7 +90,13 @@ export async function streamChat(opts: {
     const streamId = crypto.randomUUID();
     opts.onEvent({ type: "start", id: streamId });
 
-    const response = await puter.ai.chat(opts.messages, {
+    const latestUser = [...opts.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    const skillContext = buildSkillContext(latestUser);
+    const response = await puter.ai.chat(
+      [
+        { role: "system", content: skillContext },
+        ...opts.messages,
+      ], {
       model: "gpt-5.6-luna",
       stream: true,
       temperature: opts.mode === "think" ? 0.6 : 0.7,
