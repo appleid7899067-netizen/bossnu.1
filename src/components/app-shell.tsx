@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Menu, X } from "lucide-react";
 import { Toaster, toast } from "sonner";
+import { AppBuilderView } from "@/components/app-builder-view";
 import { ChatThread } from "@/components/chat-thread";
 import { Composer } from "@/components/composer";
 import { Discover } from "@/components/discover";
@@ -14,7 +15,7 @@ import { generateMindMap, generateStudioImage } from "@/lib/ai/client";
 import { streamChat } from "@/lib/ai/stream";
 import type { Search } from "@/lib/search";
 import { useAppStore } from "@/lib/store";
-import type { ChatMode, MindMapData } from "@/lib/types";
+import type { BuilderProject, ChatMode, MindMapData } from "@/lib/types";
 import { cn, uid } from "@/lib/utils";
 
 export function AppShell({ search }: { search: Search }) {
@@ -31,6 +32,7 @@ export function AppShell({ search }: { search: Search }) {
   const [mapError, setMapError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [streamingId, setStreamingId] = useState<string | null>(null);
+  const [builderProject, setBuilderProject] = useState<BuilderProject | undefined>(undefined);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
