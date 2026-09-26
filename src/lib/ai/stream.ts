@@ -1,5 +1,116 @@
 import type { ChatMode } from "@/lib/types";
 import { buildSkillContext } from "@/lib/skills";
+import { useAppStore } from "@/lib/store";
+
+export type StreamEvent =
+  | { type: "start"; id: string }
+  | { type: "block_start"; index: number; blockType: "thinking" | "text" | "tool" }
+  | { type: "thinking"; text: string }
+  | { type: "text"; text: string }
+  | { type: "block_stop"; index: number }
+  | { type: "done"; stopReason: string }
+  | { type: "error"; error: string };
+
+async function getPuter() {
+  const mod = await import("@heyputer/puter.js");
+  return mod.default;
+}
+
+export async function ensurePuterSignedIn() {
+  const puter = await getPuter();
+  if (!puter.auth.isSignedIn()) {
+    await puter.auth.signIn();
+  }
+  return puter;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+/**
+ * Normalize Puter's streaming chunks into a Claude-like event lifecycle.
+ *
+ * The UI still receives simple "thinking"/"text" deltas, while the lifecycle
+ * events let the renderer know when a message/content block starts and stops.
+ */
+function readChunk(part: unknown) {
+  const p = asRecord(part);
+  const delta = asRecord(p.delta);
+  const content = asRecord(p.content_block ?? p.contentBlock);
+  const message = asRecord(p.message);
+
+  const type = String(p.type ?? "");
+  const deltaType = String(delta.type ?? "");
+  const blockType = String(content.type ?? p.block_type ?? p.blockType ?? "");
+
+  const text =
+    typeof p.text === "string" ? p.text :
+    typeof delta.text === "string" ? delta.text :
+    typeof content.text === "string" ? content.text :
+    typeof p.content === "string" ? p.content : "";
+
+  const reasoning =
+    typeof p.reasoning === "string" ? p.reasoning :
+    typeof p.reasoning_content === "string" ? p.reasoning_content :
+    typeof delta.thinking === "string" ? delta.thinking :
+    typeof delta.reasoning === "string" ? delta.reasoning : "";
+
+  const eventType =
+    type === "message_start" ? "message_start" :
+    type === "content_block_start" ? "content_block_start" :
+    type === "content_block_stop" ? "content_block_stop" :
+    type === "message_delta" ? "message_delta" :
+    type === "message_stop" ? "message_stop" :
+    type === "error" ? "error" : "";
+
+  return {
+    eventType,
+    deltaType,
+    blockType,
+    index: Number.isFinite(Number(p.index)) ? Number(p.index) : 0,
+    id: String(p.id ?? message.id ?? ""),
+    text,
+    reasoning,
+    stopReason: String(
+      p.stop_reason ?? asRecord(p.delta).stop_reason ?? message.stop_reason ?? "end_turn",
+    ),
+  };
+}
+
+export async function streamChat(opts: {
+  messages: { role: "user" | "assistant"; content: string }[];
+  mode: ChatMode;
+  signal?: AbortSignal;
+  onEvent: (event: StreamEvent) => void;
+}) {
+  try {
+    const puter = await ensurePuterSignedIn();
+    if (opts.signal?.aborted) return;
+
+    const streamId = crypto.randomUUID();
+    opts.onEvent({ type: "start", id: streamId });
+
+    const latestUser = [...opts.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    const settings = useAppStore.getState();
+    const activeSkills = settings.agentSkills.filter((skill) => skill.enabled).map((skill) => skill.name).join(", ");
+    const memories = settings.memory.slice(0, 12).map((item) => `- ${item.content}`).join("\n");
+    const agent = settings.agentProfiles[0];
+    const skillContext = [
+      `Persona: คุณคือ ${settings.personality.name} ผู้ช่วย AI ของผู้ใช้`,
+      `บุคลิก: ${settings.personality.tone}`,
+      `ภาษา: ${settings.personality.thaiFirst ? "ใช้ภาษาไทยเป็นหลัก เว้นแต่ผู้ใช้ขอภาษาอื่น" : "ใช้ภาษาตามคำขอของผู้ใช้"}`,
+      `การทำงาน: ${settings.personality.actFirst ? "ลงมือทำก่อน อธิบายสั้น และไม่ถามซ้ำในสิ่งที่ตัดสินใจได้เอง" : "อธิบายทางเลือกก่อนลงมือเมื่อจำเป็น"}`,
+      settings.personality.warm ? "น้ำเสียง: เป็นกันเอง อบอุ่น ใช้ค่ะ/นะคะ/น้าอย่างเป็นธรรมชาติ ไม่หวานจนบดบังสาระ" : "น้ำเสียง: กระชับและเป็นมืออาชีพ",
+      `ตัวแทนหลัก: ${agent?.name ?? settings.personality.name} (${agent?.role ?? "Primary Agent"})`,
+      agent?.instructions ?? "",
+      `สกิลที่เปิดใช้งาน: ${activeSkills || "ไม่มี"}`,
+      memories ? `ความจำที่บันทึกไว้:\n${memories}` : "ไม่มีความจำที่บันทึกไว้",
+      "ห้าม: อย่าอ้างว่าทำสิ่งที่ยังไม่ได้ทำจริง",
+      buildSkillContext(latestUser),
+    ].join("\n");atMode } from "@/lib/types";
+import { buildSkillContext } from "@/lib/skills";
+import { useAppStore } from "@/lib/store";
 
 export type StreamEvent =
   | { type: "start"; id: string }
