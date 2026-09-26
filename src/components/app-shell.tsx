@@ -191,6 +191,19 @@ export function AppShell({ search }: { search: Search }) {
   }
 
   const mode: ChatMode = activeChat?.mode ?? "instant";
+
+  function contextualActions(text: string): string[] {
+    const q = text.toLowerCase();
+    if (/สร้าง\s*(แอป|แอพ)|build\s*(an?\s*)?app|builder|เว็บ|website|หน้าเว็บ/.test(q)) return ["สร้างแอปทันที", "เพิ่มฟีเจอร์", "ปรับ UI/UX", "ทดสอบแอป"];
+    if (/error|bug|บั๊ก|พัง|ผิดพลาด|แก้/.test(q)) return ["วิเคราะห์ Error", "แก้แล้วตรวจสอบ", "ดู Log", "ทดสอบซ้ำ"];
+    if (/github|repo|รีโป|commit|branch|pull request|pr/.test(q)) return ["ตรวจ Repo", "แก้ไฟล์", "ค้นโค้ด", "ตรวจ GitHub"];
+    if (/ค้นหา|เว็บ|ล่าสุด|วันนี้|ข่าว|search|ข้อมูลสด/.test(q)) return ["ค้นข้อมูลล่าสุด", "ตรวจแหล่งข้อมูล", "เปรียบเทียบข้อมูล", "สรุปผล"];
+    if (/html|css|javascript|js|โค้ด|code|component|react|ฟังก์ชัน/.test(q)) return ["เขียนโค้ด", "ปรับ UI", "แก้โค้ด", "ตรวจโค้ด"];
+    if (/วิเคราะห์|ข้อมูล|ตาราง|csv|excel|กราฟ|สถิติ/.test(q)) return ["วิเคราะห์ข้อมูล", "สร้างตาราง", "สร้างกราฟ", "ตรวจข้อมูล"];
+    return text.trim() ? ["ขยายคำสั่ง", "ลงมือทำทันที", "ตรวจผลลัพธ์"] : [];
+  }
+
+  const quickActions = contextualActions(draft);
   const showDiscover = view === "chat" && !activeChat?.messages.length;
 
   return (
@@ -320,6 +333,12 @@ export function AppShell({ search }: { search: Search }) {
                   showDiscover ? "Ask Lumina anything…" : "Continue the thought…"
                 }
                 busy={busyChat}
+                contextualActions={quickActions}
+                onContextAction={(action) => {
+                  const base = draft.trim();
+                  const instruction = action === "ลงมือทำทันที" ? base : [base, action].filter(Boolean).join(" — ");
+                  if (instruction.trim()) void send(instruction, activeChat?.id);
+                }}
                 extra={
                   <ModeToggle
                     mode={mode}
