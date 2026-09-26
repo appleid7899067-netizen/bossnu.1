@@ -13,6 +13,7 @@ import { StudioView } from "@/components/studio-view";
 import { Button } from "@/components/ui/button";
 import { generateMindMap, generateStudioImage } from "@/lib/ai/client";
 import { streamChat } from "@/lib/ai/stream";
+import { finishVoice, setVoiceEnabled, speakRealtime, stopVoice } from "@/lib/ai/voice";
 import type { Search } from "@/lib/search";
 import { useAppStore } from "@/lib/store";
 import type { BuilderProject, ChatMode, MindMapData } from "@/lib/types";
@@ -33,6 +34,7 @@ export function AppShell({ search }: { search: Search }) {
   const [imageError, setImageError] = useState<string | null>(null);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [streamStatus, setStreamStatus] = useState<string>("");
+  const [voiceEnabled, setVoiceEnabledState] = useState(true);
   const [builderProject, setBuilderProject] = useState<BuilderProject | undefined>(undefined);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -79,6 +81,7 @@ export function AppShell({ search }: { search: Search }) {
     setBusyChat(true);
     setStreamingId(assistantId);
     setStreamStatus("กำลังเชื่อมต่อ AI…");
+    stopVoice();
     go({ view: "chat", c: id });
 
     const history = (
@@ -109,8 +112,10 @@ export function AppShell({ search }: { search: Search }) {
           } else if (ev.type === "text") {
             setStreamStatus("กำลังตอบ…");
             reply += ev.text;
+            speakRealtime(ev.text);
             store.patchAssistant(id, assistantId, { content: reply });
           } else if (ev.type === "done") {
+            finishVoice();
             setStreamStatus("");
           } else if (ev.type === "error") {
             setStreamStatus("เกิดข้อผิดพลาด");
@@ -138,6 +143,7 @@ export function AppShell({ search }: { search: Search }) {
 
   function stopChat() {
     abortRef.current?.abort();
+    stopVoice();
     setBusyChat(false);
     setStreamingId(null);
   }
@@ -334,6 +340,12 @@ export function AppShell({ search }: { search: Search }) {
                 }
                 busy={busyChat}
                 contextualActions={quickActions}
+            voiceEnabled={voiceEnabled}
+            onToggleVoice={() => {
+              const next = !voiceEnabled;
+              setVoiceEnabledState(next);
+              setVoiceEnabled(next);
+            }}
                 onContextAction={(action) => {
                   const base = draft.trim();
                   const instruction = action === "ลงมือทำทันที" ? base : [base, action].filter(Boolean).join(" — ");
