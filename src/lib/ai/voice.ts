@@ -10,8 +10,8 @@ export type VoiceSettings = {
 
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   enabled: true,
-  rate: 0.96,
-  pitch: 1.18,
+  rate: 0.9,
+  pitch: 1.08,
   volume: 0.95,
   voiceName: "",
 };
@@ -49,11 +49,11 @@ function pickThaiVoice() {
   return voices.find((v) => /^th(-|_)/i.test(v.lang)) ?? voices.find((v) => /thai/i.test(v.name)) ?? null;
 }
 
-function speakNext() {
+function cleanSpeechText(value: string) {\n  return value.replace(/```[\\s\\S]*?```/g, " ").replace(/`([^`]+)`/g, "$1").replace(/[#*_>]/g, "").replace(/https?:\\/\\/\\S+/g, "").replace(/\\s+/g, " ").trim();\n}\n\nfunction speakNext() {
   if (!hasSpeech || !settings.enabled || speaking || !pending.trim()) return;
   const match = pending.match(/^(.{40,220}?[.!?。！？\\n])(?:\\s+|$)/);
   if (!match) return;
-  const text = match[1].trim();
+  const text = cleanSpeechText(match[1]);
   pending = pending.slice(match[0].length);
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "th-TH";
@@ -65,7 +65,7 @@ function speakNext() {
   speaking = true;
   utterance.onend = () => { speaking = false; speakNext(); };
   utterance.onerror = () => { speaking = false; speakNext(); };
-  window.speechSynthesis.speak(utterance);
+  window.speechSynthesis.resume();\n  window.speechSynthesis.speak(utterance);
 }
 
 function createUtterance(text: string) {
