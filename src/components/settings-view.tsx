@@ -5,8 +5,6 @@ import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const demoHtml = `<!doctype html><html><body><main><h1>🧪 Sandbox Demo</h1><button id="go">Test JavaScript</button><pre id="out">Ready</pre></main><script>document.getElementById('go').onclick=()=>document.getElementById('out').textContent='JavaScript OK • '+new Date().toLocaleTimeString('th-TH')</script></body></html>`;
-
 const SANDBOX_LANGUAGES = [
   { id: "python", label: "Python", file: "main.py" },
   { id: "javascript", label: "JavaScript", file: "main.js" },
@@ -17,14 +15,21 @@ const SANDBOX_LANGUAGES = [
   { id: "json", label: "JSON", file: "data.json" },
 ] as const;
 
-const SANDBOX_DEFAULTS: Record<string,string> = {
+const SANDBOX_DEFAULTS: Record<string, string> = {
   python: 'print("Hello from Python")',
   javascript: 'console.log("Hello from JavaScript")',
-  cpp: '#include <iostream>\\nint main(){ std::cout << "Hello from C++\\n"; }',
+  cpp: '#include <iostream>\nint main(){ std::cout << "Hello from C++\\n"; }',
   java: 'public class Main { public static void main(String[] args) { System.out.println("Hello from Java"); } }',
   bash: 'echo "Hello from Bash"',
-  html: '<!doctype html>\n<html lang="th">\n<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui;padding:24px}button{padding:10px 14px;border:0;border-radius:10px;background:#111;color:#fff}</style></head>\n<body><h1>HTML Preview OK</h1><button onclick="document.querySelector("#out").textContent = "ทำงานแล้ว ✓"">ทดสอบ</button><p id="out">พร้อม</p></body>\n</html>',
-  json: '{\\n  "hello": "world",\\n  "ok": true\\n}',
+  html: `<!doctype html>
+<html lang="th">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font-family:system-ui;padding:24px}button{padding:10px 14px;border:0;border-radius:10px;background:#111;color:#fff}</style>
+</head>
+<body><h1>HTML Preview OK</h1><button id="go">ทดสอบ</button><p id="out">พร้อม</p>
+<script>document.getElementById("go").onclick=()=>document.getElementById("out").textContent="ทำงานแล้ว ✓"</script>
+</body></html>`,
+  json: '{\n  "hello": "world",\n  "ok": true\n}',
 };
 
 export function SettingsView() {
@@ -62,14 +67,33 @@ export function SettingsView() {
         setSandboxOutput(JSON.stringify(value, null, 2) + "\n\n✓ JSON valid");
         return;
       }
-      const response = await fetch("https://runlet.codealong.live/execute", {
+
+      const runnerUrl = String(import.meta.env.VITE_SANDBOX_RUNNER_URL || "").replace(/\/$/, "");
+      if (sandboxLanguage === "bash" && !runnerUrl) {
+        throw new Error("ยังไม่ได้ตั้ง VITE_SANDBOX_RUNNER_URL สำหรับ Bash isolated runner");
+      }
+
+      const endpoint = sandboxLanguage === "bash"
+        ? runnerUrl + "/execute"
+        : "https://runlet.codealong.live/execute";
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ language: sandboxLanguage, code: sandboxCode, stdin: sandboxInput }),
+        body: JSON.stringify({
+          language: sandboxLanguage,
+          code: sandboxCode,
+          stdin: sandboxInput,
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.detail || data?.message || "Sandbox request failed");
-      setSandboxOutput([data.stdout || "", data.stderr ? "[stderr]\n" + data.stderr : "", data.status ? "\nstatus: " + data.status : ""].filter(Boolean).join("\n"));
+      setSandboxOutput([
+        data.stdout || "",
+        data.stderr ? "[stderr]\n" + data.stderr : "",
+        data.status ? "\nstatus: " + data.status : "",
+        data.durationMs ? "duration: " + data.durationMs + "ms" : "",
+      ].filter(Boolean).join("\n"));
     } catch (error) {
       setSandboxOutput(error instanceof Error ? "✕ " + error.message : "✕ Sandbox error");
     } finally {
@@ -127,9 +151,16 @@ export function SettingsView() {
           </div>
         </div>
         {sandboxLanguage === "html" && sandboxPreview ? <div className="mt-4 overflow-hidden rounded-2xl bg-clay"><div className="border-b border-border px-3 py-2 text-xs font-medium">Live Preview</div><iframe title="HTML Live Preview" sandbox="allow-scripts" srcDoc={sandboxCode} className="h-[420px] w-full bg-white" /></div> : null}
-        <p className="mt-3 text-xs text-subtle">HTML แสดงผลด้วย Live Preview ใน sandbox ของ iframe; Python / JavaScript / C++ / Java ใช้ isolated runner; JSON ตรวจ syntax ในเครื่อง. Bash ยังล็อกไว้จนกว่าจะมี isolated shell runner เพื่อไม่ให้คำสั่งแตะเซิร์ฟเวอร์หลัก</p>
+        <p className="mt-3 text-xs text-subtle">HTML = Live Preview แบบ sandboxed iframe • Bash = isolated runner ผ่าน VITE_SANDBOX_RUNNER_URL • ภาษาอื่นใช้ runner เดิม • JSON ตรวจ syntax ในเครื่อง</p>
       </Panel> : null}
     </div>
   </section>;
 }
 
+function Panel({ title, icon: Icon, children }: { title: string; icon: typeof Sparkles; children: React.ReactNode }) {
+  return <div className="rounded-2xl bg-elevated p-4"><div className="mb-4 flex items-center gap-2"><Icon className="size-4 text-muted"/><h2 className="text-sm font-semibold">{title}</h2></div>{children}</div>;
+}
+
+function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
+  return <button type="button" onClick={() => onChange(!value)} className="flex w-full items-center justify-between border-b border-border py-3 text-left text-sm last:border-b-0"><span>{label}</span><span className={cn("rounded-full px-3 py-1 text-xs", value ? "bg-fg text-bg" : "bg-clay text-muted")}>{value ? "เปิด" : "ปิด"}</span></button>;
+}
