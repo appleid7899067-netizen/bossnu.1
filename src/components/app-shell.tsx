@@ -36,6 +36,7 @@ export function AppShell({ search }: { search: Search }) {
   const [imageError, setImageError] = useState<string | null>(null);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [streamStatus, setStreamStatus] = useState<string>("");
+  const [workSteps, setWorkSteps] = useState<string[]>([]);
   const [voiceEnabled, setVoiceEnabledState] = useState(true);
   const [builderProject, setBuilderProject] = useState<BuilderProject | undefined>(undefined);
   const abortRef = useRef<AbortController | null>(null);
@@ -82,7 +83,8 @@ export function AppShell({ search }: { search: Search }) {
     setDraft("");
     setBusyChat(true);
     setStreamingId(assistantId);
-    setStreamStatus("กำลังเชื่อมต่อ AI…");
+    setStreamStatus("กำลังวิเคราะห์คำขอ…");
+    setWorkSteps(["วิเคราะห์คำขอ"]);
     stopVoice();
     go({ view: "chat", c: id });
 
@@ -105,12 +107,16 @@ export function AppShell({ search }: { search: Search }) {
         signal: ac.signal,
         onEvent: (ev) => {
           if (ev.type === "start") {
-            setStreamStatus("กำลังเริ่มสตรีม…");
+            setStreamStatus("กำลังทำความเข้าใจคำขอ…");
+            setWorkSteps((steps) => steps.includes("ทำความเข้าใจคำขอ") ? steps : [...steps, "ทำความเข้าใจคำขอ"]);
           } else if (ev.type === "block_start") {
-            setStreamStatus(ev.blockType === "tool" ? "กำลังทำงานกับเครื่องมือ…" : ev.blockType === "thinking" ? "กำลังคิด…" : "กำลังพิมพ์…");
+            const label = ev.blockType === "tool" ? "กำลังทำงานกับเครื่องมือ…" : ev.blockType === "thinking" ? "กำลังวางแผนคำตอบ…" : "กำลังสร้างคำตอบ…";
+            const step = ev.blockType === "tool" ? "เลือกและทำงานกับเครื่องมือ" : ev.blockType === "thinking" ? "วางแผนคำตอบ" : "สร้างคำตอบ";
+            setStreamStatus(label);
+            setWorkSteps((steps) => steps.includes(step) ? steps : [...steps, step]);
           } else if (ev.type === "thinking") {
             thinking += ev.text;
-            store.patchAssistant(id, assistantId, { thinking });
+            // เก็บ reasoning ไว้ในข้อความ แต่ UI แสดงเฉพาะสถานะงานแบบสรุป
           } else if (ev.type === "text") {
             setStreamStatus("กำลังตอบ…");
             reply += ev.text;
@@ -118,7 +124,9 @@ export function AppShell({ search }: { search: Search }) {
             store.patchAssistant(id, assistantId, { content: reply });
           } else if (ev.type === "done") {
             finishVoice();
-            setStreamStatus("");
+            setWorkSteps((steps) => steps.includes("สร้างคำตอบ") ? steps : [...steps, "สร้างคำตอบ"]);
+            setStreamStatus("ตอบเสร็จแล้ว ✓");
+            window.setTimeout(() => setStreamStatus(""), 900);
           } else if (ev.type === "error") {
             setStreamStatus("เกิดข้อผิดพลาด");
             toast.error(ev.error);
@@ -344,6 +352,8 @@ export function AppShell({ search }: { search: Search }) {
               <ChatThread
                 messages={activeChat?.messages ?? []}
                 streamingId={streamingId}
+                workStatus={streamStatus}
+                workSteps={workSteps}
               />
             )}
             {view === "settings" ? null : <div className="mx-auto w-full max-w-[1180px] px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
@@ -352,9 +362,7 @@ export function AppShell({ search }: { search: Search }) {
                 onChange={setDraft}
                 onSubmit={() => void send(draft, activeChat?.id)}
                 onStop={stopChat}
-                placeholder={
-                  showDiscover ? "Ask Lumina anything…" : "Continue the thought…"
-                }
+                placeholder={showDiscover ? "ถามสลี่ได้เลยค่ะ…" : "พิมพ์สิ่งที่อยากให้สลี่ทำ…"}
                 busy={busyChat}
                 contextualActions={quickActions}
             voiceEnabled={voiceEnabled}
