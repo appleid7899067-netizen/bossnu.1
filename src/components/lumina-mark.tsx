@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils";
 
-export function LuminaMark({ className }: { className?: string }) {
+export function Bossnu.SileloMark({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 32 32"
       className={cn("shrink-0", className)}
-      aria-hidden="true"
+      aria-label="Bossnu.Silelo"
     >
       <rect width="32" height="32" rx="10" fill="currentColor" />
       <path
