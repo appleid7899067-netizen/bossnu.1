@@ -5,17 +5,29 @@ export type StreamEvent =
   | { type: "text"; text: string }
   | { type: "error"; error: string };
 
-function deltaText(delta: Record<string, unknown> | undefined) {
-  if (!delta) return { thinking: "", text: "" };
-  const thinking = [
-    delta.reasoning_content,
-    delta.reasoning,
-    (delta.reasoning as { content?: unknown } | undefined)?.content,
-  ]
-    .map((v) => (typeof v === "string" ? v : ""))
-    .join("");
-  const text = typeof delta.content === "string" ? delta.content : "";
-  return { thinking, text };
+async function getPuter() {
+  const mod = await import("@heyputer/puter.js");
+  return mod.default;
+}
+
+export async function ensurePuterSignedIn() {
+  const puter = await getPuter();
+  if (!puter.auth.isSignedIn()) {
+    await puter.auth.signIn();
+  }
+  return puter;
+}
+
+function chunkText(part: unknown) {
+  const p = part as Record<string, unknown>;
+  const text = typeof p.text === "string" ? p.text : "";
+  const reasoning =
+    typeof p.reasoning === "string"
+      ? p.reasoning
+      : typeof p.reasoning_content === "string"
+        ? p.reasoning_content
+        : "";
+  return { text, reasoning };
 }
 
 export async function streamChat(opts: {
@@ -24,60 +36,30 @@ export async function streamChat(opts: {
   signal?: AbortSignal;
   onEvent: (event: StreamEvent) => void;
 }) {
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages: opts.messages, mode: opts.mode }),
-    signal: opts.signal,
-  });
+  try {
+    const puter = await ensurePuterSignedIn();
+    if (opts.signal?.aborted) return;
 
-  if (!res.ok) {
-    let error = "Lumina could not reply just now.";
-    try {
-      const body = (await res.json()) as { error?: string };
-      if (body.error) error = body.error;
-    } catch {
-      /* keep default */
+    const response = await puter.ai.chat(opts.messages, {
+      model: "gpt-5.6-luna",
+      stream: true,
+      temperature: opts.mode === "think" ? 0.6 : 0.7,
+      max_tokens: opts.mode === "think" ? 2200 : 1400,
+      reasoning_effort: opts.mode === "think" ? "medium" : "low",
+      normalize: true,
+    });
+
+    for await (const part of response as AsyncIterable<unknown>) {
+      if (opts.signal?.aborted) return;
+      const { text, reasoning } = chunkText(part);
+      if (reasoning) opts.onEvent({ type: "thinking", text: reasoning });
+      if (text) opts.onEvent({ type: "text", text });
     }
-    opts.onEvent({ type: "error", error });
-    return;
-  }
-
-  if (!res.body) {
-    opts.onEvent({ type: "error", error: "Empty reply from Lumina." });
-    return;
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) continue;
-      const payload = trimmed.slice(5).trim();
-      if (!payload || payload === "[DONE]") continue;
-      try {
-        const json = JSON.parse(payload) as {
-          choices?: { delta?: Record<string, unknown> }[];
-          error?: { message?: string };
-        };
-        if (json.error?.message) {
-          opts.onEvent({ type: "error", error: json.error.message });
-          continue;
-        }
-        const { thinking, text } = deltaText(json.choices?.[0]?.delta);
-        if (thinking) opts.onEvent({ type: "thinking", text: thinking });
-        if (text) opts.onEvent({ type: "text", text });
-      } catch {
-        /* ignore malformed chunks */
-      }
-    }
+  } catch (err) {
+    const e = err as { message?: string };
+    opts.onEvent({
+      type: "error",
+      error: e?.message || "Puter could not reply just now.",
+    });
   }
 }

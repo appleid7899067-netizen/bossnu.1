@@ -10,7 +10,7 @@ import { MindMapView } from "@/components/mind-map-view";
 import { Sidebar } from "@/components/sidebar";
 import { StudioView } from "@/components/studio-view";
 import { Button } from "@/components/ui/button";
-import { generateMindMap, generateStudioImage } from "@/lib/ai/server";
+import { generateMindMap, generateStudioImage } from "@/lib/ai/client";
 import { streamChat } from "@/lib/ai/stream";
 import type { Search } from "@/lib/search";
 import { useAppStore } from "@/lib/store";
