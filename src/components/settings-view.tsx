@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bot, Brain, FolderOpen, Play, Plus, Sparkles, Trash2, UserRound, WandSparkles } from "lucide-react";
 import type { PersonalitySettings } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getAvailableVoices, getVoiceSettings, isVoiceSupported, updateVoiceSettings, type VoiceSettings } from "@/lib/ai/voice";
 
 const SANDBOX_LANGUAGES = [
   { id: "python", label: "Python", file: "main.py" },
@@ -34,7 +35,9 @@ const SANDBOX_DEFAULTS: Record<string, string> = {
 
 export function SettingsView() {
   const store = useAppStore();
-  const [tab, setTab] = useState<"personality"|"skills"|"agents"|"memory"|"profiles"|"sandbox">("personality");
+  const [tab, setTab] = useState<"personality"|"skills"|"agents"|"memory"|"profiles"|"sandbox"|"voice">("personality");
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => getVoiceSettings());
+  const [voiceList, setVoiceList] = useState<{ name: string; lang: string }[]>([]);
   const [newMemory, setNewMemory] = useState("");
   const [newAgent, setNewAgent] = useState("");
   const [saved, setSaved] = useState(false);
@@ -46,6 +49,20 @@ export function SettingsView() {
   const [sandboxPreview, setSandboxPreview] = useState(false);
   const skills = store.agentSkills;
   const enabledCount = useMemo(() => skills.filter(s => s.enabled).length, [skills]);
+
+  useEffect(() => {
+    if (!isVoiceSupported()) return;
+    const refresh = () => setVoiceList(getAvailableVoices());
+    refresh();
+    window.speechSynthesis.addEventListener("voiceschanged", refresh);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", refresh);
+  }, []);
+
+  const changeVoice = (patch: Partial<VoiceSettings>) => {
+    const next = { ...voiceSettings, ...patch };
+    setVoiceSettings(next);
+    updateVoiceSettings(patch);
+  };
 
   const save = (patch: Partial<PersonalitySettings>) => {
     store.updatePersonality(patch);
@@ -116,7 +133,7 @@ export function SettingsView() {
       </div>
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3">
         {[
-          ["personality","บุคลิค",Sparkles],["skills","สกิล",WandSparkles],["agents","ตัวแทน",Bot],["memory","ความจำ",Brain],["profiles","แฟ้มโปรไฟล์",FolderOpen],["sandbox","Sandbox",Play],
+          ["personality","บุคลิค",Sparkles],["skills","สกิล",WandSparkles],["agents","ตัวแทน",Bot],["memory","ความจำ",Brain],["profiles","แฟ้มโปรไฟล์",FolderOpen],["voice","เสียง",Sparkles],["sandbox","Sandbox",Play],
         ].map(([id,label,Icon]) => <button key={id as string} type="button" onClick={() => setTab(id as typeof tab)} className={cn("flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-sm",tab===id?"bg-elevated text-fg":"text-muted hover:bg-hover hover:text-fg")}><Icon className="size-4"/>{label as string}</button>)}
       </div>
 
@@ -124,6 +141,8 @@ export function SettingsView() {
         <Panel title="บุคลิคหลัก" icon={Sparkles}><label className="block text-sm text-muted">ชื่อผู้ช่วย<input value={store.personality.name} onChange={e=>save({name:e.target.value})} className="mt-1 w-full rounded-xl bg-clay px-3 py-2.5 outline-none"/></label><label className="mt-3 block text-sm text-muted">โทนเสียง<textarea value={store.personality.tone} onChange={e=>save({tone:e.target.value})} rows={4} className="mt-1 w-full resize-none rounded-xl bg-clay px-3 py-2.5 outline-none"/></label></Panel>
         <Panel title="พฤติกรรม" icon={UserRound}><Toggle label="ลงมือทำก่อนอธิบาย" value={store.personality.actFirst} onChange={v=>save({actFirst:v})}/><Toggle label="พูดภาษาไทยเป็นหลัก" value={store.personality.thaiFirst} onChange={v=>save({thaiFirst:v})}/><Toggle label="ตอบน่ารักแบบสลี่" value={store.personality.warm} onChange={v=>save({warm:v})}/></Panel>
       </div> : null}
+
+      {tab==="voice" ? <VoicePanel supported={isVoiceSupported()} settings={voiceSettings} voices={voiceList} onChange={changeVoice} /> : null}
 
       {tab==="skills" ? <Panel title={`สกิลที่ใช้งาน • ${enabledCount}/${skills.length}`} icon={WandSparkles}><div className="grid gap-2 md:grid-cols-2">{skills.map(skill=><div key={skill.id} className="flex items-center justify-between rounded-xl bg-clay p-3"><div><p className="text-sm font-medium">{skill.name}</p><p className="text-xs text-muted">{skill.description}</p></div><button type="button" onClick={()=>store.toggleAgentSkill(skill.id)} className={cn("rounded-full px-3 py-1 text-xs",skill.enabled?"bg-fg text-bg":"bg-elevated text-muted")}>{skill.enabled?"เปิด":"ปิด"}</button></div>)}</div></Panel> : null}
 
@@ -155,6 +174,36 @@ export function SettingsView() {
       </Panel> : null}
     </div>
   </section>;
+}
+
+function VoicePanel({ supported, settings, voices, onChange }: { supported: boolean; settings: VoiceSettings; voices: { name: string; lang: string }[]; onChange: (patch: Partial<VoiceSettings>) => void }) {
+  const thaiVoices = voices.filter((voice) => /^th(-|_)/i.test(voice.lang) || /thai/i.test(voice.name));
+  const options = thaiVoices.length ? thaiVoices : voices;
+  const testVoice = () => {
+    if (!supported) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance("สวัสดีค่ะ นี่คือเสียงของสลี่ พร้อมทำงานให้แล้วนะคะ");
+    utterance.lang = "th-TH";
+    utterance.rate = settings.rate;
+    utterance.pitch = settings.pitch;
+    utterance.volume = settings.volume;
+    const voice = voices.find((item) => item.name === settings.voiceName) ?? thaiVoices[0];
+    if (voice) utterance.voice = window.speechSynthesis.getVoices().find((item) => item.name === voice.name) ?? null;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  return <Panel title="ตั้งค่าเสียงสลี่" icon={Sparkles}>
+    <div className="space-y-4">
+      {!supported ? <div className="rounded-xl bg-clay p-3 text-sm text-muted">เบราว์เซอร์นี้ยังไม่รองรับเสียงพูดแบบ Speech Synthesis</div> : null}
+      <Toggle label="เปิดเสียงตอบกลับอัตโนมัติ" value={settings.enabled} onChange={(value) => onChange({ enabled: value })} />
+      <label className="block text-sm"><div className="mb-2 flex justify-between"><span>ความเร็ว</span><span className="text-xs text-muted">{settings.rate.toFixed(2)}×</span></div><input type="range" min="0.7" max="1.3" step="0.01" value={settings.rate} onChange={(e) => onChange({ rate: Number(e.target.value) })} className="w-full"/></label>
+      <label className="block text-sm"><div className="mb-2 flex justify-between"><span>โทนเสียง</span><span className="text-xs text-muted">{settings.pitch.toFixed(2)}</span></div><input type="range" min="0.7" max="1.5" step="0.01" value={settings.pitch} onChange={(e) => onChange({ pitch: Number(e.target.value) })} className="w-full"/></label>
+      <label className="block text-sm"><div className="mb-2 flex justify-between"><span>ระดับเสียง</span><span className="text-xs text-muted">{Math.round(settings.volume * 100)}%</span></div><input type="range" min="0.2" max="1" step="0.01" value={settings.volume} onChange={(e) => onChange({ volume: Number(e.target.value) })} className="w-full"/></label>
+      <label className="block text-sm text-muted">เสียงภาษาไทย<select value={settings.voiceName} onChange={(e) => onChange({ voiceName: e.target.value })} className="mt-1 w-full rounded-xl bg-clay px-3 py-2.5 text-fg outline-none"><option value="">เลือกอัตโนมัติ</option>{options.map((voice) => <option key={voice.name + voice.lang} value={voice.name}>{voice.name} · {voice.lang}</option>)}</select></label>
+      <button type="button" onClick={testVoice} disabled={!supported} className="w-full rounded-xl bg-fg px-4 py-2.5 text-sm font-medium text-bg disabled:opacity-40">🔊 ทดลองเสียงสลี่</button>
+      <p className="text-xs leading-relaxed text-subtle">ค่าจะบันทึกในเครื่องทันที และมีผลกับเสียงระหว่างการตอบแบบสตรีมด้วย</p>
+    </div>
+  </Panel>;
 }
 
 function Panel({ title, icon: Icon, children }: { title: string; icon: typeof Sparkles; children: React.ReactNode }) {
