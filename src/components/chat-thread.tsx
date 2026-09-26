@@ -9,8 +9,7 @@ export function ChatThread({ messages, streamingId }: { messages: ChatMessage[];
   const end = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
-  useEffect(() => { if (autoScroll) end.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [messages, streamingId, autoScroll]);
-  function onScroll() { const el=scroller.current; if (!el) return; setAutoScroll(el.scrollHeight-el.scrollTop-el.clientHeight < 120); }
+  useEffect(() => {\n    if (!autoScroll) return;\n    const el = scroller.current;\n    if (!el) return;\n    // Streaming updates happen many times per second. Instant bottom-locking\n    // prevents scrollIntoView({behavior:"smooth"}) from fighting the user and\n    // making the whole viewport appear to jump up/down.\n    el.scrollTop = el.scrollHeight;\n  }, [messages, streamingId, autoScroll]);\n  function onScroll() {\n    const el = scroller.current;\n    if (!el) return;\n    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;\n    setAutoScroll(distance < 80);\n  }
   return <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
     <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-7 px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
       {messages.length === 0 ? <div className="flex min-h-[45vh] items-center justify-center text-center"><p className="text-sm text-muted">Start a conversation. Your workspace stays right here.</p></div> : null}
