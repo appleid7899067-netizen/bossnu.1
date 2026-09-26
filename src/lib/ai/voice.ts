@@ -49,7 +49,17 @@ function pickThaiVoice() {
   return voices.find((v) => /^th(-|_)/i.test(v.lang)) ?? voices.find((v) => /thai/i.test(v.name)) ?? null;
 }
 
-function cleanSpeechText(value: string) {\n  return value.replace(/```[\\s\\S]*?```/g, " ").replace(/`([^`]+)`/g, "$1").replace(/[#*_>]/g, "").replace(/https?:\\/\\/\\S+/g, "").replace(/\\s+/g, " ").trim();\n}\n\nfunction speakNext() {
+function cleanSpeechText(value: string) {
+  return value
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/[#*_>]/g, "")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function speakNext() {
   if (!hasSpeech || !settings.enabled || speaking || !pending.trim()) return;
   const match = pending.match(/^(.{40,220}?[.!?。！？\\n])(?:\\s+|$)/);
   if (!match) return;
