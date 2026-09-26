@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-export function Bossnu.SileloMark({ className }: { className?: string }) {
+export function BossnuSileloMark({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 32 32"
@@ -23,12 +23,14 @@ export function Bossnu.SileloMark({ className }: { className?: string }) {
 export function LuminaWordmark({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-2.5 text-fg">
-      <LuminaMark className="size-8 text-primary" />
+      <BossnuSileloMark className="size-8 text-primary" />
       {!compact ? (
         <span className="font-display text-xl font-medium tracking-tight">
-          Lumina
+          Bossnu.Silelo
         </span>
       ) : null}
     </div>
   );
 }
+
+export const LuminaMark = BossnuSileloMark;
