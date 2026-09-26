@@ -51,8 +51,8 @@ function pickThaiVoice() {
 
 function cleanSpeechText(value: string) {
   return value
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\x60\x60\x60[\s\S]*?\x60\x60\x60/g, " ")
+    .replace(/\x60([^\x60]+)\x60/g, "$1")
     .replace(/[#*_>]/g, "")
     .replace(/https?:\/\/\S+/g, "")
     .replace(/\s+/g, " ")
@@ -61,7 +61,7 @@ function cleanSpeechText(value: string) {
 
 function speakNext() {
   if (!hasSpeech || !settings.enabled || speaking || !pending.trim()) return;
-  const match = pending.match(/^(.{40,220}?[.!?。！？\\n])(?:\\s+|$)/);
+  const match = pending.match(/^(.{40,220}?[.!?。！？\n])(?:\s+|$)/);
   if (!match) return;
   const text = cleanSpeechText(match[1]);
   pending = pending.slice(match[0].length);
@@ -75,7 +75,8 @@ function speakNext() {
   speaking = true;
   utterance.onend = () => { speaking = false; speakNext(); };
   utterance.onerror = () => { speaking = false; speakNext(); };
-  window.speechSynthesis.resume();\n  window.speechSynthesis.speak(utterance);
+  window.speechSynthesis.resume();
+  window.speechSynthesis.speak(utterance);
 }
 
 function createUtterance(text: string) {
