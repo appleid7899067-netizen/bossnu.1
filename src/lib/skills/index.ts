@@ -52,7 +52,7 @@ const skills: Skill[] = [
     name: "App Builder",
     description: "Turns product requests into complete interactive app changes.",
     triggers: ["สร้างแอป", "แอพ", "builder", "app", "ui", "ux", "หน้าเว็บ", "dashboard"],
-    instructions: "Treat the request as a working product change. Preserve existing functionality, make the UI responsive and accessible, and include real interactions rather than static placeholders.",
+    instructions: "Build the requested app immediately. Use HTML, CSS, and vanilla JavaScript as the primary stack. Return a complete runnable app with real interactions and responsive UI. Make sensible decisions without unnecessary clarification. Do not stop at a mockup, outline, or pseudo-code.",
   },
   {
     id: "github",
