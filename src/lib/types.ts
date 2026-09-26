@@ -1,5 +1,5 @@
 export type ChatMode = "instant" | "think";
-export type AppView = "chat" | "maps" | "studio" | "builder";
+export type AppView = "chat" | "maps" | "studio" | "builder" | "settings";
 export type ChatMessage = { id: string; role: "user" | "assistant"; content: string; thinking?: string; createdAt: number; };
 export type Conversation = { id: string; title: string; mode: ChatMode; messages: ChatMessage[]; updatedAt: number; };
 export type MapChild = { id: string; label: string; note: string; };
@@ -9,3 +9,7 @@ export type SavedMap = { id: string; data: MindMapData; createdAt: number; };
 export type StudioImage = { id: string; prompt: string; url: string; aspect: string; createdAt: number; };
 export type BuilderFile = { path: string; content: string; };
 export type BuilderProject = { id: string; title: string; description: string; entry: string; files: BuilderFile[]; updatedAt: number; };
+export type PersonalitySettings = { name: string; tone: string; actFirst: boolean; thaiFirst: boolean; warm: boolean; };
+export type AgentSkill = { id: string; name: string; description: string; enabled: boolean; };
+export type AgentProfile = { id: string; name: string; role: string; instructions: string; skills: string[]; createdAt: number; };
+export type MemoryItem = { id: string; content: string; createdAt: number; };
