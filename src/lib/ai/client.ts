@@ -61,9 +61,17 @@ export async function generateStudioImage(input: { prompt: string; aspect: strin
 
 
 const BUILDER_SCHEMA = `
-Return ONLY valid JSON:
-{"title":"string","description":"string","entry":"index.html","files":[{"path":"index.html","content":"complete HTML"},{"path":"styles.css","content":"CSS"},{"path":"script.js","content":"vanilla JS"}]}
-Build a self-contained browser app. Use semantic HTML, accessible controls, responsive CSS, polished visual hierarchy, and real client-side interactions. No external dependencies, no remote assets, no markdown fences.
+AI BUILDER HARD RULES:
+1. BUILD THE APP IMMEDIATELY. Do not answer with a plan, tutorial, explanation, questions, or pseudo-code.
+2. Always return a complete runnable browser app, even when the request is short or underspecified. Make sensible product decisions and implement them.
+3. HTML/CSS/JavaScript are the primary stack. Use vanilla HTML5 + CSS3 + JavaScript (ES2022). Do not use React, JSX, TypeScript, npm packages, frameworks, or external dependencies unless the user explicitly asks for them.
+4. Always provide a real UI, real interactions, useful sample/empty states, responsive layout, and working client-side behavior. Never return a static mockup or placeholder-only screen.
+5. The required core files are index.html, styles.css, and script.js. Keep the app self-contained and runnable by opening index.html.
+6. index.html must actually load styles.css and script.js. JavaScript must use DOM APIs and event listeners, with no missing functions or fake handlers.
+7. Prefer local assets, inline SVG, CSS shapes, or generated placeholders over remote assets. Do not depend on external URLs for the app to function.
+8. Return ONLY valid JSON matching this exact shape:
+{"title":"string","description":"string","entry":"index.html","files":[{"path":"index.html","content":"complete HTML"},{"path":"styles.css","content":"complete CSS"},{"path":"script.js","content":"complete vanilla JavaScript"}]}
+9. Return complete replacement files, not patches, and do not wrap the JSON in markdown fences.
 `;
 
 export async function generateAppBuilder(input: { request: string; project: import("@/lib/types").BuilderProject }) {
