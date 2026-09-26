@@ -8,13 +8,13 @@
   --color-fg: #f4f4f5;
   --color-muted: #a1a1aa;
   --color-subtle: #71717a;
-  --color-primary: #f26207;
-  --color-primary-fg: #fff7ed;
-  --color-primary-hover: #ff7a24;
+  --color-primary: #c4a7ff;
+  --color-primary-fg: #2a174f;
+  --color-primary-hover: #d3bfff;
   --color-border: #2a2a2e;
   --color-danger: #ef4444;
   --color-success: #34d399;
-  --color-ring: #f26207;
+  --color-ring: #c4a7ff;
   --font-sans: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --radius-xs: 0.25rem;
