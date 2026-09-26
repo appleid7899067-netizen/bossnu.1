@@ -32,6 +32,7 @@ export function AppShell({ search }: { search: Search }) {
   const [mapError, setMapError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [streamingId, setStreamingId] = useState<string | null>(null);
+  const [streamStatus, setStreamStatus] = useState<string>("");
   const [builderProject, setBuilderProject] = useState<BuilderProject | undefined>(undefined);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -77,6 +78,7 @@ export function AppShell({ search }: { search: Search }) {
     setDraft("");
     setBusyChat(true);
     setStreamingId(assistantId);
+    setStreamStatus("กำลังเชื่อมต่อ AI…");
     go({ view: "chat", c: id });
 
     const history = (
@@ -97,13 +99,21 @@ export function AppShell({ search }: { search: Search }) {
         mode: chatMode,
         signal: ac.signal,
         onEvent: (ev) => {
-          if (ev.type === "thinking") {
+          if (ev.type === "start") {
+            setStreamStatus("กำลังเริ่มสตรีม…");
+          } else if (ev.type === "block_start") {
+            setStreamStatus(ev.blockType === "tool" ? "กำลังทำงานกับเครื่องมือ…" : ev.blockType === "thinking" ? "กำลังคิด…" : "กำลังพิมพ์…");
+          } else if (ev.type === "thinking") {
             thinking += ev.text;
             store.patchAssistant(id, assistantId, { thinking });
           } else if (ev.type === "text") {
+            setStreamStatus("กำลังตอบ…");
             reply += ev.text;
             store.patchAssistant(id, assistantId, { content: reply });
+          } else if (ev.type === "done") {
+            setStreamStatus("");
           } else if (ev.type === "error") {
+            setStreamStatus("เกิดข้อผิดพลาด");
             toast.error(ev.error);
           }
         },
