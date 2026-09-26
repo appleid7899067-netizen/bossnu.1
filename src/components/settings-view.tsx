@@ -5,7 +5,25 @@ import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const demoHtml = `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;font-family:system-ui;background:#f7f4ff;color:#24202e;display:grid;place-items:center;min-height:100vh}.card{width:min(420px,88vw);padding:28px;border-radius:24px;background:white;box-shadow:0 18px 50px #0001;text-align:center}.btn{border:0;border-radius:999px;padding:12px 18px;background:#6d4aff;color:white;font-weight:700;cursor:pointer}.count{font-size:42px;font-weight:800;margin:18px}</style></head><body><main class="card"><div>🧪 Sandbox Demo</div><h1>สตูดิโอทดลองของสลี่</h1><div class="count" id="count">0</div><button class="btn" id="go">ทดสอบ JavaScript</button><p id="status">พร้อมทำงาน</p></main><script>let n=0;document.getElementById('go').onclick=()=>{n++;document.getElementById('count').textContent=n;document.getElementById('status').textContent='รันสำเร็จ • '+new Date().toLocaleTimeString('th-TH')}</script></body></html>`;
+const demoHtml = `<!doctype html><html><body><main><h1>🧪 Sandbox Demo</h1><button id="go">Test JavaScript</button><pre id="out">Ready</pre></main><script>document.getElementById('go').onclick=()=>document.getElementById('out').textContent='JavaScript OK • '+new Date().toLocaleTimeString('th-TH')</script></body></html>`;
+
+const SANDBOX_LANGUAGES = [
+  { id: "python", label: "Python", file: "main.py" },
+  { id: "javascript", label: "JavaScript", file: "main.js" },
+  { id: "cpp", label: "C++", file: "main.cpp" },
+  { id: "java", label: "Java", file: "Main.java" },
+  { id: "bash", label: "Bash", file: "main.sh" },
+  { id: "json", label: "JSON", file: "data.json" },
+] as const;
+
+const SANDBOX_DEFAULTS: Record<string,string> = {
+  python: 'print("Hello from Python")',
+  javascript: 'console.log("Hello from JavaScript")',
+  cpp: '#include <iostream>\\nint main(){ std::cout << "Hello from C++\\n"; }',
+  java: 'public class Main { public static void main(String[] args) { System.out.println("Hello from Java"); } }',
+  bash: 'echo "Hello from Bash"',
+  json: '{\\n  "hello": "world",\\n  "ok": true\\n}',
+};
 
 export function SettingsView() {
   const store = useAppStore();
@@ -13,14 +31,48 @@ export function SettingsView() {
   const [newMemory, setNewMemory] = useState("");
   const [newAgent, setNewAgent] = useState("");
   const [saved, setSaved] = useState(false);
+  const [sandboxLanguage, setSandboxLanguage] = useState("python");
+  const [sandboxCode, setSandboxCode] = useState(SANDBOX_DEFAULTS.python);
+  const [sandboxInput, setSandboxInput] = useState("");
+  const [sandboxOutput, setSandboxOutput] = useState("พร้อมรันโค้ด");
+  const [sandboxBusy, setSandboxBusy] = useState(false);
   const skills = store.agentSkills;
-
   const enabledCount = useMemo(() => skills.filter(s => s.enabled).length, [skills]);
 
   const save = (patch: Partial<PersonalitySettings>) => {
     store.updatePersonality(patch);
     setSaved(true);
     window.setTimeout(() => setSaved(false), 900);
+  };
+
+  const runSandbox = async () => {
+    setSandboxBusy(true);
+    setSandboxOutput("กำลังเปิด sandbox และรันโค้ด…");
+    try {
+      if (sandboxLanguage === "json") {
+        const value = JSON.parse(sandboxCode);
+        setSandboxOutput(JSON.stringify(value, null, 2) + "\n\n✓ JSON valid");
+        return;
+      }
+      const response = await fetch("https://runlet.codealong.live/execute", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ language: sandboxLanguage, code: sandboxCode, stdin: sandboxInput }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.detail || data?.message || "Sandbox request failed");
+      setSandboxOutput([data.stdout || "", data.stderr ? "[stderr]\n" + data.stderr : "", data.status ? "\nstatus: " + data.status : ""].filter(Boolean).join("\n"));
+    } catch (error) {
+      setSandboxOutput(error instanceof Error ? "✕ " + error.message : "✕ Sandbox error");
+    } finally {
+      setSandboxBusy(false);
+    }
+  };
+
+  const changeSandboxLanguage = (language: string) => {
+    setSandboxLanguage(language);
+    setSandboxCode(SANDBOX_DEFAULTS[language] ?? "");
+    setSandboxOutput("พร้อมรัน " + language);
   };
 
   return <section className="min-h-0 flex-1 overflow-y-auto">
@@ -48,10 +100,25 @@ export function SettingsView() {
 
       {tab==="profiles" ? <Panel title="แฟ้มโปรไฟล์ตัวแทน" icon={FolderOpen}><div className="grid gap-3 md:grid-cols-2">{store.agentProfiles.map(agent=><div key={agent.id} className="rounded-2xl bg-clay p-4"><div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-elevated"><Bot className="size-5"/></div><div><p className="font-medium">{agent.name}</p><p className="text-xs text-muted">{agent.role}</p></div></div><div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted"><span>สกิล {agent.skills.length}</span><span>สร้าง {new Date(agent.createdAt).toLocaleDateString("th-TH")}</span></div><div className="mt-3 rounded-xl bg-bg/50 p-3 text-xs leading-relaxed text-muted">{agent.instructions}</div></div>)}</div></Panel> : null}
 
-      {tab==="sandbox" ? <Panel title="แซนบ็อกซ์เดโม" icon={Play}><div className="mb-3 flex items-center justify-between"><p className="text-sm text-muted">พื้นที่ทดลอง HTML/CSS/JavaScript แบบแยก iframe ไม่แตะหน้าแอปหลัก</p><Button onClick={()=>window.location.reload()} variant="outline"><Play className="size-4"/>รีเฟรชเดโม</Button></div><div className="overflow-hidden rounded-2xl border border-border bg-white"><iframe title="Sandbox Demo" srcDoc={demoHtml} sandbox="allow-scripts" className="h-[420px] w-full border-0"/></div></Panel> : null}
+      {tab==="sandbox" ? <Panel title="แซนบ็อกซ์รันโค้ด" icon={Play}>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {SANDBOX_LANGUAGES.map(lang=><button key={lang.id} type="button" onClick={()=>changeSandboxLanguage(lang.id)} className={cn("rounded-full px-3 py-1.5 text-xs",sandboxLanguage===lang.id?"bg-fg text-bg":"bg-clay text-muted hover:text-fg")}>{lang.label}</button>)}
+        </div>
+        <div className="grid gap-3 lg:grid-cols-[1fr_360px]">
+          <div className="overflow-hidden rounded-2xl bg-[#111]">
+            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 text-xs text-white/60"><span>{SANDBOX_LANGUAGES.find(x=>x.id===sandboxLanguage)?.file}</span><span>{sandboxBusy?"กำลังรัน…":"พร้อม"}</span></div>
+            <textarea value={sandboxCode} onChange={e=>setSandboxCode(e.target.value)} spellCheck={false} className="min-h-[330px] w-full resize-y bg-transparent p-4 font-mono text-sm leading-6 text-white outline-none"/>
+          </div>
+          <div className="flex min-h-[330px] flex-col rounded-2xl bg-clay">
+            <div className="border-b border-border px-3 py-2 text-xs font-medium">Output / Console</div>
+            <textarea value={sandboxInput} onChange={e=>setSandboxInput(e.target.value)} placeholder="stdin (ถ้ามี)" className="m-3 min-h-16 rounded-xl bg-bg p-3 font-mono text-xs outline-none"/>
+            <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-3 pb-3 font-mono text-xs leading-5 text-muted">{sandboxOutput}</pre>
+            <div className="p-3"><Button className="w-full" disabled={sandboxBusy} onClick={()=>void runSandbox()}><Play className="size-4"/>{sandboxBusy?"กำลังรัน…":"Run code"}</Button></div>
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-subtle">Python / JavaScript / C++ / Java ใช้ isolated runner; JSON ตรวจ syntax ในเครื่อง. Bash พร้อมต่อ self-hosted sandbox runner เพื่อไม่ให้ shell แตะเซิร์ฟเวอร์หลัก</p>
+      </Panel> : null}
     </div>
   </section>;
 }
 
-function Panel({title,icon:Icon,children}:{title:string;icon:typeof Brain;children:React.ReactNode}) { return <div className="rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)]"><div className="mb-4 flex items-center gap-2"><Icon className="size-4 text-muted"/><h2 className="font-medium">{title}</h2></div>{children}</div>; }
-function Toggle({label,value,onChange}:{label:string;value:boolean;onChange:(v:boolean)=>void}) { return <button type="button" onClick={()=>onChange(!value)} className="flex w-full items-center justify-between border-b border-border py-3 text-left last:border-0"><span className="text-sm">{label}</span><span className={cn("h-6 w-11 rounded-full p-1 transition-colors",value?"bg-fg":"bg-clay")}><span className={cn("block size-4 rounded-full bg-bg transition-transform",value?"translate-x-5":"translate-x-0")}/></span></button>; }
