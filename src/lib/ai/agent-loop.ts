@@ -33,10 +33,21 @@ export async function runAgentLoop(opts: {
   onText: (text: string) => void;
   onPhase?: (phase: AgentPhase, detail?: string) => void;
   maxRuns?: number;
+  workspaceId?: string;
 }) {
   const messages = [...opts.messages];
   const goal = [...messages].reverse().find(message => message.role === "user")?.content ?? "";
   const selectedSkills = selectSkills(goal, 5);
+  const workspaceId = opts.workspaceId?.trim() || null;
+  let workspaceContext = "ไม่มี Persistent Workspace";
+  if (workspaceId) {
+    await ensureBossWorkspace(workspaceId);
+    const [workspaceFiles, workspaceMemory] = await Promise.all([
+      listWorkspaceFiles(workspaceId),
+      recallWorkspaceMemory(workspaceId, goal),
+    ]);
+    workspaceContext = formatWorkspaceContext(workspaceFiles, workspaceMemory);
+  }
   const core = new CowAgentCore(goal);
   let count = 0;
   const plan = buildCowPlan(goal, selectedSkills.map(skill => skill.name));
@@ -85,6 +96,8 @@ export async function runAgentLoop(opts: {
 
     if (!calls.length) {
       core.complete();
+      if (workspaceId) await updateWorkspaceTask(workspaceId, core.task.id, "done", core.task.attempts);
+      if (workspaceId && raw.trim()) await rememberWorkspace(workspaceId, "latest-answer", raw, "conversation");
       opts.onPhase?.("answer", "💬 Answer • ตอบผลในแชท");
       return;
     }
@@ -100,6 +113,7 @@ export async function runAgentLoop(opts: {
 
       if (count >= max) {
         core.fail();
+        if (workspaceId) await updateWorkspaceTask(workspaceId, core.task.id, "failed", core.task.attempts);
         opts.onPhase?.("answer", "💬 Answer • ถึงขีดจำกัดการรัน");
         opts.onText(`\nถึงขีดจำกัด ${max} รอบแล้ว กรุณาส่งข้อความเพื่อทำต่อค่ะ\n`);
         return;
