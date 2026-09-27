@@ -36,6 +36,12 @@
   ::selection { background: color-mix(in oklab, var(--color-primary) 40%, transparent); color: var(--color-fg); }
 }
 @layer utilities {
+  /* Softer, compact typography for assistant prose (including raw live tokens). */
+  .assistant-prose {
+    font-family: "Noto Sans Thai", "Leelawadee UI", Tahoma, "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+    font-kerning: normal;
+    text-rendering: optimizeLegibility;
+  }
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }

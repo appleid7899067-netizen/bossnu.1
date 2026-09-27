@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Check, Copy, Maximize2, Minimize2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { fenceBareSvg } from "@/lib/markdown-format";
 
 function inline(text: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = [];
@@ -92,13 +93,13 @@ function MdBlock({ text }: { text: string }) {
   const flushPara = () => {
     if (!para.length) return;
     const body = para.join(" ");
-    blocks.push(<p key={`p-${blocks.length}`} className="leading-[1.7]">{inline(body, `p${blocks.length}`)}</p>);
+    blocks.push(<p key={`p-${blocks.length}`} className="leading-[1.75]">{inline(body, `p${blocks.length}`)}</p>);
     para = [];
   };
   const flushList = () => {
     if (!list) return;
     const Tag = list.ordered ? "ol" : "ul";
-    blocks.push(<Tag key={`l-${blocks.length}`} className={cn("flex flex-col gap-2 pl-6 leading-[1.7]", list.ordered ? "list-decimal" : "list-disc")}>
+    blocks.push(<Tag key={`l-${blocks.length}`} className={cn("flex flex-col gap-1.5 pl-5 leading-[1.75]", list.ordered ? "list-decimal" : "list-disc")}>
       {list.items.map((item, i) => <li key={i}>{inline(item, `li${blocks.length}-${i}`)}</li>)}
     </Tag>);
     list = null;
@@ -135,13 +136,13 @@ function MdBlock({ text }: { text: string }) {
       flushPara(); flushList();
       const level = heading[1].length;
       const Tag = level === 1 ? "h3" : level === 2 ? "h4" : "h5";
-      const size = level === 1 ? "text-[1.65em]" : level === 2 ? "text-[1.35em]" : "text-[1.12em]";
+      const size = level === 1 ? "text-[1.45em]" : level === 2 ? "text-[1.22em]" : "text-[1.08em]";
       blocks.push(<Tag key={`h-${blocks.length}`} className={cn("font-display font-semibold tracking-tight leading-snug", size)}>{inline(heading[2], `h${blocks.length}`)}</Tag>);
       continue;
     }
     if (/^>\s?/.test(line)) {
       flushPara(); flushList();
-      blocks.push(<blockquote key={`q-${blocks.length}`} className="border-l-2 border-primary/50 pl-4 text-muted">{inline(line.replace(/^>\s?/, ""), `q${blocks.length}`)}</blockquote>);
+      blocks.push(<blockquote key={`q-${blocks.length}`} className="border-l-2 border-primary/50 pl-3.5 leading-[1.75] text-muted">{inline(line.replace(/^>\s?/, ""), `q${blocks.length}`)}</blockquote>);
       continue;
     }
     if (ul || ol) {
@@ -235,13 +236,16 @@ export function Markdown({
   className?: string;
   live?: boolean;
 }) {
-  const normalizedRuns = text.replace(/<run\s+lang=["']([^"']+)["']>([\s\S]*?)<\/run>/gi, (_, lang, code) => `\n\`\`\`${lang}\n${code.trim()}\n\`\`\`\n`);
+  const normalizedRuns = fenceBareSvg(text).replace(
+    /<run\s+lang=["']([^"']+)["']>([\s\S]*?)<\/run>/gi,
+    (_, lang, code) => `\n\`\`\`${lang}\n${code.trim()}\n\`\`\`\n`,
+  );
   const cleanedText = normalizedRuns.replace(/\*{3,}/g, "").replace(/\/\/nn\//gi, "");
   // Keep the DOM shape stable while tokens stream in. Promoting an unfinished
   // table or code fence to a richer element mid-stream can confuse hydration
   // and DOM reconciliation in mobile browsers.
   if (live) {
-    return <div className={cn("min-w-0 max-w-full whitespace-pre-wrap break-words text-[1rem] leading-[1.7] [overflow-wrap:anywhere]", className)}>{cleanedText}</div>;
+    return <div className={cn("assistant-prose min-w-0 max-w-full whitespace-pre-wrap break-words text-[14px] leading-[1.75] tracking-[-0.01em] [overflow-wrap:anywhere]", className)}>{cleanedText}</div>;
   }
   const parts = splitFences(cleanedText);
   const webParts = parts.filter((part) => part.type === "code" && isWebLang(part.lang));
@@ -251,7 +255,7 @@ export function Markdown({
   const firstWebIndex = parts.findIndex((part) => part.type === "code" && isWebLang(part.lang));
 
   return (
-    <div className={cn("flex min-w-0 max-w-full flex-col gap-4 text-[1rem] leading-[1.7] [overflow-wrap:anywhere]", className)}>
+    <div className={cn("assistant-prose flex min-w-0 max-w-full flex-col gap-3 text-[14px] leading-[1.75] tracking-[-0.01em] [overflow-wrap:anywhere]", className)}>
       {parts.map((part, i) =>
         part.type === "code" ? (
           <div key={i} className="contents">

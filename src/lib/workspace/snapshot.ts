@@ -55,6 +55,9 @@ export type SyncEvidence = {
   added: number;
   modified: number;
   deleted: number;
+  addedFiles: string[];
+  modifiedFiles: string[];
+  deletedFiles: string[];
   renamed: { from: string; to: string }[];
   unchanged: number;
   skipped: string[];
@@ -212,6 +215,9 @@ export function verifyReadBack(
     added: plan.added.length,
     modified: plan.modified.length,
     deleted: plan.deleted.length,
+    addedFiles: plan.added,
+    modifiedFiles: plan.modified,
+    deletedFiles: plan.deleted,
     renamed: plan.renamed,
     unchanged: plan.unchanged.length,
     skipped: [...skippedPaths].sort(),
@@ -231,7 +237,7 @@ export function verifyReadBack(
 /** Evidence for a sync that could not run at all (no snapshot, DB error, …). */
 export function failedEvidence(error: string, now = new Date()): SyncEvidence {
   return {
-    verified: false, complete: false, source: "none", added: 0, modified: 0, deleted: 0, renamed: [], unchanged: 0,
+    verified: false, complete: false, source: "none", added: 0, modified: 0, deleted: 0, addedFiles: [], modifiedFiles: [], deletedFiles: [], renamed: [], unchanged: 0,
     skipped: [], missing: [], mismatched: [], unexpected: [], expectedCount: 0, storedCount: 0,
     manifestHash: "", readBackHash: "", checkedAt: now.toISOString(), error, saved: 0, total: 0,
   };
