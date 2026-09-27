@@ -187,7 +187,8 @@ export function Markdown({
   className?: string;
   live?: boolean;
 }) {
-  const parts = splitFences(text);
+  const cleanedText = text.replace(/\*{3,}/g, "").replace(/\/\/nn\//gi, "");
+  const parts = splitFences(cleanedText);
   return (
     <div className={cn("flex flex-col gap-2 text-[0.9rem] leading-[1.55]", className)}>
       {parts.map((part, i) =>
