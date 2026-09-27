@@ -202,8 +202,8 @@ function CodeBlock({ code, lang, live, showPreview = true }: { code: string; lan
     } catch { /* Clipboard may be unavailable in embedded previews. */ }
   }
   return (
-    <div className={cn("overflow-hidden rounded-2xl border border-[#303030] bg-[#171717] text-[#e5e7eb]", isWeb && live ? "html-live" : "")}>
-      <div className="flex min-h-12 items-center justify-between gap-3 border-b border-[#303030] bg-[#111111] px-4 py-2 text-xs text-[#b8bec8]">
+    <div className={cn("overflow-hidden rounded-2xl border border-[#24395f] bg-[#0d1830] text-[#e8efff]", isWeb && live ? "html-live" : "")}>
+      <div className="flex min-h-12 items-center justify-between gap-3 border-b border-[#24395f] bg-[#101d38] px-4 py-2 text-xs text-[#a9badb]">
         <span>{isTooLong ? "Text" : (lang || "Code")}</span>
         <div className="flex items-center gap-1">
           {isWeb ? <button type="button" onClick={() => setPreview((v) => !v)} className="rounded-lg px-2.5 py-1.5 text-xs hover:bg-white/10">{preview ? "‹ Code" : "▶ Preview"}</button> : null}
@@ -213,15 +213,15 @@ function CodeBlock({ code, lang, live, showPreview = true }: { code: string; lan
       </div>
       {isTooLong ? (
         <div className="bg-[#171717]">
-          <div className="flex items-center justify-between border-b border-[#303030] px-4 py-2 text-[11px] text-[#9ca3af]"><span>Long text</span><span>{code.length.toLocaleString()} characters</span></div>
-          <pre className={cn("overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-[#e5e7eb]", expanded ? "max-h-[75vh]" : "max-h-[320px]")}><code>{code}</code></pre>
+          <div className="flex items-center justify-between border-b border-[#24395f] px-4 py-2 text-[11px] text-[#9ca3af]"><span>Long text</span><span>{code.length.toLocaleString()} characters</span></div>
+          <pre className={cn("overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-[#e8efff]", expanded ? "max-h-[75vh]" : "max-h-[320px]")}><code>{code}</code></pre>
         </div>
       ) : preview && isWeb && showPreview && value !== "css" && value !== "tailwind" && value !== "tailwindcss" ? (
         <iframe title="HTML preview" sandbox="allow-scripts" srcDoc={code} className={cn("w-full bg-white", expanded ? "h-[75vh]" : "h-[360px]")} />
       ) : (
-        <pre className={cn("overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-[#e5e7eb]", expanded ? "max-h-[75vh]" : "max-h-[320px]")}><code>{code}</code></pre>
+        <pre className={cn("overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-[#e8efff]", expanded ? "max-h-[75vh]" : "max-h-[320px]")}><code>{code}</code></pre>
       )}
-      {isWeb ? <div className="flex items-center justify-between border-t border-[#303030] px-4 py-2 text-[10px] text-[#9ca3af]"><span>{value === "css" ? "CSS • Sandbox Style" : value.startsWith("tailwind") ? "Tailwind CSS • Sandbox" : "HTML • Sandboxed Preview"}</span><span>Isolated preview</span></div> : null}
+      {isWeb ? <div className="flex items-center justify-between border-t border-[#24395f] px-4 py-2 text-[10px] text-[#9ca3af]"><span>{value === "css" ? "CSS • Sandbox Style" : value.startsWith("tailwind") ? "Tailwind CSS • Sandbox" : "HTML • Sandboxed Preview"}</span><span>Isolated preview</span></div> : null}
     </div>
   );
 }
@@ -235,7 +235,8 @@ export function Markdown({
   className?: string;
   live?: boolean;
 }) {
-  const cleanedText = text.replace(/\*{3,}/g, "").replace(/\/\/nn\//gi, "");
+  const normalizedRuns = text.replace(/<run\s+lang=["']([^"']+)["']>([\s\S]*?)<\/run>/gi, (_, lang, code) => `\n\`\`\`${lang}\n${code.trim()}\n\`\`\`\n`);
+  const cleanedText = normalizedRuns.replace(/\*{3,}/g, "").replace(/\/\/nn\//gi, "");
   // Keep the DOM shape stable while tokens stream in. Promoting an unfinished
   // table or code fence to a richer element mid-stream can confuse hydration
   // and DOM reconciliation in mobile browsers.
@@ -255,7 +256,7 @@ export function Markdown({
         part.type === "code" ? (
           <div key={i} className="contents">
             {i === firstWebIndex && webParts.length > 0 ? <WebPreview html={html} css={css} tailwind={tailwind} live={live} /> : null}
-            {part.lang === "sandbox" ? <div className="overflow-hidden rounded-xl border border-border bg-[#171717] text-[#e5e7eb]">
+            {part.lang === "sandbox" ? <div className="overflow-hidden rounded-xl border border-border bg-[#0d1830] text-[#e8efff]">
               <div className="border-b border-white/10 px-4 py-2 text-xs font-semibold">⌘ Sandbox Terminal</div>
               <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs">{part.value}</pre>
             </div> : <CodeBlock

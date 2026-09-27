@@ -89,7 +89,7 @@ export function detectSandboxInput(input: string): SandboxDetection {
     try {
       JSON.parse(value);
       return { runtime: "json", label: "JSON", code: value, confidence: "high", webPreview: false, dangerous: false };
-    } catch {}
+    } catch { /* intentionally ignored */ }
   }
 
   const command = commandDetection(value);

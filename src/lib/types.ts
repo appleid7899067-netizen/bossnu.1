@@ -14,3 +14,4 @@ export type AgentSkill = { id: string; name: string; description: string; enable
 export type AgentProfile = { id: string; name: string; role: string; instructions: string; skills: string[]; createdAt: number; };
 export type MemoryItem = { id: string; content: string; createdAt: number; };
 export type LearnedSkill = { id: string; name: string; runtime: string; pattern: string; testCommand?: string; result: "passed" | "failed"; evidence: string; createdAt: number; uses: number; lastTestedAt?: number; };
+export type CommandHistoryItem = { id: string; command: string; runtime: string; status: "running" | "success" | "error" | "aborted"; createdAt: number; };

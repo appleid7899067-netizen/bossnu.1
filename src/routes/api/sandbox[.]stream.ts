@@ -10,7 +10,6 @@ import {
 } from "@/types/sandbox";
 
 const MAX_BODY_BYTES = 96 * 1024;
-const RUNTIMES = ["node","python","bash","go","rust","java","cpp"] as const;
 
 function runnerUrl() {
   return (
@@ -124,7 +123,7 @@ async function handle(request: Request): Promise<Response> {
                 completed = true;
                 send({ type:"complete", result:{ ...ev.result, durationMs: ev.result?.durationMs ?? Date.now()-started } });
               } else send(ev);
-            } catch {}
+            } catch { /* intentionally ignored */ }
           }
           if (done) break;
         }
