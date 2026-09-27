@@ -217,11 +217,25 @@ export function Markdown({
 }) {
   const cleanedText = text.replace(/\*{3,}/g, "").replace(/\/\/nn\//gi, "");
   const parts = splitFences(cleanedText);
+  const webParts = parts.filter((part) => part.type === "code" && isWebLang(part.lang));
+  const html = webParts.find((part) => ["html", "htm"].includes((part.lang || "").toLowerCase()))?.value || "";
+  const css = webParts.filter((part) => (part.lang || "").toLowerCase() === "css").map((part) => part.value).join("\n");
+  const tailwind = webParts.filter((part) => ["tailwind", "tailwindcss"].includes((part.lang || "").toLowerCase())).map((part) => part.value).join("\n");
+  const firstWebIndex = parts.findIndex((part) => part.type === "code" && isWebLang(part.lang));
+
   return (
     <div className={cn("flex flex-col gap-2 text-[0.9rem] leading-[1.55]", className)}>
       {parts.map((part, i) =>
         part.type === "code" ? (
-          <CodeBlock key={i} code={part.value} lang={part.lang} live={live} />
+          <div key={i} className="contents">
+            {i === firstWebIndex && webParts.length > 0 ? <WebPreview html={html} css={css} tailwind={tailwind} live={live} /> : null}
+            <CodeBlock
+              code={part.value}
+              lang={part.lang}
+              live={live}
+              showPreview={webParts.length === 1}
+            />
+          </div>
         ) : /^\s*:::sandbox-preview\s+https?:\/\/\S+\s*$/m.test(part.value.trim()) ? (
           <SandboxPreview key={i} url={part.value.trim().match(/^:::sandbox-preview\s+(https?:\/\/\S+)\s*$/)?.[1] || ""} />
         ) : (
