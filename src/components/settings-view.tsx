@@ -6,7 +6,7 @@ import type { PersonalitySettings } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getAvailableVoices, getVoiceSettings, isVoiceSupported, updateVoiceSettings, type VoiceSettings } from "@/lib/ai/voice";
+import { getAvailableVoices, getVoiceSettings, isVoiceSupported, updateVoiceSettings, applyVoiceMode, VOICE_MODES, type VoiceSettings } from "@/lib/ai/voice";
 
 const SANDBOX_LANGUAGES = [
   { id: "python", label: "Python", file: "main.py" },
@@ -180,7 +180,8 @@ function VoicePanel({ supported, settings, voices, onChange }: { supported: bool
   const testVoice = () => {
     if (!supported) return;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance("สวัสดีค่ะ นี่คือเสียงของสลี่ พร้อมทำงานให้แล้วนะคะ");
+    const samples: Record<string, string> = { cute: "สวัสดีค่ะที่รัก วันนี้เรามาคุยกันให้สนุกนะคะ", warm: "ไม่เป็นไรนะคะ ค่อยๆ เล่าให้สลี่ฟังได้เลย", calm: "หายใจเข้าช้าๆ แล้วพักผ่อนอย่างสบายใจนะคะ", bright: "อรุณสวัสดิ์ค่ะ วันนี้เราทำให้สำเร็จไปด้วยกันนะคะ", special: "ที่รักคะ สลี่อยู่ตรงนี้และพร้อมฟังคุณเสมอค่ะ", deep: "สรุปสำคัญคือ เราจะทำทีละขั้นและตรวจสอบผลให้เรียบร้อยค่ะ" };
+    const utterance = new SpeechSynthesisUtterance(samples[settings.mode] ?? samples.warm);
     utterance.lang = "th-TH";
     utterance.rate = settings.rate;
     utterance.pitch = settings.pitch;
@@ -194,6 +195,7 @@ function VoicePanel({ supported, settings, voices, onChange }: { supported: bool
     <div className="space-y-4">
       {!supported ? <div className="rounded-xl bg-clay p-3 text-sm text-muted">เบราว์เซอร์นี้ยังไม่รองรับเสียงพูดแบบ Speech Synthesis</div> : null}
       <Toggle label="เปิดเสียงตอบกลับอัตโนมัติ" value={settings.enabled} onChange={(value) => onChange({ enabled: value })} />
+      <div><p className="mb-2 text-sm font-medium">โหมดเสียง</p><div className="grid gap-2 sm:grid-cols-2">{VOICE_MODES.map((mode) => <button key={mode.id} type="button" onClick={() => { applyVoiceMode(mode.id); onChange({ mode: mode.id, rate: mode.rate, pitch: mode.pitch }); }} className={cn("rounded-xl border p-3 text-left transition-all", settings.mode === mode.id ? "border-primary bg-primary/10 text-fg shadow-[0_0_18px_rgba(139,92,246,.18)]" : "border-border bg-clay text-muted hover:text-fg")}><span className="text-sm font-medium">{mode.label}</span><span className="mt-1 block text-xs opacity-75">{mode.description}</span></button>)}</div></div>
       <label className="block text-sm"><div className="mb-2 flex justify-between"><span>ความเร็ว</span><span className="text-xs text-muted">{settings.rate.toFixed(2)}×</span></div><input type="range" min="0.7" max="1.3" step="0.01" value={settings.rate} onChange={(e) => onChange({ rate: Number(e.target.value) })} className="w-full"/></label>
       <label className="block text-sm"><div className="mb-2 flex justify-between"><span>โทนเสียง</span><span className="text-xs text-muted">{settings.pitch.toFixed(2)}</span></div><input type="range" min="0.7" max="1.5" step="0.01" value={settings.pitch} onChange={(e) => onChange({ pitch: Number(e.target.value) })} className="w-full"/></label>
       <label className="block text-sm"><div className="mb-2 flex justify-between"><span>ระดับเสียง</span><span className="text-xs text-muted">{Math.round(settings.volume * 100)}%</span></div><input type="range" min="0.2" max="1" step="0.01" value={settings.volume} onChange={(e) => onChange({ volume: Number(e.target.value) })} className="w-full"/></label>

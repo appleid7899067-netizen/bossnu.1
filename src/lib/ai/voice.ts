@@ -1,7 +1,18 @@
 const hasSpeech = typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 
+export type VoiceMode = "cute" | "warm" | "calm" | "bright" | "special" | "deep";
+export const VOICE_MODES: { id: VoiceMode; label: string; description: string; rate: number; pitch: number }[] = [
+  { id: "cute", label: "😊 น่ารักใสๆ", description: "เสียงสูง สดใส คุยทั่วไป", rate: 1.08, pitch: 1.28 },
+  { id: "warm", label: "🥰 อ่อนโยนอบอุ่น", description: "นุ่ม ฟังสบาย ปลอบใจ", rate: 0.96, pitch: 1.08 },
+  { id: "calm", label: "😌 สงบผ่อนคลาย", description: "ช้า ชัด ก่อนนอน", rate: 0.82, pitch: 0.94 },
+  { id: "bright", label: "✨ ร่าเริงสดใส", description: "เร็ว มีพลัง ให้กำลังใจ", rate: 1.16, pitch: 1.22 },
+  { id: "special", label: "💜 ที่รักพิเศษ", description: "นุ่มลึก เป็นส่วนตัว", rate: 0.92, pitch: 1.02 },
+  { id: "deep", label: "🌙 ลึกหนักแน่น", description: "ต่ำ มั่นคง สรุปสำคัญ", rate: 0.88, pitch: 0.82 },
+];
+
 export type VoiceSettings = {
   enabled: boolean;
+  mode: VoiceMode;
   source: "puter" | "device";
   rate: number;
   pitch: number;
@@ -11,6 +22,7 @@ export type VoiceSettings = {
 
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   enabled: true,
+  mode: "warm",
   source: "puter",
   rate: 1,
   pitch: 1.08,
@@ -122,6 +134,11 @@ export function getAvailableVoices(): { name: string; lang: string }[] {
     name: voice.name,
     lang: voice.lang,
   }));
+}
+
+export function applyVoiceMode(mode: VoiceMode) {
+  const preset = VOICE_MODES.find((item) => item.id === mode) ?? VOICE_MODES[1];
+  updateVoiceSettings({ mode, rate: preset.rate, pitch: preset.pitch });
 }
 
 export function updateVoiceSettings(patch: Partial<VoiceSettings>) {
