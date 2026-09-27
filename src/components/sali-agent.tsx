@@ -666,11 +666,30 @@ function ResultCard({
             <SkillBlock skill={result.skill} expanded={result.type === "skill"} />
           ) : null}
 
-          {result.output ? <OutputBlock text={result.output} /> : null}
-
-          {result.html ? <HtmlPreview html={result.html} /> : null}
-
-          {result.previewUrl ? <LivePreview url={result.previewUrl} /> : null}
+          {(result.output || result.html || result.previewUrl) ? (
+            <section className="overflow-hidden rounded-xl border border-border bg-elevated" data-testid="sandbox-workspace">
+              <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+                <SquareTerminal className="size-3.5 text-primary" />
+                <span className="text-[11px] font-semibold">Workspace</span>
+                <span className="text-[10px] text-muted">Terminal + Live Preview</span>
+                {result.previewUrl || result.html ? (
+                  <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-emerald-600">
+                    <Globe className="size-3" /> Preview พร้อม
+                  </span>
+                ) : null}
+              </div>
+              <div className={cn("grid gap-px bg-border", (result.html || result.previewUrl) ? "lg:grid-cols-2" : "grid-cols-1")}>
+                {result.output ? (
+                  <div className="min-w-0 bg-[#0f172a]">
+                    <div className="flex h-8 items-center px-3 text-[10px] text-slate-400">Terminal</div>
+                    <OutputBlock text={result.output} />
+                  </div>
+                ) : null}
+                {result.html ? <HtmlPreview html={result.html} /> : null}
+                {result.previewUrl ? <LivePreview url={result.previewUrl} /> : null}
+              </div>
+            </section>
+          ) : null}
 
           {result.steps && result.steps.length > 0 ? (
             <ol className="grid gap-1 sm:grid-cols-2">
