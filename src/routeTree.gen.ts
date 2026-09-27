@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SandboxRouteImport } from './routes/sandbox'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiSandboxRouteImport } from './routes/api/sandbox'
+import { Route as ApiSandboxStreamRouteImport } from './routes/api/sandbox.stream'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,12 +35,18 @@ const ApiSandboxRoute = ApiSandboxRouteImport.update({
   path: '/api/sandbox',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSandboxStreamRoute = ApiSandboxStreamRouteImport.update({
+  id: '/api/sandbox.stream',
+  path: '/api/sandbox.stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/sandbox': typeof SandboxRoute
   '/api/chat': typeof ApiChatRoute
   '/api/sandbox': typeof ApiSandboxRoute
+  '/api/sandbox.stream': typeof ApiSandboxStreamRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -56,10 +63,10 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sandbox' | '/api/chat' | '/api/sandbox'
+  fullPaths: '/' | '/sandbox' | '/api/chat' | '/api/sandbox' | '/api/sandbox.stream'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sandbox' | '/api/chat' | '/api/sandbox'
-  id: '__root__' | '/' | '/sandbox' | '/api/chat' | '/api/sandbox'
+  to: '/' | '/sandbox' | '/api/chat' | '/api/sandbox' | '/api/sandbox.stream'
+  id: '__root__' | '/' | '/sandbox' | '/api/chat' | '/api/sandbox' | '/api/sandbox.stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +74,7 @@ export interface RootRouteChildren {
   SandboxRoute: typeof SandboxRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiSandboxRoute: typeof ApiSandboxRoute
+  ApiSandboxStreamRoute: typeof ApiSandboxStreamRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +107,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSandboxRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/sandbox.stream': {
+      id: '/api/sandbox.stream'
+      path: '/api/sandbox.stream'
+      fullPath: '/api/sandbox.stream'
+      preLoaderRoute: typeof ApiSandboxStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +122,7 @@ const rootRouteChildren: RootRouteChildren = {
   SandboxRoute: SandboxRoute,
   ApiChatRoute: ApiChatRoute,
   ApiSandboxRoute: ApiSandboxRoute,
+  ApiSandboxStreamRoute: ApiSandboxStreamRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
