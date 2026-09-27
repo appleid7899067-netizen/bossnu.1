@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { AgentProfile, AgentSkill, ChatMessage, ChatMode, Conversation, LearnedSkill, MemoryItem, PersonalitySettings, SavedMap, StudioImage } from "@/lib/types";
+import type { AgentProfile, AgentSkill, ChatMessage, ChatMode, Conversation, CommandHistoryItem, LearnedSkill, MemoryItem, PersonalitySettings, SavedMap, StudioImage } from "@/lib/types";
 import { titleFromPrompt, uid } from "@/lib/utils";
 
 const MAX_CHATS=40, MAX_MAPS=16, MAX_IMAGES=12, MAX_MESSAGES=48;
@@ -19,20 +19,21 @@ const defaultAgent:AgentProfile={id:"slii",name:"สลี่",role:"Primary Age
 const defaultPersonality:PersonalitySettings={name:"สลี่",tone:"น่ารัก อ่อนโยน เป็นกันเอง ขี้อ้อนเล็กน้อย แต่ทำงานจริงและกระชับ",actFirst:true,thaiFirst:true,warm:true,autoSandbox:true,darkMode:true};
 
 type AppState={
-conversations:Conversation[]; activeChatId:string|null; maps:SavedMap[]; activeMapId:string|null; images:StudioImage[]; hydrated:boolean;
+conversations:Conversation[]; commandHistory:CommandHistoryItem[]; activeChatId:string|null; maps:SavedMap[]; activeMapId:string|null; images:StudioImage[]; hydrated:boolean;
 personality:PersonalitySettings; agentSkills:AgentSkill[]; agentProfiles:AgentProfile[]; memory:MemoryItem[]; learnedSkills:LearnedSkill[];
 setHydrated:()=>void; newChat:(mode?:ChatMode)=>string; setActiveChat:(id:string|null)=>void; setChatMode:(id:string,mode:ChatMode)=>void;
-addUserMessage:(chatId:string,content:string)=>string; startAssistant:(chatId:string)=>string; patchAssistant:(chatId:string,messageId:string,patch:Partial<Pick<ChatMessage,"content"|"thinking">>)=>void; removeEmptyAssistant:(chatId:string,messageId:string)=>void; deleteMessage:(chatId:string,messageId:string)=>void; deleteChat:(id:string)=>void;
+addUserMessage:(chatId:string,content:string)=>string; addCommandHistory:(item:Omit<CommandHistoryItem,"id"|"createdAt">)=>void; startAssistant:(chatId:string)=>string; patchAssistant:(chatId:string,messageId:string,patch:Partial<Pick<ChatMessage,"content"|"thinking">>)=>void; removeEmptyAssistant:(chatId:string,messageId:string)=>void; deleteMessage:(chatId:string,messageId:string)=>void; deleteChat:(id:string)=>void;
 addMap:(map:SavedMap)=>void; setActiveMap:(id:string|null)=>void; deleteMap:(id:string)=>void; addImage:(image:StudioImage)=>void; deleteImage:(id:string)=>void;
 updatePersonality:(patch:Partial<PersonalitySettings>)=>void; toggleAgentSkill:(id:string)=>void; addAgentProfile:(profile:AgentProfile)=>void; deleteAgentProfile:(id:string)=>void; addMemory:(content:string)=>void; deleteMemory:(id:string)=>void; saveLearnedSkill:(skill:Omit<LearnedSkill,"id"|"createdAt"|"uses">)=>void; useLearnedSkill:(id:string)=>void;
 };
 
 export const useAppStore=create<AppState>()(persist((set)=>({
-conversations:[],activeChatId:null,maps:[],activeMapId:null,images:[],hydrated:false,personality:defaultPersonality,agentSkills:defaultSkills,agentProfiles:[defaultAgent],memory:[],learnedSkills:[],
+conversations:[],commandHistory:[],activeChatId:null,maps:[],activeMapId:null,images:[],hydrated:false,personality:defaultPersonality,agentSkills:defaultSkills,agentProfiles:[defaultAgent],memory:[],learnedSkills:[],
 setHydrated:()=>set({hydrated:true}),
 newChat:(mode="instant")=>{const id=uid("chat");const next:Conversation={id,title:"แชตใหม่",mode,messages:[],updatedAt:Date.now()};set(s=>({conversations:[next,...s.conversations].slice(0,MAX_CHATS),activeChatId:id}));return id;},
 setActiveChat:id=>set({activeChatId:id}),setChatMode:(id,mode)=>set(s=>({conversations:s.conversations.map(c=>c.id===id?{...c,mode}:c)})),
 addUserMessage:(chatId,content)=>{const messageId=uid("msg");set(s=>({conversations:s.conversations.map(c=>{if(c.id!==chatId)return c;const messages=[...c.messages,{id:messageId,role:"user" as const,content,createdAt:Date.now()}].slice(-MAX_MESSAGES);return {...c,title:c.messages.length===0?titleFromPrompt(content):c.title,messages,updatedAt:Date.now()};})}));return messageId;},
+addCommandHistory:item=>set(s=>({commandHistory:[{...item,id:uid("cmd"),createdAt:Date.now()},...s.commandHistory].slice(0,50)})),
 startAssistant:chatId=>{const messageId=uid("msg");set(s=>({conversations:s.conversations.map(c=>c.id===chatId?{...c,messages:[...c.messages,{id:messageId,role:"assistant" as const,content:"",thinking:"",createdAt:Date.now()}].slice(-MAX_MESSAGES),updatedAt:Date.now()}:c)}));return messageId;},
 patchAssistant:(chatId,messageId,patch)=>set(s=>({conversations:s.conversations.map(c=>c.id!==chatId?c:{...c,messages:c.messages.map(m=>m.id===messageId?{...m,...patch}:m),updatedAt:Date.now()})})),
 removeEmptyAssistant:(chatId,messageId)=>set(s=>({conversations:s.conversations.map(c=>c.id===chatId?{...c,messages:c.messages.filter(m=>m.id!==messageId)}:c)})),
@@ -49,6 +50,6 @@ saveLearnedSkill:skill=>set(s=>{
   return {learnedSkills:[{...skill,id:uid("skill"),createdAt:Date.now(),uses:1,lastTestedAt:Date.now()},...s.learnedSkills].slice(0,200)};
 }),
 useLearnedSkill:id=>set(s=>({learnedSkills:s.learnedSkills.map(x=>x.id===id?{...x,uses:x.uses+1}:x)})),
-}),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({conversations:s.conversations,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory,learnedSkills:s.learnedSkills}),merge:(persisted,current)=>{const p=(persisted??{}) as Partial<AppState>;return {...current,...p,agentSkills:[...(p.agentSkills??current.agentSkills),...defaultSkills.filter(d=>!(p.agentSkills??current.agentSkills).some(s=>s.id===d.id))],personality:{...current.personality,...(p.personality??{})}};}}));
+}),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({conversations:s.conversations,commandHistory:s.commandHistory,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory,learnedSkills:s.learnedSkills}),merge:(persisted,current)=>{const p=(persisted??{}) as Partial<AppState>;return {...current,...p,agentSkills:[...(p.agentSkills??current.agentSkills),...defaultSkills.filter(d=>!(p.agentSkills??current.agentSkills).some(s=>s.id===d.id))],personality:{...current.personality,...(p.personality??{})}};}}));
 
 export function getConversation(id:string|null){if(!id)return undefined;return useAppStore.getState().conversations.find(c=>c.id===id);}

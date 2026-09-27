@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { Bot, GitBranch, ImageIcon, MessageSquare, Plus, Settings, SquareTerminal, Trash2 } from "lucide-react";
+import { Bot, GitBranch, ImageIcon, MessageSquare, Plus, Settings, SquareTerminal, Trash2, RotateCcw } from "lucide-react";
+import type { CommandHistoryItem } from "@/lib/types";
 import { LuminaWordmark } from "@/components/lumina-mark";
 import { Button } from "@/components/ui/button";
 import type { AppView, Conversation, SavedMap } from "@/lib/types";
@@ -14,7 +15,7 @@ function NavItem({ active, icon: Icon, label, onClick }: { active: boolean; icon
 
 export function Sidebar({ view, onView, conversations, maps, activeChatId, activeMapId, onNewChat, onOpenChat, onDeleteChat, onOpenMap }: {
   view: AppView; onView: (view: AppView) => void; conversations: Conversation[]; maps: SavedMap[]; activeChatId: string | null; activeMapId: string | null;
-  onNewChat: () => void; onOpenChat: (id: string) => void; onDeleteChat: (id: string) => void; onOpenMap: (id: string) => void;
+  onNewChat: () => void; onOpenChat: (id: string) => void; onDeleteChat: (id: string) => void; onOpenMap: (id: string) => void; commandHistory: CommandHistoryItem[]; onRunCommand: (command: string) => void;
 }) {
   const store = useAppStore();
   return <aside className="flex h-full min-h-0 w-[260px] shrink-0 flex-col border-r border-border bg-bg">

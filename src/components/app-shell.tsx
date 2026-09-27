@@ -125,6 +125,8 @@ export function AppShell({ search }: { search: Search }) {
       }
       let output = "";
       setStreamStatus("กำลังรันใน Sandbox…");
+      store.addCommandHistory({ command: call.command, runtime: call.language, status: "running" });
+      store.addCommandHistory({ command: call.command, runtime: call.language, status: "running" });
       setWorkSteps(steps => [...steps, `▶ ${call.command.slice(0, 80)}`]);
       setSandboxRun({ runtime: call.language, label: "Sandbox Terminal", command: call.command, status: "running", output });
       try {
@@ -263,6 +265,8 @@ export function AppShell({ search }: { search: Search }) {
           view={view}
           conversations={store.conversations}
           maps={store.maps}
+          commandHistory={store.commandHistory}
+          onRunCommand={(command) => void send(command, activeChat?.id)}
           activeChatId={search.c ?? null}
           activeMapId={search.m ?? activeMap?.id ?? null}
           onView={(v) => {
@@ -299,6 +303,8 @@ export function AppShell({ search }: { search: Search }) {
               view={view}
               conversations={store.conversations}
               maps={store.maps}
+              commandHistory={store.commandHistory}
+              onRunCommand={(command) => void send(command, activeChat?.id)}
               activeChatId={search.c ?? null}
               activeMapId={search.m ?? activeMap?.id ?? null}
               onView={(v) => {
