@@ -77,7 +77,7 @@ export function detectSandboxInput(input: string): SandboxDetection {
     return { runtime: "tailwind", label: "Tailwind CSS", code: value, confidence: "high", webPreview: true, dangerous: false };
   }
   if (/(^|\n)\s*[.#]?[a-zA-Z][^{]*\{[\s\S]*:[^;{}]+;[\s\S]*\}/.test(value)) {
-    return { runtime: "css", label: "CSS", code: value, confidence: "high", webPreview: true };
+    return { runtime: "css", label: "CSS", code: value, confidence: "high", webPreview: true, dangerous: false };
   }
   if (htmlDocument(value)) {
     return { runtime: "html", label: "HTML / Web", code: value, confidence: "high", webPreview: true };
