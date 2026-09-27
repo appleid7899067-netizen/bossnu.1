@@ -2,6 +2,15 @@ import { RunScanner, modelResult, terminalTranscript } from "./sandbox-tool.ts";
 import type { RunCall, ToolResult } from "./sandbox-tool.ts";
 import { CowAgentCore, buildCowPlan } from "./cow-agent-core.ts";
 import { selectSkills } from "../skills/index.ts";
+import {
+  createWorkspaceTask,
+  ensureBossWorkspace,
+  formatWorkspaceContext,
+  listWorkspaceFiles,
+  recallWorkspaceMemory,
+  rememberWorkspace,
+  updateWorkspaceTask,
+} from "./boss-workspace.ts";
 
 function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -34,6 +43,7 @@ export async function runAgentLoop(opts: {
   opts.onPhase?.("goal", "🎯 เป้าหมาย");
   opts.onText(`\n> 🎯 เป้าหมาย: ${goal.slice(0, 300)}\n`);
   const max = Math.min(4, Math.max(0, opts.maxRuns ?? 4));
+  if (workspaceId) await createWorkspaceTask(workspaceId, goal, core.task.id);
 
   while (!opts.signal.aborted) {
     core.setPhase("plan");
@@ -52,6 +62,7 @@ export async function runAgentLoop(opts: {
 
     const agentContext = [
       "Agent Core: CowAgent-style operating loop.",
+      workspaceContext,
       "Goal: " + goal.slice(0, 1000),
       "Active skills: " + (selectedSkills.map(skill => skill.name).join(", ") || "General"),
       "Plan: " + plan.join(" → "),
@@ -79,7 +90,10 @@ export async function runAgentLoop(opts: {
     }
 
     messages.push({ role: "assistant", content: raw });
-    if (raw.trim()) core.remember("latest-plan", raw, "conversation");
+    if (raw.trim()) {
+      core.remember("latest-plan", raw, "conversation");
+      if (workspaceId) await rememberWorkspace(workspaceId, "latest-plan", raw, "conversation");
+    }
 
     for (const call of calls) {
       if (opts.signal.aborted) return;
@@ -113,6 +127,7 @@ export async function runAgentLoop(opts: {
 
       core.setPhase("observe");
       core.remember(`run-${count}`, modelResult(call, result), "run");
+      if (workspaceId) await rememberWorkspace(workspaceId, `run-${count}`, modelResult(call, result), "run");
       opts.onPhase?.("observe", "👀 Observe • กำลังอ่านผลจาก Sandbox");
       opts.onText(terminalTranscript(call, result));
 
