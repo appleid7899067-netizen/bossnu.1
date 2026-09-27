@@ -51,7 +51,8 @@ export function AppShell({ search }: { search: Search }) {
     reason: string;
   } | null>(null);
   const [voiceEnabled, setVoiceEnabledState] = useState(true);
-  const [callOpen, setCallOpen] = useState(false);\n  const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [callOpen, setCallOpen] = useState(false);
+  const [activeTool, setActiveTool] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
