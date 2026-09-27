@@ -21,7 +21,7 @@ import { useAppStore } from "@/lib/store";
 import type { BuilderProject, ChatMode, MindMapData } from "@/lib/types";
 import { cn, uid } from "@/lib/utils";
 import { detectSandboxInput } from "@/lib/sandbox/detect";
-import { executeSandbox, sandboxPreviewUrl } from "@/lib/sandbox/client";
+import { sandboxClient } from "@/lib/sandbox-client";
 import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
 
 export function AppShell({ search }: { search: Search }) {
@@ -117,9 +117,9 @@ export function AppShell({ search }: { search: Search }) {
       setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: "กำลังรัน…" });
       setWorkSteps((steps) => [...steps, "กำลังรันในแซนด์บ็อกจริง"]);
       try {
-        const result = await executeSandbox(sandboxDetection);
+        const result = await sandboxClient.execute(sandboxDetection.command, { type: sandboxDetection.runtime });
         const output = [result?.stdout, result?.stderr].filter(Boolean).join("\\n").trim();
-        setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: result?.status === "running" ? "กำลังทำงาน" : result?.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด", output, previewUrl: result ? sandboxPreviewUrl(result) : null });
+        setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: result?.status === "running" ? "กำลังทำงาน" : result?.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด", output, previewUrl: null });
         if (result?.status === "success") {
           store.saveLearnedSkill({
             name: `Sandbox ${sandboxDetection.label}`,
@@ -132,7 +132,7 @@ export function AppShell({ search }: { search: Search }) {
           setWorkSteps((steps) => steps.includes("บันทึกทักษะที่ทดสอบผ่าน") ? steps : [...steps, "บันทึกทักษะที่ทดสอบผ่าน"]);
         }
         sandboxNote = output ? "\\n\\n**ผลการรัน Sandbox**\\n\\n\`\`\`text\\n" + output + "\\n\`\`\`" : "";
-        const preview = result ? sandboxPreviewUrl(result) : null;
+        const preview = null;
         if (preview) sandboxNote += "\\n\\n:::sandbox-preview " + preview + "\\n";
         setWorkSteps((steps) => [...steps, result?.status === "running" ? "เว็บกำลังทำงานและเปิด Preview" : result?.status === "success" ? "Sandbox รันสำเร็จ" : "Sandbox แจ้งข้อผิดพลาด"]);
         setStreamStatus(result?.status === "running" ? "เปิด Live Preview แล้ว…" : "ตรวจผล Sandbox แล้ว…");
