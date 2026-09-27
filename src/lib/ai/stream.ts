@@ -75,7 +75,7 @@ export async function streamChat(opts: {
     const activeSkills = settings.agentSkills.filter((s) => s.enabled).map((s) => s.name).join(", ");
     const memories = settings.memory.slice(0, 12).map((m) => `- ${m.content}`).join("\n");
     const agent = settings.agentProfiles[0];
-    const learnedSkills = settings.learnedSkills.slice(0, 20).map((s) => `- ${s.name} [${s.runtime}] tested: ${s.pattern} | uses: ${s.uses}`).join("\n");
+    const learnedSkills = settings.learnedSkills.slice(0, 30).map((s) => `- ${s.name} [${s.runtime}] result: ${s.result} | command: ${s.pattern} | evidence: ${s.evidence.slice(0, 240)} | uses: ${s.uses}`).join("\n");
 
     const system = [
       `Persona: คุณคือ ${settings.personality.name} ผู้ช่วย AI ผู้หญิงของผู้ใช้`,
