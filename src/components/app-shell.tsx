@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Menu, Phone, X } from "lucide-react";
 import { Toaster, toast } from "sonner";
-import { AppBuilderView } from "@/components/app-builder-view";
 import { ChatThread, type SandboxRunView } from "@/components/chat-thread";
 import { Composer } from "@/components/composer";
 import { Discover } from "@/components/discover";
@@ -21,7 +20,7 @@ import { streamChat } from "@/lib/ai/stream";
 import { finishVoice, setVoiceEnabled, speakRealtime, stopVoice } from "@/lib/ai/voice";
 import type { Search } from "@/lib/search";
 import { useAppStore } from "@/lib/store";
-import type { BuilderProject, ChatMode, MindMapData } from "@/lib/types";
+import type { ChatMode, MindMapData } from "@/lib/types";
 import { cn, uid } from "@/lib/utils";
 import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
 import { sandboxClient } from "@/lib/sandbox-client";
@@ -53,7 +52,6 @@ export function AppShell({ search }: { search: Search }) {
   } | null>(null);
   const [voiceEnabled, setVoiceEnabledState] = useState(true);
   const [callOpen, setCallOpen] = useState(false);
-  const [builderProject, setBuilderProject] = useState<BuilderProject | undefined>(undefined);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {

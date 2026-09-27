@@ -10,7 +10,6 @@ import {
 } from "@/types/sandbox";
 
 const MAX_BODY_BYTES = 96 * 1024;
-const RUNTIMES = ["node","python","bash","go","rust","java","cpp"] as const;
 
 function runnerUrl() {
   return (

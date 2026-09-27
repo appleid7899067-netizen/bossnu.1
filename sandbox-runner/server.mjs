@@ -215,8 +215,8 @@ async function executeStream(body, res) {
       const limited = chunk.subarray(0, remaining); sentBytes += limited.length;
       sse(res, { type: "output", stream, text: limited.toString("utf8") });
     };
-    child.stdout.on("data", c => { const t=c.toString("utf8"); stdout=append(stdout,c); output("stdout", c); });
-    child.stderr.on("data", c => { const t=c.toString("utf8"); stderr=append(stderr,c); output("stderr", c); });
+    child.stdout.on("data", c => { stdout=append(stdout,c); output("stdout", c); });
+    child.stderr.on("data", c => { stderr=append(stderr,c); output("stderr", c); });
     await new Promise(resolve => {
       child.on("error", e => { stderr=append(stderr,e); });
       child.on("close", code => { clearTimeout(timer); res.off("close", cancel); cancel(); const status=timedOut?"timeout":code===0?"success":"error"; sse(res,{type:"complete",result:{success:status==="success",status,type:language,runtime:language,command,stdout,stderr,output:[stdout,stderr].filter(Boolean).join("\n").trim(),exitCode:code,durationMs:Date.now()-started}}); resolve(); });
