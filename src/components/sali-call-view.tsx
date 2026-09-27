@@ -54,7 +54,8 @@ export function SaliCallView({
 
   function startRecognition() {
     if (!activeRef.current || muted) return;
-    const SR = window.SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+    const speechWindow = window as any;
+    const SR = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
     if (!SR) {
       setStatus("เบราว์เซอร์นี้ไม่รองรับการฟังเสียงภาษาไทย");
       return;
