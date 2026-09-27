@@ -67,6 +67,8 @@ export type ExecuteOptions = {
   /** Runtime hint; omit for auto-detection. */
   type?: CommandType;
   signal?: AbortSignal;
+  /** Explicit approval from the user for a command classified as dangerous. */
+  allowDangerous?: boolean;
 };
 
 export class SandboxClient {
@@ -113,7 +115,7 @@ export class SandboxClient {
       response = await this.fetchImpl("/api/sandbox.stream", {
         method: "POST",
         headers: { "content-type": "application/json", accept: "text/event-stream" },
-        body: JSON.stringify(stripUndefined({ cmd: command, skill: options.skill, type: options.type })),
+        body: JSON.stringify(stripUndefined({ cmd: command, skill: options.skill, type: options.type, allowDangerous: options.allowDangerous })),
         signal: combined,
       });
     } catch (error) {
@@ -134,7 +136,7 @@ export class SandboxClient {
     if (command.length > SANDBOX_LIMITS.commandChars) {
       return errorResult(`คำสั่งยาวเกิน ${SANDBOX_LIMITS.commandChars.toLocaleString()} ตัวอักษร`);
     }
-    return this.post({ cmd: command, skill: options.skill, type: options.type }, options.signal);
+    return this.post({ cmd: command, skill: options.skill, type: options.type, allowDangerous: options.allowDangerous }, options.signal);
   }
 
   executeNode(cmd: string, options: Omit<ExecuteOptions, "type"> = {}) {
