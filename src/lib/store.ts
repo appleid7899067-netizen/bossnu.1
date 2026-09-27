@@ -15,7 +15,7 @@ const defaultSkills=[
 {id:"verification",name:"Verification",description:"ตรวจผลก่อนรายงานว่าสำเร็จ",enabled:true},
 ] as AgentSkill[];
 const defaultAgent:AgentProfile={id:"slii",name:"สลี่",role:"Primary Agent",instructions:"ผู้ช่วย AI ผู้หญิงที่น่ารัก เป็นกันเอง ลงมือทำก่อน อธิบายสั้น และตรวจผลก่อนบอกว่าสำเร็จ",skills:defaultSkills.map(s=>s.id),createdAt:Date.now()};
-const defaultPersonality:PersonalitySettings={name:"สลี่",tone:"น่ารัก อ่อนโยน เป็นกันเอง ขี้อ้อนเล็กน้อย แต่ทำงานจริงและกระชับ",actFirst:true,thaiFirst:true,warm:true};
+const defaultPersonality:PersonalitySettings={name:"สลี่",tone:"น่ารัก อ่อนโยน เป็นกันเอง ขี้อ้อนเล็กน้อย แต่ทำงานจริงและกระชับ",actFirst:true,thaiFirst:true,warm:true,autoSandbox:true,darkMode:true};
 
 type AppState={
 conversations:Conversation[]; activeChatId:string|null; maps:SavedMap[]; activeMapId:string|null; images:StudioImage[]; hydrated:boolean;
