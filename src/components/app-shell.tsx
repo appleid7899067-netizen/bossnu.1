@@ -433,7 +433,19 @@ export function AppShell({ search }: { search: Search }) {
                 busy={busyChat}
                 contextualActions={quickActions}
                 toolActions={roomTools}
-                activeTool={activeTool}\\n                onToolAction={(tool) => {\\n                  setActiveTool(tool);\\n                  const prompts: Record<string, string> = {\\n                    auto: "ทำงานแบบ Auto ให้ Boss เลือกเครื่องมือที่เหมาะสม",\\n                    sandbox: "ใช้ Sandbox เพื่อรันและทดสอบงานนี้จริง",\\n                    web: "ค้นข้อมูลสดจากเว็บและตรวจแหล่งข้อมูล",\\n                    github: "ตรวจและทำงานกับ GitHub/Repo ที่เกี่ยวข้อง",\\n                    builder: "ใช้โหมด AI Builder เพื่อสร้างหรือปรับแอปแบบครบวงจร",\\n                  };\\n                  const hint = prompts[tool];\\n                  if (hint && !draft.trim()) setDraft(hint);\\n                }}
+                activeTool={activeTool}
+                onToolAction={(tool) => {
+                  setActiveTool(tool);
+                  const prompts: Record<string, string> = {
+                    auto: "ทำงานแบบ Auto ให้ Boss เลือกเครื่องมือที่เหมาะสม",
+                    sandbox: "ใช้ Sandbox เพื่อรันและทดสอบงานนี้จริง",
+                    web: "ค้นข้อมูลสดจากเว็บและตรวจแหล่งข้อมูล",
+                    github: "ตรวจและทำงานกับ GitHub/Repo ที่เกี่ยวข้อง",
+                    builder: "ใช้โหมด AI Builder เพื่อสร้างหรือปรับแอปแบบครบวงจร",
+                  };
+                  const hint = prompts[tool];
+                  if (hint && !draft.trim()) setDraft(hint);
+                }}
             voiceEnabled={voiceEnabled}
             onToggleVoice={() => {
               const next = !voiceEnabled;
