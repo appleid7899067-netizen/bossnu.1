@@ -72,7 +72,8 @@ export function SaliCallView({
         .map((result: any) => result[0]?.transcript ?? "")
         .join(" ")
         .trim();
-      if (window.speechSynthesis?.speaking || processingRef.current) return;\n      if (finalText) void handleUserSpeech(finalText);
+      if (window.speechSynthesis?.speaking || processingRef.current) return;
+      if (finalText) void handleUserSpeech(finalText);
     };
     rec.onerror = () => {
       setListening(false);
@@ -142,7 +143,9 @@ export function SaliCallView({
     activeRef.current = true;
     setSeconds(0);
     setStatus("กำลังเชื่อมต่อ…");
-    stopVoice();\n    try { recognitionRef.current?.stop(); } catch {}\n    const greeting = "สวัสดีค่ะ สลี่พร้อมคุยแล้วนะคะ พูดกับสลี่ได้เลย";
+    stopVoice();
+    try { recognitionRef.current?.stop(); } catch {}
+    const greeting = "สวัสดีค่ะ สลี่พร้อมคุยแล้วนะคะ พูดกับสลี่ได้เลย";
     addMessage("assistant", greeting);
     await new Promise((resolve) => setTimeout(resolve, 250));
     setSpeaking(true);
