@@ -22,22 +22,7 @@ import type { BuilderProject, ChatMode, MindMapData } from "@/lib/types";
 import { cn, uid } from "@/lib/utils";
 import { detectSandboxInput } from "@/lib/sandbox/detect";
 import { executeSandbox, sandboxPreviewUrl } from "@/lib/sandbox/client";
-
-function sandboxPreviewDocument(runtime: string, source: string) {
-  const safeScript = source.replace(/<\/script/gi, "<\\/script");
-  if (runtime === "html") {
-    const document = /<!doctype\s+html|<html(?:\s|>)/i.test(source)
-      ? source
-      : `<!doctype html><html lang="th"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>${source}</body></html>`;
-    return document;
-  }
-  if (runtime === "javascript") {
-    return `<!doctype html><html lang="th"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="app"></div><script>${safeScript}</script></body></html>`;
-  }
-  const style = runtime === "css" ? source : "";
-  const tailwind = runtime === "tailwind" ? '<script src="https://cdn.tailwindcss.com"></script>' : "";
-  return `<!doctype html><html lang="th"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${style}</style>${tailwind}</head><body><main class="p-6"><h1 class="text-2xl font-bold">Live preview</h1><p class="mt-2">ปรับแต่งตัวอย่างด้วย ${runtime === "css" ? "CSS" : "Tailwind CSS"}</p></main></body></html>`;
-}
+import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
 
 export function AppShell({ search }: { search: Search }) {
   const navigate = useNavigate();
@@ -235,7 +220,7 @@ export function AppShell({ search }: { search: Search }) {
     setBusyMap(true);
     setMapError(null);
     try {
-      const result = await generateMindMap({ data: { topic } });
+      const result = await generateMindMap({ topic });
       if (!result.ok) {
         setMapError(result.error);
         return;
@@ -257,7 +242,7 @@ export function AppShell({ search }: { search: Search }) {
     setBusyImage(true);
     setImageError(null);
     try {
-      const result = await generateStudioImage({ data: { prompt, aspect } });
+      const result = await generateStudioImage({ prompt, aspect });
       if (!result.ok) {
         setImageError(result.error);
         return;
