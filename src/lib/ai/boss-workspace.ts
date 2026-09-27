@@ -24,7 +24,8 @@ export type WorkspaceMemory = {
 };
 
 function safePath(input: string): string {
-  const path = input.trim().replace(/\\/g, "/").replace(/^\\/+/, "");
+  let path = input.trim().split(String.fromCharCode(92)).join("/");
+  while (path.startsWith("/")) path = path.slice(1);
   if (!path || path.length > MAX_PATH || path.includes("\0")) throw new Error("Invalid workspace path");
   const parts = path.split("/");
   if (parts.some(part => !part || part === "." || part === "..")) throw new Error("Invalid workspace path");
