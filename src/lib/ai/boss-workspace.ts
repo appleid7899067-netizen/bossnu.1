@@ -179,7 +179,7 @@ export async function updateWorkspaceTask(id: string, taskId: string, status: st
 
 export function formatWorkspaceContext(files: WorkspaceFile[], memories: WorkspaceMemory[]): string {
   const home = files
-    .filter(file => /^(agent|memory)\\//.test(file.path))
+    .filter(file => file.path.startsWith("agent/") || file.path.startsWith("memory/"))
     .slice(0, 8)
     .map(file => `--- ${file.path} ---\\n${file.content.slice(0, 6000)}`)
     .join("\\n");
