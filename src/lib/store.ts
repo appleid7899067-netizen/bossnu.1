@@ -48,6 +48,6 @@ saveLearnedSkill:skill=>set(s=>{
   return {learnedSkills:[{...skill,id:uid("skill"),createdAt:Date.now(),uses:1},...s.learnedSkills].slice(0,200)};
 }),
 useLearnedSkill:id=>set(s=>({learnedSkills:s.learnedSkills.map(x=>x.id===id?{...x,uses:x.uses+1}:x)})),
-}),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({conversations:s.conversations,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory,learnedSkills:s.learnedSkills})}));
+}),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({conversations:s.conversations,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory,learnedSkills:s.learnedSkills}),merge:(persisted,current)=>{const p=(persisted??{}) as Partial<AppState>;return {...current,...p,personality:{...current.personality,...(p.personality??{})}};}}));
 
 export function getConversation(id:string|null){if(!id)return undefined;return useAppStore.getState().conversations.find(c=>c.id===id);}
