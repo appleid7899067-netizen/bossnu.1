@@ -235,7 +235,7 @@ export function Markdown({
   className?: string;
   live?: boolean;
 }) {
-  const normalizedRuns = text.replace(/<run\s+lang=["\']([^"\']+)["\']>([\s\S]*?)<\/run>/gi, (_, lang, code) => `\n\`\`\`${lang}\n${code.trim()}\n\`\`\`\n`);
+  const normalizedRuns = text.replace(/<run\s+lang=["']([^"']+)["']>([\s\S]*?)<\/run>/gi, (_, lang, code) => `\n\`\`\`${lang}\n${code.trim()}\n\`\`\`\n`);
   const cleanedText = normalizedRuns.replace(/\*{3,}/g, "").replace(/\/\/nn\//gi, "");
   // Keep the DOM shape stable while tokens stream in. Promoting an unfinished
   // table or code fence to a richer element mid-stream can confuse hydration

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Trash2 } from "lucide-react";
 import { Markdown } from "@/components/markdown";
 import type { ChatMessage } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import { LuminaMark } from "@/components/lumina-mark";
 
 export type SandboxRunView = {

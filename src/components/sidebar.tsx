@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Bot, GitBranch, ImageIcon, MessageSquare, Plus, Settings, SquareTerminal, Trash2, RotateCcw } from "lucide-react";
+import { Bot, GitBranch, ImageIcon, MessageSquare, Plus, Settings, SquareTerminal, Trash2 } from "lucide-react";
 import type { CommandHistoryItem } from "@/lib/types";
 import { LuminaWordmark } from "@/components/lumina-mark";
 import { Button } from "@/components/ui/button";
