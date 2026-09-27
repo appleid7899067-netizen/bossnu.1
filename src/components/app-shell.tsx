@@ -398,6 +398,7 @@ export function AppShell({ search }: { search: Search }) {
                 streamingId={streamingId}
                 workStatus={streamStatus}
                 workSteps={workSteps}
+                sandboxRun={sandboxRun}
               />
             )}
             {view === "settings" ? null : <div className="mx-auto w-full max-w-[1180px] px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
