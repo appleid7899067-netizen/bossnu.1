@@ -58,7 +58,10 @@ test("non-.sql entries are dropped (readdir also yields the auth/ directory)", (
 
 test("the auth schema ships outside the globbed directory", () => {
   const migrationsDir = join(projectRoot(), "migrations");
-  assert.deepEqual(pendingMigrations(readdirSync(migrationsDir), []), []);
+  // App migrations (e.g. 999_boss_workspace.sql) may live here; the auth
+  // schema must not, or it would run twice under different basenames.
+  const topLevel = pendingMigrations(readdirSync(migrationsDir), []).map((m) => m.name);
+  assert.ok(!topLevel.some((name) => /auth/i.test(name)), `auth schema leaked into globbed dir: ${topLevel}`);
   assert.ok(readdirSync(join(migrationsDir, "auth")).includes("0001_auth.sql"));
 });
 

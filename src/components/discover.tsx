@@ -14,14 +14,14 @@ const PROMPTS = [
 export function Discover({ onPrompt, onView }: { onPrompt: (text: string) => void; onView: (view: AppView) => void }) {
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-col items-center px-5 pt-10 pb-8 sm:pt-[13vh]">
-      <div className="mb-5 grid size-12 place-items-center rounded-full bg-[#eaf2ff] text-primary"><Sparkles className="size-6" /></div>
-      <h1 className="lumina-rise text-center text-[30px] font-semibold tracking-[-0.04em] text-[#252a32] sm:text-[36px]">Hi, I’m PANUPANXBOSS.</h1>
-      <p className="mt-2 text-center text-[15px] text-[#9299a3]">How can I help you today?</p>
+      <div className="mb-5 grid size-12 place-items-center rounded-full bg-primary/10 text-primary"><Sparkles className="size-6" /></div>
+      <h1 className="lumina-rise text-center text-[30px] font-semibold tracking-[-0.04em] text-fg sm:text-[36px]">Hi, I’m PANUPANXBOSS.</h1>
+      <p className="mt-2 text-center text-[15px] text-muted">How can I help you today?</p>
       <div className="mt-10 grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
         {PROMPTS.map((p, i) => (
-          <button key={p.title} type="button" onClick={() => onPrompt(p.body)} className="lumina-rise group min-h-[112px] rounded-2xl border border-[#eaedf1] bg-white p-4 text-left transition hover:border-[#b9d1fb] hover:bg-[#fbfdff]" style={{ animationDelay: `${i * 35}ms` }}>
-            <p className="text-[14px] font-semibold text-[#3d4653]">{p.title}</p>
-            <p className="mt-2 line-clamp-2 text-[13px] leading-[1.6] text-[#9098a3]">{p.body}</p>
+          <button key={p.title} type="button" onClick={() => onPrompt(p.body)} className="lumina-rise group min-h-[112px] rounded-2xl border border-border bg-surface p-4 text-left transition hover:border-primary/40 hover:bg-hover" style={{ animationDelay: `${i * 35}ms` }}>
+            <p className="text-[14px] font-semibold text-fg">{p.title}</p>
+            <p className="mt-2 line-clamp-2 text-[13px] leading-[1.6] text-muted">{p.body}</p>
           </button>
         ))}
       </div>
@@ -30,11 +30,11 @@ export function Discover({ onPrompt, onView }: { onPrompt: (text: string) => voi
         <ModePill icon={GitBranch} label="Mind maps" onClick={() => onView("maps")} />
         <ModePill icon={Bot} label="AI Builder" onClick={() => onView("builder")} />
         <ModePill icon={ImageIcon} label="Studio" onClick={() => onView("studio")} />
-        <Link to="/sandbox" className="inline-flex h-9 items-center gap-2 rounded-full border border-[#e8ebef] bg-white px-3.5 text-xs font-medium text-[#66707c] transition hover:bg-[#f6f8fb]"><SquareTerminal className="size-3.5 text-primary" />Sandbox</Link>
+        <Link to="/sandbox" className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-surface px-3.5 text-xs font-medium text-muted transition hover:bg-hover hover:text-fg"><SquareTerminal className="size-3.5 text-primary" />Sandbox</Link>
       </div>
     </div>
   );
 }
 function ModePill({ icon: Icon, label, onClick }: { icon: typeof MessageSquare; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className="inline-flex h-9 items-center gap-2 rounded-full border border-[#e8ebef] bg-white px-3.5 text-xs font-medium text-[#66707c] transition hover:bg-[#f6f8fb]"><Icon className="size-3.5 text-primary" />{label}</button>;
+  return <button type="button" onClick={onClick} className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-surface px-3.5 text-xs font-medium text-muted transition hover:bg-hover hover:text-fg"><Icon className="size-3.5 text-primary" />{label}</button>;
 }

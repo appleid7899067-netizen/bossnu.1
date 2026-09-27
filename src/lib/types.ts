@@ -1,7 +1,8 @@
 export type ChatMode = "instant" | "think";
 export type AppView = "chat" | "maps" | "studio" | "builder" | "settings";
-export type ChatMessage = { id: string; role: "user" | "assistant"; content: string; thinking?: string; createdAt: number; };
-export type Conversation = { id: string; title: string; mode: ChatMode; messages: ChatMessage[]; updatedAt: number; };
+export type ChatAttachment = { name: string; size: number; content: string; };
+export type ChatMessage = { id: string; role: "user" | "assistant"; content: string; thinking?: string; attachments?: ChatAttachment[]; createdAt: number; };
+export type Conversation = { id: string; title: string; mode: ChatMode; messages: ChatMessage[]; updatedAt: number; pinned?: boolean; };
 export type MapChild = { id: string; label: string; note: string; };
 export type MapBranch = { id: string; label: string; tone: "sage" | "ink" | "clay" | "sky" | "sand"; children: MapChild[]; };
 export type MindMapData = { topic: string; summary: string; branches: MapBranch[]; };

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Menu, Phone, X } from "lucide-react";
 import { Toaster, toast } from "sonner";
+import { AppBuilderView } from "@/components/app-builder-view";
 import { ChatThread, type SandboxRunView } from "@/components/chat-thread";
 import { Composer } from "@/components/composer";
 import { Discover } from "@/components/discover";
@@ -20,7 +21,9 @@ import { streamChat } from "@/lib/ai/stream";
 import { finishVoice, setVoiceEnabled, speakRealtime, stopVoice } from "@/lib/ai/voice";
 import type { Search } from "@/lib/search";
 import { useAppStore } from "@/lib/store";
-import type { ChatMode, MindMapData } from "@/lib/types";
+import type { ChatAttachment, ChatMode, MindMapData } from "@/lib/types";
+import { messageForModel } from "@/lib/attachments";
+import { conversationToMarkdown } from "@/lib/store";
 import { cn, uid } from "@/lib/utils";
 import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
 import { sandboxClient } from "@/lib/sandbox-client";
@@ -32,6 +35,9 @@ export function AppShell({ search }: { search: Search }) {
   const [drawer, setDrawer] = useState(false);
   const [agentSettingsOpen, setAgentSettingsOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [mapTopic, setMapTopic] = useState("");
   const [studioPrompt, setStudioPrompt] = useState("");
   const [aspect, setAspect] = useState("1:1");
@@ -48,6 +54,7 @@ export function AppShell({ search }: { search: Search }) {
     content: string;
     chatId?: string;
     mode?: ChatMode;
+    attachments?: ChatAttachment[];
     reason: string;
   } | null>(null);
   const [voiceEnabled, setVoiceEnabledState] = useState(true);
@@ -91,26 +98,26 @@ export function AppShell({ search }: { search: Search }) {
     });
   }
 
-  async function send(text: string, chatId?: string, mode?: ChatMode, allowDangerous = false) {
+  async function send(text: string, chatId?: string, mode?: ChatMode, allowDangerous = false, files: ChatAttachment[] = []) {
     const content = text.trim();
-    if (!content || busyChat) return;
+    if ((!content && !files.length) || busyChat) return;
     const detection = detectSandboxInput(content);
     if (detection.command && detection.dangerous && !allowDangerous) {
-      setDangerousApproval({ content, chatId, mode, reason: detection.riskReason ?? "คำสั่งนี้อาจกระทบไฟล์" });
+      setDangerousApproval({ content, chatId, mode, attachments: files, reason: detection.riskReason ?? "คำสั่งนี้อาจกระทบไฟล์" });
       return;
     }
     setDangerousApproval(null);
     const id = chatId ?? store.newChat(mode ?? "instant");
     const convo = useAppStore.getState().conversations.find(c => c.id === id);
     const chatMode = mode ?? convo?.mode ?? "instant";
-    store.addUserMessage(id, content);
+    store.addUserMessage(id, content, files);
     const assistantId = store.startAssistant(id);
     const history = (useAppStore.getState().conversations.find(c => c.id === id)?.messages ?? [])
-      .filter(m => m.id !== assistantId && m.content).map(m => ({ role: m.role, content: m.content }));
+      .filter(m => m.id !== assistantId && (m.content || m.attachments?.length)).map(m => ({ role: m.role, content: messageForModel(m) }));
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-    setDraft(""); setActiveTool(null); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
+    setDraft(""); setAttachments([]); setActiveTool(null); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
     setStreamStatus("กำลังวางแผน…"); setWorkSteps(["🎯 เป้าหมาย"]);
     stopVoice(); go({ view: "chat", c: id });
     let reply = "";
@@ -119,7 +126,7 @@ export function AppShell({ search }: { search: Search }) {
     const execute = async (call: RunCall, approved = false) => {
       ac.signal.throwIfAborted();
       const risk = assessSandboxRisk(call.command);
-      if (risk.dangerous && !approved && !window.confirm(`${risk.riskReason}\\n\\n${call.command}\\n\\nอนุญาตให้รันคำสั่งนี้ใน Sandbox?`)) {
+      if (risk.dangerous && !approved && !window.confirm(`${risk.riskReason}\n\n${call.command}\n\nอนุญาตให้รันคำสั่งนี้ใน Sandbox?`)) {
         return { status: "error", error: "ผู้ใช้ไม่อนุญาตคำสั่งนี้ ห้ามลองใหม่หรือหลีกเลี่ยงการอนุญาต" };
       }
       let output = "";
@@ -153,7 +160,7 @@ export function AppShell({ search }: { search: Search }) {
     try {
       if (detection.webPreview && detection.code && ["html", "javascript", "css", "tailwind"].includes(detection.runtime)) {
         setSandboxRun({ runtime: detection.runtime, label: detection.label, command: "browser sandbox", status: "Preview พร้อมแล้ว", previewHtml: sandboxPreviewDocument(detection.runtime, detection.code) });
-        append("แสดง Live Preview ในแชตแล้วค่ะ\\n\\n");
+        append("แสดง Live Preview ในแชตแล้วค่ะ\n\n");
       } else if (tools && store.personality.autoSandbox && detection.command) {
         const call: RunCall = { language: isRunnerRuntime(detection.runtime) ? detection.runtime : "bash", command: detection.command };
         const result = await execute(call, allowDangerous);
@@ -183,7 +190,7 @@ export function AppShell({ search }: { search: Search }) {
             return next.slice(-10);
           });
         },
-        onText: text => { append(text); if (!text.startsWith("\\n\\n```sandbox")) speakRealtime(text); },
+        onText: text => { append(text); if (!text.startsWith("\n\n```sandbox")) speakRealtime(text); },
         model: async (messages, onText) => {
           let failure = "";
           setStreamStatus("🧠 Plan • กำลังวางแผน…");
@@ -201,8 +208,8 @@ export function AppShell({ search }: { search: Search }) {
       if (!reply && !ac.signal.aborted) append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
       setStreamStatus(ac.signal.aborted ? "หยุดแล้ว ⛔" : "ตอบเสร็จแล้ว ✓");
     } catch (error) {
-      if (ac.signal.aborted) { append("\\n\\n⛔ หยุดการทำงานแล้ว"); setStreamStatus("หยุดแล้ว ⛔"); }
-      else { const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด"; append(`\\n\\n${message}`); toast.error(message); setStreamStatus("เกิดข้อผิดพลาด"); }
+      if (ac.signal.aborted) { append("\n\n⛔ หยุดการทำงานแล้ว"); setStreamStatus("หยุดแล้ว ⛔"); }
+      else { const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด"; append(`\n\n${message}`); toast.error(message); setStreamStatus("เกิดข้อผิดพลาด"); }
     } finally {
       finishVoice(); setBusyChat(false); setStreamingId(null);
     }
@@ -212,6 +219,66 @@ export function AppShell({ search }: { search: Search }) {
     abortRef.current?.abort();
     stopVoice();
   }
+
+  /** Re-asks the most recent user message, replacing everything after it. */
+  function regenerate() {
+    if (busyChat || !activeChat) return;
+    const lastUser = [...activeChat.messages].reverse().find(m => m.role === "user");
+    if (!lastUser) return;
+    store.truncateFrom(activeChat.id, lastUser.id);
+    void send(lastUser.content, activeChat.id, activeChat.mode, false, lastUser.attachments ?? []);
+  }
+
+  /** Replaces a user message (dropping later turns) and resends it. */
+  function editAndResend(messageId: string, content: string) {
+    if (busyChat || !activeChat) return;
+    const original = activeChat.messages.find(m => m.id === messageId);
+    if (!original) return;
+    store.truncateFrom(activeChat.id, messageId);
+    void send(content, activeChat.id, activeChat.mode, false, original.attachments ?? []);
+  }
+
+  function exportChat(id: string) {
+    const convo = useAppStore.getState().conversations.find(c => c.id === id);
+    if (!convo) return;
+    const blob = new Blob([conversationToMarkdown(convo, store.personality.name)], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${convo.title.replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 60) || "chat"}.md`;
+    a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast.success("ส่งออกแชตเป็น Markdown แล้ว");
+  }
+
+  const busyRef = useRef(false);
+  busyRef.current = busyChat;
+  const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  shortcutRef.current = (e: KeyboardEvent) => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (e.key === "Escape" && busyRef.current) { e.preventDefault(); stopChat(); return; }
+    if (mod && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      if (window.matchMedia("(min-width: 768px)").matches) { go({ view: "chat" }); window.setTimeout(() => searchRef.current?.focus(), 30); }
+      else setDrawer(true);
+      return;
+    }
+    if (mod && e.shiftKey && e.key.toLowerCase() === "o") {
+      e.preventDefault();
+      const id = store.newChat(mode);
+      go({ view: "chat", c: id });
+      window.setTimeout(() => composerRef.current?.focus(), 30);
+      return;
+    }
+    const target = e.target as HTMLElement | null;
+    const typing = target?.closest("input, textarea, select, [contenteditable='true']");
+    if (e.key === "/" && !typing && !mod) { e.preventDefault(); composerRef.current?.focus(); }
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => shortcutRef.current(e);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   async function makeMap() {
     const topic = mapTopic.trim();
@@ -313,6 +380,10 @@ export function AppShell({ search }: { search: Search }) {
             if (search.c === id) go({ view: "chat", c: undefined });
           }}
           onOpenMap={(id) => go({ view: "maps", m: id })}
+          onRenameChat={store.renameChat}
+          onTogglePin={store.togglePinChat}
+          onExportChat={exportChat}
+          searchRef={searchRef}
         />
       </div>
 
@@ -351,6 +422,9 @@ export function AppShell({ search }: { search: Search }) {
                 if (search.c === id) go({ view: "chat", c: undefined });
               }}
               onOpenMap={(id) => go({ view: "maps", m: id })}
+              onRenameChat={store.renameChat}
+              onTogglePin={store.togglePinChat}
+              onExportChat={exportChat}
             />
           </div>
         </div>
@@ -392,6 +466,12 @@ export function AppShell({ search }: { search: Search }) {
             busy={busyMap}
             error={mapError}
           />
+        ) : view === "builder" ? (
+          <AppBuilderView
+            project={store.builderProject ?? undefined}
+            onProject={(project) => store.setBuilderProject(project)}
+            onReset={() => store.setBuilderProject(null)}
+          />
         ) : view === "studio" ? (
           <StudioView
             prompt={studioPrompt}
@@ -421,13 +501,20 @@ export function AppShell({ search }: { search: Search }) {
                 workStatus={streamStatus}
                 workSteps={workSteps}
                 sandboxRun={sandboxRun}
+                busy={busyChat}
+                onDeleteMessage={(messageId) => { if (activeChat) store.deleteMessage(activeChat.id, messageId); }}
+                onEditMessage={editAndResend}
+                onRegenerate={regenerate}
               />
             )}
             {view === "settings" ? null : <div className="mx-auto w-full max-w-[1400px] px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
               <Composer
                 value={draft}
                 onChange={setDraft}
-                onSubmit={() => void send(draft, activeChat?.id)}
+                onSubmit={() => void send(draft, activeChat?.id, undefined, false, attachments)}
+                attachments={attachments}
+                onAttachments={setAttachments}
+                inputRef={composerRef}
                 onStop={stopChat}
                 placeholder={showDiscover ? "Message PANUPANXBOSS…" : "Message PANUPANXBOSS…"}
                 busy={busyChat}
@@ -455,7 +542,7 @@ export function AppShell({ search }: { search: Search }) {
                 onContextAction={(action) => {
                   const base = draft.trim();
                   const instruction = action === "ลงมือทำทันที" ? base : [base, action].filter(Boolean).join(" — ");
-                  if (instruction.trim()) void send(instruction, activeChat?.id);
+                  if (instruction.trim() || attachments.length) void send(instruction, activeChat?.id, undefined, false, attachments);
                 }}
                 extra={
                   <ModeToggle
@@ -471,7 +558,7 @@ export function AppShell({ search }: { search: Search }) {
                 }
               />
               <p className="mt-2 px-1 text-center text-[0.7rem] text-subtle">
-                สลี่พร้อมช่วยค่ะ • แชตเก็บไว้บนอุปกรณ์นี้
+                สลี่พร้อมช่วยค่ะ • แชตเก็บไว้บนอุปกรณ์นี้ • <kbd className="font-sans">/</kbd> พิมพ์ • <kbd className="font-sans">Ctrl K</kbd> ค้นหา • <kbd className="font-sans">Esc</kbd> หยุด
               </p>
             </div>}
           </>
@@ -519,7 +606,7 @@ export function AppShell({ search }: { search: Search }) {
                 onClick={() => {
                   const pending = dangerousApproval;
                   setDangerousApproval(null);
-                  void send(pending.content, pending.chatId, pending.mode, true);
+                  void send(pending.content, pending.chatId, pending.mode, true, pending.attachments ?? []);
                 }}
               >อนุญาตให้รัน</button>
             </div>

@@ -271,7 +271,15 @@ async function executeStream(body, res) {
     child.stderr.on("data", c => { stderr=append(stderr,c); output("stderr", c); });
     await new Promise(resolve => {
       child.on("error", e => { stderr=append(stderr,e); });
-      child.on("close", code => { clearTimeout(timer); res.off("close", cancel); cancel(); const status=timedOut?"timeout":code===0?"success":"error"; sse(res,{type:"complete",result:{success:status==="success",status,type:language,runtime:language,command,stdout,stderr,output:[stdout,stderr].filter(Boolean).join("\n").trim(),exitCode:code,durationMs:Date.now()-started,workspaceFiles:await collectWorkspaceFiles(dir)}}); resolve(); });
+      child.on("close", code => {
+        clearTimeout(timer); res.off("close", cancel); cancel();
+        const status = timedOut ? "timeout" : code === 0 ? "success" : "error";
+        const durationMs = Date.now() - started;
+        collectWorkspaceFiles(dir).catch(() => []).then(workspaceFiles => {
+          sse(res, { type: "complete", result: { success: status === "success", status, type: language, runtime: language, command, stdout, stderr, output: [stdout, stderr].filter(Boolean).join("\n").trim(), exitCode: code, durationMs, workspaceFiles } });
+          resolve();
+        });
+      });
     });
     return res.end();
   } finally {

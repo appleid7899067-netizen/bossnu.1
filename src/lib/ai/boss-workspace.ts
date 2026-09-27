@@ -249,17 +249,17 @@ export function formatWorkspaceContext(files: WorkspaceFile[], memories: Workspa
   const home = files
     .filter(file => file.path.startsWith("agent/") || file.path.startsWith("memory/"))
     .slice(0, 8)
-    .map(file => `--- ${file.path} ---\\n${file.content.slice(0, 6000)}`)
-    .join("\\n");
+    .map(file => `--- ${file.path} ---\n${file.content.slice(0, 6000)}`)
+    .join("\n");
   const memory = memories
     .slice(0, 12)
     .map(item => `- ${item.key}: ${item.value.slice(0, 3000)}`)
-    .join("\\n");
+    .join("\n");
   return [
     "Boss Workspace (persistent Agent Home)",
     home || "ไม่มี Agent Home files",
     "Persistent memory:",
     memory || "ไม่มีความจำที่เกี่ยวข้อง",
-  ].join("\\n");
+  ].join("\n");
 }
 
