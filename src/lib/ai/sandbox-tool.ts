@@ -1,4 +1,9 @@
 /** Protocol syntax is deliberately line-oriented; examples inside fences are inert. */
+/** An explicit Sandbox mention in the user's request should enable this chat tool. */
+export function sandboxRequestedByUser(text: string) {
+  return /\bsandbox(?:\s+terminal)?\b|แซนด์?บ็อกซ์|แซนบ็อก/i.test(text);
+}
+
 export const SANDBOX_TOOL_PROMPT = `You have a real Sandbox Terminal (bash, npm, npx, git, python3).
 To execute a shell command, emit exactly one block on separate lines, outside Markdown fences:
 <run lang="bash">

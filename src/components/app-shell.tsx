@@ -17,7 +17,7 @@ import { generateMindMap, generateStudioImage } from "@/lib/ai/client";
 import { redactSensitiveCommand, runAgentLoop, type AgentPhase } from "@/lib/ai/agent-loop";
 import { agentWorkspaceIdFor, createHttpWorkspace } from "@/lib/workspace/http-workspace";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
-import type { RunCall } from "@/lib/ai/sandbox-tool";
+import { sandboxRequestedByUser, type RunCall } from "@/lib/ai/sandbox-tool";
 import { isRunnerRuntime } from "@/types/sandbox";
 import { streamChat } from "@/lib/ai/stream";
 import { finishVoice, setVoiceEnabled, speakRealtime, stopVoice } from "@/lib/ai/voice";
@@ -133,7 +133,7 @@ export function AppShell({ search }: { search: Search }) {
       const current = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
       store.patchAssistant(id, assistantId, { activities: current.map(activity => activity.id === activityId ? { ...activity, ...patch } as ChatActivity : activity) });
     };
-    const tools = store.agentSkills.some(s => s.id === "sandbox-terminal" && s.enabled);
+    const tools = store.agentSkills.some(s => s.id === "sandbox-terminal" && s.enabled) || activeTool === "sandbox" || sandboxRequestedByUser(content);
     const execute = async (call: RunCall, approved = false) => {
       ac.signal.throwIfAborted();
       const risk = assessSandboxRisk(call.command);

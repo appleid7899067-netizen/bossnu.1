@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { RunScanner, modelResult, terminalTranscript } from "./sandbox-tool.ts";
+import { RunScanner, modelResult, sandboxRequestedByUser, terminalTranscript } from "./sandbox-tool.ts";
 import { runAgentLoop } from "./agent-loop.ts";
 const call = { language: "bash" as const, command: "echo hello" };
 const block = '<run lang="bash">\necho hello\n</run>\n';
@@ -60,4 +60,10 @@ test("stop interrupts a model that never finishes", async () => {
   const work = runAgentLoop({ messages: [], signal: ac.signal, tools: true,
     model: async () => new Promise(() => {}), execute: async () => ({ status: "success" }), onText: () => {} });
   ac.abort(); await assert.rejects(work, { name: "AbortError" });
+});
+
+test("an explicit English or Thai Sandbox request enables the chat terminal", () => {
+  assert.equal(sandboxRequestedByUser("Use Sandbox Terminal to install dayjs"), true);
+  assert.equal(sandboxRequestedByUser("ใช้แซนด์บ็อกซ์ติดตั้ง dayjs"), true);
+  assert.equal(sandboxRequestedByUser("ช่วยสรุปเอกสารนี้"), false);
 });
