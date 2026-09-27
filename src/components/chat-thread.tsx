@@ -47,7 +47,7 @@ function MessageBubble({ message, live, onDelete }: { message: ChatMessage; live
       <LuminaMark className="mt-0.5 size-7 shrink-0 text-primary" />
       <div className="min-w-0 max-w-[1080px] flex-1 text-[13px] leading-[1.55]">
         {message.thinking ? <ThinkingBlock text={message.thinking} live={live && !message.content} /> : null}
-        {empty ? <p className="lumina-shimmer text-sm font-medium">กำลังคิด…</p> : message.content ? <Markdown text={message.content} /> : null}
+        {empty ? <p className="lumina-shimmer text-sm font-medium">กำลังคิด…</p> : message.content ? <Markdown text={message.content} live={live} /> : null}
         {live && message.content ? <span className="lumina-caret" /> : null}
         {!live && message.content ? <div className="flex items-center gap-1"><CopyLine text={message.content} /><button type="button" onClick={onDelete} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-danger" aria-label="ลบข้อความ" title="ลบข้อความ"><Trash2 className="size-3.5" />ลบ</button></div> : null}
       </div>
