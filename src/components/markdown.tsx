@@ -106,7 +106,17 @@ function splitContent(src: string): ContentPart[] {
     last = m.index + m[0].length;
   }
   if (last < src.length) {
-    parts.push({ type: "md", value: src.slice(last) });
+    const remaining = src.slice(last);
+    const unclosedCode = remaining.match(/^```([a-zA-Z0-9_-]*)\n?([\s\S]*)$/);
+    if (unclosedCode) {
+      parts.push({
+        type: "code",
+        lang: unclosedCode[1],
+        value: unclosedCode[2],
+      });
+    } else {
+      parts.push({ type: "md", value: remaining });
+    }
   }
   return parts;
 }
@@ -570,15 +580,6 @@ export function Markdown({
 }) {
   const autoSandbox = useAppStore((s) => s.personality.autoSandbox);
   const cleanedText = text.replace(/\*{3,}/g, "").replace(/\/\/nn\//gi, "");
-  // Keep the DOM shape stable while tokens stream in unless there is a run/agent block
-  if (
-    live &&
-    !cleanedText.includes("<run") &&
-    !cleanedText.includes("used Bash") &&
-    !cleanedText.includes("Ran commands")
-  ) {
-    return <div className={cn("min-w-0 max-w-full whitespace-pre-wrap break-words text-[1rem] leading-[1.7] [overflow-wrap:anywhere]", className)}>{cleanedText}</div>;
-  }
   const parts = splitContent(cleanedText);
   const webParts = parts.filter(
     (part): part is { type: "code"; lang?: string; value: string } =>

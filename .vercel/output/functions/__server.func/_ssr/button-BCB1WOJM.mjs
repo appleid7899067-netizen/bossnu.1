@@ -1,11 +1,11 @@
 import { o as __toESM } from "../_runtime.mjs";
 import { C as require_jsx_runtime, Y as require_react } from "../_libs/@tanstack/react-router+[...].mjs";
 import { E as Maximize2, I as Check, N as Copy, P as ChevronRight, m as RotateCw, x as Minimize2 } from "../_libs/lucide-react.mjs";
-import { c as errorResult, i as SANDBOX_LIMITS, n as CommandResultSchema, s as SkillsListResponseSchema } from "./router-BLAkoUbn.mjs";
+import { c as errorResult, i as SANDBOX_LIMITS, n as CommandResultSchema, s as SkillsListResponseSchema } from "./router-Di6tjDIg.mjs";
 import { n as clsx, t as cva } from "../_libs/class-variance-authority+clsx.mjs";
 import { t as twMerge } from "../_libs/tailwind-merge.mjs";
 import { n as create, t as persist } from "../_libs/zustand.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/button-CI3kuFDd.js
+//#region node_modules/.nitro/vite/services/ssr/assets/button-BCB1WOJM.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 function cn(...inputs) {
@@ -685,10 +685,19 @@ function splitContent(src) {
 		}
 		last = m.index + m[0].length;
 	}
-	if (last < src.length) parts.push({
-		type: "md",
-		value: src.slice(last)
-	});
+	if (last < src.length) {
+		const remaining = src.slice(last);
+		const unclosedCode = remaining.match(/^```([a-zA-Z0-9_-]*)\n?([\s\S]*)$/);
+		if (unclosedCode) parts.push({
+			type: "code",
+			lang: unclosedCode[1],
+			value: unclosedCode[2]
+		});
+		else parts.push({
+			type: "md",
+			value: remaining
+		});
+	}
 	return parts;
 }
 function TerminalRunBlock({ command, lang = "bash", duration, status: initialStatus, initialOutput, autoRun = true }) {
@@ -1233,12 +1242,7 @@ function CodeBlock({ code, lang, live, showPreview = true }) {
 }
 function Markdown({ text, className, live = false }) {
 	useAppStore((s) => s.personality.autoSandbox);
-	const cleanedText = text.replace(/\*{3,}/g, "").replace(/\/\/nn\//gi, "");
-	if (live && !cleanedText.includes("<run") && !cleanedText.includes("used Bash") && !cleanedText.includes("Ran commands")) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-		className: cn("min-w-0 max-w-full whitespace-pre-wrap break-words text-[1rem] leading-[1.7] [overflow-wrap:anywhere]", className),
-		children: cleanedText
-	});
-	const parts = splitContent(cleanedText);
+	const parts = splitContent(text.replace(/\*{3,}/g, "").replace(/\/\/nn\//gi, ""));
 	const webParts = parts.filter((part) => part.type === "code" && isWebLang(part.lang));
 	const html = webParts.find((part) => ["html", "htm"].includes((part.lang || "").toLowerCase()))?.value || "";
 	const css = webParts.filter((part) => (part.lang || "").toLowerCase() === "css").map((part) => part.value).join("\n");

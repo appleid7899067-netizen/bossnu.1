@@ -667,16 +667,27 @@ export function AppShell({ search }: { search: Search }) {
                   if (instruction.trim()) void send(instruction, activeChat?.id);
                 }}
                 extra={
-                  <ModeToggle
-                    mode={mode}
-                    onChange={(next) => {
-                      if (activeChat) store.setChatMode(activeChat.id, next);
-                      else {
-                        const id = store.newChat(next);
-                        go({ view: "chat", c: id });
-                      }
-                    }}
-                  />
+                  <div className="flex items-center gap-1.5">
+                    <ModeToggle
+                      mode={mode}
+                      onChange={(next) => {
+                        if (activeChat) store.setChatMode(activeChat.id, next);
+                        else {
+                          const id = store.newChat(next);
+                          go({ view: "chat", c: id });
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setCommandHistoryOpen(true)}
+                      className="hidden sm:inline-flex items-center gap-1 rounded-lg bg-clay px-2 py-1 text-xs text-muted hover:text-fg hover:bg-hover transition"
+                      title="ดูประวัติคำสั่ง (Command History)"
+                    >
+                      <Terminal className="size-3 text-emerald-400" />
+                      <span>History ({store.commandHistory.length})</span>
+                    </button>
+                  </div>
                 }
               />
               <p className="mt-2 px-1 text-center text-[0.7rem] text-subtle">

@@ -1,9 +1,9 @@
 import { o as __toESM } from "../_runtime.mjs";
 import { C as require_jsx_runtime, Y as require_react, b as Link } from "../_libs/@tanstack/react-router+[...].mjs";
 import { B as ArrowUp, D as LoaderCircle, F as ChevronDown, I as Check, M as ExternalLink, N as Copy, V as ArrowLeft, d as Sparkles, h as RefreshCw, k as Globe, l as Square, s as Trash2, t as X, u as SquareTerminal, z as BookOpen } from "../_libs/lucide-react.mjs";
-import { a as SKILL_CATEGORIES, d as Route$3, o as SKILL_CATEGORY_LABELS } from "./router-BLAkoUbn.mjs";
-import { a as uid, n as Markdown, r as cn, s as useSandbox, t as Button } from "./button-CI3kuFDd.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/sandbox-MVaF-BAR.js
+import { a as SKILL_CATEGORIES, d as Route$3, o as SKILL_CATEGORY_LABELS } from "./router-Di6tjDIg.mjs";
+import { a as uid, n as Markdown, r as cn, s as useSandbox, t as Button } from "./button-BCB1WOJM.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/sandbox-BixbLlNP.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var TYPE_OPTIONS = [

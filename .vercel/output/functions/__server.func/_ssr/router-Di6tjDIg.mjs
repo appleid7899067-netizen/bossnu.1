@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-//#region node_modules/.nitro/vite/services/ssr/assets/router-BLAkoUbn.js
+//#region node_modules/.nitro/vite/services/ssr/assets/router-Di6tjDIg.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var __defProp = Object.defineProperty;
@@ -310,7 +310,7 @@ function PreviewHostBridge() {
 	}, [router]);
 	return null;
 }
-var styles_default = "/assets/styles-DEA0jxgm.css";
+var styles_default = "/assets/styles-_3nZCAQu.css";
 var APP_NAME = "Lumina";
 var Route$5 = createRootRoute({
 	head: () => ({
@@ -384,12 +384,12 @@ function parseSearch(raw) {
 		m: typeof raw.m === "string" ? raw.m : void 0
 	};
 }
-var $$splitComponentImporter$1 = () => import("./routes-BUJsRgVN.mjs");
+var $$splitComponentImporter$1 = () => import("./routes-Dm8hmibH.mjs");
 var Route$4 = createFileRoute("/")({
 	validateSearch: parseSearch,
 	component: lazyRouteComponent($$splitComponentImporter$1, "component")
 });
-var $$splitComponentImporter = () => import("./sandbox-MVaF-BAR.mjs");
+var $$splitComponentImporter = () => import("./sandbox-BixbLlNP.mjs");
 var Route$3 = createFileRoute("/sandbox")({
 	validateSearch: (raw) => ({ skill: typeof raw.skill === "string" && raw.skill ? raw.skill : void 0 }),
 	head: () => ({ meta: [{ title: "Sali Sandbox Agent" }, {

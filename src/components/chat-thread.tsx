@@ -59,7 +59,7 @@ export function ChatThread({
       ref={scroller}
       onScroll={onScroll}
       className="chat-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
-      style={{ overflowAnchor: "auto" }}
+      style={{ overflowAnchor: "none" }}
     >
       <div className="mx-auto flex w-full min-w-0 max-w-[1180px] flex-col gap-5 px-3 py-5 sm:px-5 sm:py-7 lg:px-7">
         {messages.length === 0 ? (
@@ -77,7 +77,7 @@ export function ChatThread({
           />
         ))}
 
-        {streamingId && workStatus ? (
+        {(streamingId || workStatus) && workStatus ? (
           <WorkStatus status={workStatus} steps={workSteps} sandboxRun={sandboxRun} />
         ) : null}
 
@@ -121,7 +121,7 @@ function MessageBubble({
   const empty = !message.content && !message.thinking;
 
   return (
-    <div className="lumina-rise group flex gap-3 sm:gap-4">
+    <div className={cn("group flex gap-3 sm:gap-4", !live && "lumina-rise")}>
       <LuminaMark className="mt-0.5 size-7 shrink-0 text-primary" />
       <div className="min-w-0 max-w-[1080px] flex-1 break-words text-[14px] leading-[1.65] [overflow-wrap:anywhere] sm:text-[13px] sm:leading-[1.55]">
         {message.thinking ? <ThinkingBlock text={message.thinking} live={live && !message.content} /> : null}
@@ -201,36 +201,40 @@ function WorkStatus({
   sandboxRun?: SandboxRunView | null;
 }) {
   return (
-    <div className="lumina-rise flex gap-3 sm:gap-4 transition-all duration-150">
-      <div className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-emerald-500/10 text-xs text-emerald-400">
+    <div className="flex gap-3 sm:gap-4 transition-all duration-150">
+      <div className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-xs text-emerald-400">
         <span className="size-2 animate-pulse rounded-full bg-emerald-400" />
       </div>
-      <div className="min-w-0 w-full max-w-[900px] rounded-2xl border border-border/80 bg-elevated/70 p-3 shadow-sm">
+      <div className="min-w-0 w-full max-w-[900px] rounded-2xl border border-emerald-500/25 bg-elevated/80 p-3.5 shadow-sm backdrop-blur-sm">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="size-2 animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="text-xs font-semibold text-fg">{status}</span>
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex size-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
+            </span>
+            <span className="text-xs font-semibold text-fg tracking-tight">{status}</span>
           </div>
-          {sandboxRun ? (
-            <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-400">
-              {sandboxRun.label} • {sandboxRun.runtime}
+          <div className="flex items-center gap-2">
+            {sandboxRun ? (
+              <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-400">
+                {sandboxRun.label} • {sandboxRun.runtime}
+              </span>
+            ) : null}
+            <span className="rounded-md bg-clay px-2 py-0.5 font-mono text-[10px] text-muted">
+              Arena Repo Mode
             </span>
-          ) : (
-            <span className="rounded-md bg-elevated px-2 py-0.5 text-[10px] text-muted">
-              Repo Mode
-            </span>
-          )}
+          </div>
         </div>
 
         {steps.length > 0 && (
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
+          <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-border/50 pt-2">
             {steps.map((step, index) => (
               <span
                 key={step + index}
-                className="inline-flex items-center gap-1 rounded-lg bg-clay/80 px-2 py-1 text-[10px] text-muted"
+                className="inline-flex items-center gap-1 rounded-lg bg-clay/90 px-2 py-1 text-[10px] text-muted border border-border/50"
               >
                 <Check className="size-3 text-emerald-400 stroke-[2.5]" />
-                <span>{step}</span>
+                <span className="truncate max-w-[260px]">{step}</span>
               </span>
             ))}
           </div>

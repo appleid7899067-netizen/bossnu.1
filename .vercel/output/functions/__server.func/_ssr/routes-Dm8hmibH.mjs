@@ -1,10 +1,10 @@
 import { o as __toESM } from "../_runtime.mjs";
 import { C as require_jsx_runtime, Y as require_react, b as Link, x as useNavigate } from "../_libs/@tanstack/react-router+[...].mjs";
 import { A as GitBranch, B as ArrowUp, C as MicOff, I as Check, L as Brain, N as Copy, O as Image, R as Bot, S as Mic, T as Menu, _ as Play, a as UserRound, b as Paperclip, c as Terminal, d as Sparkles, f as Settings, g as Plus, i as Volume2, j as FolderOpen, l as Square, m as RotateCw, n as WandSparkles, p as Search, r as VolumeX, s as Trash2, t as X, u as SquareTerminal, v as Phone, w as MessageSquare, y as PhoneOff, z as BookOpen } from "../_libs/lucide-react.mjs";
-import { f as Route$4, l as sandboxPreviewDocument, u as detectSandboxInput } from "./router-BLAkoUbn.mjs";
-import { a as uid, i as sandboxClient, n as Markdown, o as useAppStore, r as cn, t as Button } from "./button-CI3kuFDd.mjs";
+import { f as Route$4, l as sandboxPreviewDocument, u as detectSandboxInput } from "./router-Di6tjDIg.mjs";
+import { a as uid, i as sandboxClient, n as Markdown, o as useAppStore, r as cn, t as Button } from "./button-BCB1WOJM.mjs";
 import { n as toast, t as Toaster } from "../_libs/sonner.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-BUJsRgVN.js
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-Dm8hmibH.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 function BossnuSileloMark({ className }) {
@@ -72,7 +72,7 @@ function ChatThread({ messages, streamingId, onDeleteMessage, workStatus, workSt
 		ref: scroller,
 		onScroll,
 		className: "chat-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain",
-		style: { overflowAnchor: "auto" },
+		style: { overflowAnchor: "none" },
 		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "mx-auto flex w-full min-w-0 max-w-[1180px] flex-col gap-5 px-3 py-5 sm:px-5 sm:py-7 lg:px-7",
 			children: [
@@ -88,7 +88,7 @@ function ChatThread({ messages, streamingId, onDeleteMessage, workStatus, workSt
 					live: m.id === streamingId,
 					onDelete: () => onDeleteMessage?.(m.id)
 				}, m.id)),
-				streamingId && workStatus ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WorkStatus, {
+				(streamingId || workStatus) && workStatus ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WorkStatus, {
 					status: workStatus,
 					steps: workSteps,
 					sandboxRun
@@ -123,7 +123,7 @@ function MessageBubble({ message, live, onDelete }) {
 	});
 	const empty = !message.content && !message.thinking;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-		className: "lumina-rise group flex gap-3 sm:gap-4",
+		className: cn("group flex gap-3 sm:gap-4", !live && "lumina-rise"),
 		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(LuminaMark, { className: "mt-0.5 size-7 shrink-0 text-primary" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "min-w-0 max-w-[1080px] flex-1 break-words text-[14px] leading-[1.65] [overflow-wrap:anywhere] sm:text-[13px] sm:leading-[1.55]",
 			children: [
@@ -184,36 +184,45 @@ function CopyLine({ text }) {
 }
 function WorkStatus({ status, steps, sandboxRun }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-		className: "lumina-rise flex gap-3 sm:gap-4 transition-all duration-150",
+		className: "flex gap-3 sm:gap-4 transition-all duration-150",
 		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-			className: "mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-emerald-500/10 text-xs text-emerald-400",
+			className: "mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-xs text-emerald-400",
 			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "size-2 animate-pulse rounded-full bg-emerald-400" })
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-			className: "min-w-0 w-full max-w-[900px] rounded-2xl border border-border/80 bg-elevated/70 p-3 shadow-sm",
+			className: "min-w-0 w-full max-w-[900px] rounded-2xl border border-emerald-500/25 bg-elevated/80 p-3.5 shadow-sm backdrop-blur-sm",
 			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "flex items-center justify-between gap-3",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "flex items-center gap-2",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "size-2 animate-ping rounded-full bg-emerald-400 opacity-75" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-						className: "text-xs font-semibold text-fg",
+					className: "flex items-center gap-2.5",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						className: "relative flex size-2.5",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "relative inline-flex size-2.5 rounded-full bg-emerald-500" })]
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "text-xs font-semibold text-fg tracking-tight",
 						children: status
 					})]
-				}), sandboxRun ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
-					className: "rounded-md bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-400",
-					children: [
-						sandboxRun.label,
-						" • ",
-						sandboxRun.runtime
-					]
-				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-					className: "rounded-md bg-elevated px-2 py-0.5 text-[10px] text-muted",
-					children: "Repo Mode"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex items-center gap-2",
+					children: [sandboxRun ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						className: "rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-400",
+						children: [
+							sandboxRun.label,
+							" • ",
+							sandboxRun.runtime
+						]
+					}) : null, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "rounded-md bg-clay px-2 py-0.5 font-mono text-[10px] text-muted",
+						children: "Arena Repo Mode"
+					})]
 				})]
 			}), steps.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				className: "mt-2.5 flex flex-wrap gap-1.5",
+				className: "mt-2.5 flex flex-wrap gap-1.5 border-t border-border/50 pt-2",
 				children: steps.map((step, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
-					className: "inline-flex items-center gap-1 rounded-lg bg-clay/80 px-2 py-1 text-[10px] text-muted",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { className: "size-3 text-emerald-400 stroke-[2.5]" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: step })]
+					className: "inline-flex items-center gap-1 rounded-lg bg-clay/90 px-2 py-1 text-[10px] text-muted border border-border/50",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { className: "size-3 text-emerald-400 stroke-[2.5]" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "truncate max-w-[260px]",
+						children: step
+					})]
 				}, step + index))
 			})]
 		})]
@@ -3521,15 +3530,28 @@ function AppShell({ search }) {
 								const instruction = action === "ลงมือทำทันที" ? base : [base, action].filter(Boolean).join(" — ");
 								if (instruction.trim()) send(instruction, activeChat?.id);
 							},
-							extra: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ModeToggle, {
-								mode,
-								onChange: (next) => {
-									if (activeChat) store.setChatMode(activeChat.id, next);
-									else go({
-										view: "chat",
-										c: store.newChat(next)
-									});
-								}
+							extra: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "flex items-center gap-1.5",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ModeToggle, {
+									mode,
+									onChange: (next) => {
+										if (activeChat) store.setChatMode(activeChat.id, next);
+										else go({
+											view: "chat",
+											c: store.newChat(next)
+										});
+									}
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+									type: "button",
+									onClick: () => setCommandHistoryOpen(true),
+									className: "hidden sm:inline-flex items-center gap-1 rounded-lg bg-clay px-2 py-1 text-xs text-muted hover:text-fg hover:bg-hover transition",
+									title: "ดูประวัติคำสั่ง (Command History)",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Terminal, { className: "size-3 text-emerald-400" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+										"History (",
+										store.commandHistory.length,
+										")"
+									] })]
+								})]
 							})
 						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 							className: "mt-2 px-1 text-center text-[0.7rem] text-subtle",
