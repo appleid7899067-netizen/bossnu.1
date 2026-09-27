@@ -20,6 +20,7 @@ import type { Search } from "@/lib/search";
 import { useAppStore } from "@/lib/store";
 import type { BuilderProject, ChatMode, MindMapData } from "@/lib/types";
 import { cn, uid } from "@/lib/utils";
+import { detectSandboxInput } from "@/lib/sandbox/detect";
 
 export function AppShell({ search }: { search: Search }) {
   const navigate = useNavigate();
@@ -85,8 +86,13 @@ export function AppShell({ search }: { search: Search }) {
     setDraft("");
     setBusyChat(true);
     setStreamingId(assistantId);
+    const sandboxDetection = detectSandboxInput(content);
     setStreamStatus("กำลังวิเคราะห์คำขอ…");
-    setWorkSteps(["วิเคราะห์คำขอ"]);
+    setWorkSteps([
+      "วิเคราะห์คำขอ",
+      sandboxDetection.runtime !== "unknown" ? "ตรวจพบ " + sandboxDetection.label : "ตรวจสอบวิธีทำงาน",
+      sandboxDetection.webPreview ? "เตรียม Live Preview อัตโนมัติ" : "เตรียมขั้นตอนทำงาน",
+    ]);
     stopVoice();
     go({ view: "chat", c: id });
 
