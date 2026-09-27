@@ -25,5 +25,8 @@ export function createHttpWorkspace(workspaceId: string, fetcher: typeof fetch =
     async remember(key, value, kind) {
       await call({ action: "remember", key, value, source: kind });
     },
+    async learnSkill(skill) {
+      await call({ action: "learn-skill", name: skill.name, runtime: skill.runtime, path: skill.command, goal: skill.goal, value: skill.evidence });
+    },
   };
 }
