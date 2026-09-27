@@ -15,7 +15,7 @@ export function Discover({ onPrompt, onView }: { onPrompt: (text: string) => voi
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-col items-center px-5 pt-10 pb-8 sm:pt-[13vh]">
       <div className="mb-5 grid size-12 place-items-center rounded-full bg-[#eaf2ff] text-primary"><Sparkles className="size-6" /></div>
-      <h1 className="lumina-rise text-center text-[30px] font-semibold tracking-[-0.04em] text-[#252a32] sm:text-[36px]">Hi, I’m DeepSeek.</h1>
+      <h1 className="lumina-rise text-center text-[30px] font-semibold tracking-[-0.04em] text-[#252a32] sm:text-[36px]">Hi, I’m PANUPANXBOSS.</h1>
       <p className="mt-2 text-center text-[15px] text-[#9299a3]">How can I help you today?</p>
       <div className="mt-10 grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
         {PROMPTS.map((p, i) => (

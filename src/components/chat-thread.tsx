@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Trash2 } from "lucide-react";
 import { Markdown } from "@/components/markdown";
 import type { ChatMessage } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import { LuminaMark } from "@/components/lumina-mark";
 
 export type SandboxRunView = {
@@ -190,21 +189,20 @@ function WorkStatus({
   steps: string[];
   sandboxRun?: SandboxRunView | null;
 }) {
+  const [expanded, setExpanded] = useState(true);
   return (
     <div className="lumina-rise flex gap-3 sm:gap-4">
-      <div className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs text-primary">✦</div>
+      <div className="work-live mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs text-primary">✦</div>
       <div className="min-w-0 w-full max-w-[900px] rounded-2xl bg-clay/70 p-3">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <span className="size-1.5 animate-pulse rounded-full bg-primary" />
-            <span className="text-xs font-semibold text-fg">{status}</span>
+            <span className="truncate text-xs font-semibold text-fg">{status}<span className="work-dots" aria-hidden="true"><i /><i /><i /></span></span>
           </div>
-          {sandboxRun ? (
-            <span className="rounded-md bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
-              {sandboxRun.label}
-            </span>
-          ) : null}
+          <button type="button" onClick={() => setExpanded((value) => !value)} className="shrink-0 rounded-lg px-2 py-1 text-[11px] text-muted transition hover:bg-hover hover:text-fg">{expanded ? "ซ่อนสรุป" : "Summary"}</button>
         </div>
+        {expanded ? <div className="mb-3 rounded-xl border border-border/60 bg-bg/20 p-3"><p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted">สรุปการทำงาน</p><div className="relative flex flex-col gap-2 pl-5">{steps.map((step, index) => <div key={`${step}-${index}`} className="relative text-xs text-muted"><span className="absolute -left-5 top-1.5 size-2 rounded-full bg-primary shadow-[0_0_8px_var(--color-primary)]" />{index < steps.length - 1 ? <span className="absolute -left-[13px] top-3 h-[calc(100%+8px)] w-px bg-border" /> : null}<span className="font-mono">{step}</span></div>)}</div></div> : null}
+          {sandboxRun ? <span className="rounded-md bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">{sandboxRun.label}</span> : null}
 
         {sandboxRun ? (
           <div className="overflow-hidden rounded-xl border border-border/70 bg-elevated/60">

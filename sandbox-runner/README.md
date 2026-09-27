@@ -1,8 +1,7 @@
 # Sali Sandbox Runner v4
 
 The app proxies commands to this separate service; the web/Vercel process never
-executes shell commands. Docker includes Node/npm/npx, Bash, Git, curl and Python 3.
-Go, Rust, Java and C++ require a custom image with those toolchains installed.
+executes shell commands. Docker includes Node 22/npm/npx, Bash, Git, curl, Python 3/pip, Go, Rust/Cargo, Java 21, C/C++ build tools, jq, zip and unzip. Each workspace persists on the runner disk and commands stream output with bounded timeout and output limits.
 
 ## Run / deploy
 

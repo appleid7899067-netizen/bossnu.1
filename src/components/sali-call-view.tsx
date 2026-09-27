@@ -41,7 +41,7 @@ export function SaliCallView({
   useEffect(() => {
     return () => {
       activeRef.current = false;
-      try { recognitionRef.current?.stop(); } catch {}
+      try { recognitionRef.current?.stop(); } catch { /* intentionally ignored */ }
       stopVoice();
     };
   }, []);
@@ -84,13 +84,13 @@ export function SaliCallView({
       if (activeRef.current && !muted && !processingRef.current) recognitionTimerRef.current = window.setTimeout(startRecognition, 700);
     };
     recognitionRef.current = rec;
-    try { rec.start(); } catch {}
+    try { rec.start(); } catch { /* intentionally ignored */ }
   }
 
   async function handleUserSpeech(text: string) {
     if (!activeRef.current || processingRef.current) return;
     processingRef.current = true;
-    try { recognitionRef.current?.stop(); } catch {}
+    try { recognitionRef.current?.stop(); } catch { /* intentionally ignored */ }
     addMessage("user", text);
     setStatus("สลี่กำลังคิดคำตอบ…");
     setSpeaking(true);
@@ -132,7 +132,7 @@ export function SaliCallView({
     if (active) {
       setActive(false);
       activeRef.current = false;
-      try { recognitionRef.current?.stop(); } catch {}
+      try { recognitionRef.current?.stop(); } catch { /* intentionally ignored */ }
       stopVoice();
       setListening(false);
       setSpeaking(false);
@@ -145,7 +145,7 @@ export function SaliCallView({
     setSeconds(0);
     setStatus("กำลังเชื่อมต่อ…");
     stopVoice();
-    try { recognitionRef.current?.stop(); } catch {}
+    try { recognitionRef.current?.stop(); } catch { /* intentionally ignored */ }
     const greeting = "สวัสดีค่ะ สลี่พร้อมคุยแล้วนะคะ พูดกับสลี่ได้เลย";
     addMessage("assistant", greeting);
     await new Promise((resolve) => setTimeout(resolve, 250));

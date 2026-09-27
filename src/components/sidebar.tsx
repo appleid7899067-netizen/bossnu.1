@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Bot, GitBranch, ImageIcon, MessageSquare, Plus, Settings, SquareTerminal, Trash2 } from "lucide-react";
+import type { CommandHistoryItem } from "@/lib/types";
 import { LuminaWordmark } from "@/components/lumina-mark";
 import { Button } from "@/components/ui/button";
 import type { AppView, Conversation, SavedMap } from "@/lib/types";
@@ -14,7 +15,7 @@ function NavItem({ active, icon: Icon, label, onClick }: { active: boolean; icon
 
 export function Sidebar({ view, onView, conversations, maps, activeChatId, activeMapId, onNewChat, onOpenChat, onDeleteChat, onOpenMap }: {
   view: AppView; onView: (view: AppView) => void; conversations: Conversation[]; maps: SavedMap[]; activeChatId: string | null; activeMapId: string | null;
-  onNewChat: () => void; onOpenChat: (id: string) => void; onDeleteChat: (id: string) => void; onOpenMap: (id: string) => void;
+  onNewChat: () => void; onOpenChat: (id: string) => void; onDeleteChat: (id: string) => void; onOpenMap: (id: string) => void; commandHistory: CommandHistoryItem[]; onRunCommand: (command: string) => void;
 }) {
   const store = useAppStore();
   return <aside className="flex h-full min-h-0 w-[260px] shrink-0 flex-col border-r border-border bg-bg">
@@ -24,7 +25,7 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
       <NavItem active={view === "chat"} icon={MessageSquare} label="Chat" onClick={() => onView("chat")} />
       <NavItem active={view === "maps"} icon={GitBranch} label="History" onClick={() => onView("maps")} />
       <NavItem active={view === "studio"} icon={ImageIcon} label="Explore" onClick={() => onView("studio")} />
-      <NavItem active={view === "builder"} icon={Bot} label="DeepSeek V3" onClick={() => onView("builder")} />
+      <NavItem active={view === "builder"} icon={Bot} label="PANUPANXBOSS V3" onClick={() => onView("builder")} />
       <Link to="/sandbox" className="flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-sm font-medium text-muted transition-colors hover:bg-hover hover:text-fg" activeProps={{ className: "bg-elevated text-fg" }}>
         <SquareTerminal className="size-4 shrink-0" strokeWidth={1.8} />Sandbox
       </Link>

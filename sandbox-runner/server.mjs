@@ -86,13 +86,13 @@ function spawnProcess(command, args, cwd, timeoutMs, signal) {
       detached: true, stdio: ["pipe", "pipe", "pipe"],
     });
     child.stdin.end();
-    const cancel = () => { try { process.kill(-child.pid, "SIGKILL"); } catch {} };
+    const cancel = () => { try { process.kill(-child.pid, "SIGKILL"); } catch { /* intentionally ignored */ } };
     let stdout = "", stderr = "", timedOut = false;
     signal?.addEventListener("abort", cancel, { once: true });
     if (signal?.aborted) cancel();
     const timer = setTimeout(() => {
       timedOut = true;
-      try { process.kill(-child.pid, "SIGKILL"); } catch {}
+      try { process.kill(-child.pid, "SIGKILL"); } catch { /* intentionally ignored */ }
     }, timeoutMs);
     child.stdout.on("data", c => { stdout = append(stdout, c); });
     child.stderr.on("data", c => { stderr = append(stderr, c); });
@@ -118,7 +118,7 @@ function startPersistent(command, args, cwd) {
   child.stdin.end();
   let stdout = "", stderr = "";
   child.on("error", e => { stderr = append(stderr, e); });
-  const lifetime = setTimeout(() => { try { process.kill(-child.pid, "SIGKILL"); } catch {} }, 30 * 60 * 1000);
+  const lifetime = setTimeout(() => { try { process.kill(-child.pid, "SIGKILL"); } catch { /* intentionally ignored */ } }, 30 * 60 * 1000);
   lifetime.unref();
   child.stdout.on("data", c => { stdout = append(stdout, c); });
   child.stderr.on("data", c => { stderr = append(stderr, c); });
@@ -203,11 +203,11 @@ async function executeStream(body, res) {
       detached: true, stdio: ["pipe", "pipe", "pipe"],
     });
     child.stdin.end();
-    const cancel = () => { try { process.kill(-child.pid, "SIGKILL"); } catch {} };
+    const cancel = () => { try { process.kill(-child.pid, "SIGKILL"); } catch { /* intentionally ignored */ } };
     let stdout = "", stderr = "", timedOut = false;
     res.on("close", cancel);
     if (res.destroyed) cancel();
-    const timer = setTimeout(() => { timedOut = true; try { process.kill(-child.pid, "SIGKILL"); } catch {} }, TIMEOUT_MS);
+    const timer = setTimeout(() => { timedOut = true; try { process.kill(-child.pid, "SIGKILL"); } catch { /* intentionally ignored */ } }, TIMEOUT_MS);
     let sentBytes = 0;
     const output = (stream, chunk) => {
       const remaining = MAX_OUTPUT - sentBytes;
@@ -215,8 +215,8 @@ async function executeStream(body, res) {
       const limited = chunk.subarray(0, remaining); sentBytes += limited.length;
       sse(res, { type: "output", stream, text: limited.toString("utf8") });
     };
-    child.stdout.on("data", c => { const t=c.toString("utf8"); stdout=append(stdout,c); output("stdout", c); });
-    child.stderr.on("data", c => { const t=c.toString("utf8"); stderr=append(stderr,c); output("stderr", c); });
+    child.stdout.on("data", c => { stdout=append(stdout,c); output("stdout", c); });
+    child.stderr.on("data", c => { stderr=append(stderr,c); output("stderr", c); });
     await new Promise(resolve => {
       child.on("error", e => { stderr=append(stderr,e); });
       child.on("close", code => { clearTimeout(timer); res.off("close", cancel); cancel(); const status=timedOut?"timeout":code===0?"success":"error"; sse(res,{type:"complete",result:{success:status==="success",status,type:language,runtime:language,command,stdout,stderr,output:[stdout,stderr].filter(Boolean).join("\n").trim(),exitCode:code,durationMs:Date.now()-started}}); resolve(); });
