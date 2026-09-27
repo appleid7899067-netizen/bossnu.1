@@ -123,28 +123,34 @@ async function seedWorkspace(dir, files) {
   }
 }
 
-async function collectWorkspaceFiles(root) {
+async function collectWorkspaceSnapshot(root) {
   const result = [];
+  let complete = true;
   async function walk(dir, relative) {
-    if (result.length >= SYNC_MAX_FILES) return;
     const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
-      if (result.length >= SYNC_MAX_FILES || SYNC_SKIP.has(entry.name)) continue;
+      if (SYNC_SKIP.has(entry.name)) continue;
       const full = join(dir, entry.name);
       const rel = relative ? relative + "/" + entry.name : entry.name;
       if (entry.isDirectory()) {
         await walk(full, rel);
+        if (result.length >= SYNC_MAX_FILES) return;
       } else if (entry.isFile()) {
+        if (result.length >= SYNC_MAX_FILES) { complete = false; return; }
         const info = await stat(full).catch(() => null);
-        if (!info || info.size > SYNC_MAX_FILE_BYTES) continue;
+        if (!info) { complete = false; continue; }
+        if (info.size > SYNC_MAX_FILE_BYTES) { complete = false; continue; }
         const content = await readFile(full).catch(() => null);
-        if (!content || content.includes(0)) continue;
+        if (!content || content.includes(0)) { complete = false; continue; }
         result.push({ path: "project/" + rel, content: content.toString("utf8") });
       }
     }
   }
   await walk(join(root, "project"), "");
-  return result;
+  return { files: result, complete };
+}
+async function collectWorkspaceFiles(root) {
+  return (await collectWorkspaceSnapshot(root)).files;
 }
 
 async function cloneWorkspace(dir) {
@@ -237,7 +243,8 @@ async function executeStream(body, res) {
         output: [session.stdout(), session.stderr()].filter(Boolean).join("\n").trim().slice(-MAX_OUTPUT),
         sessionId: session.id, port, previewPath: "/preview/" + session.id + "/",
         durationMs: Date.now() - started,
-        workspaceFiles: await collectWorkspaceFiles(dir),
+        workspaceFiles: (await collectWorkspaceSnapshot(dir)).files,
+        workspaceSyncComplete: (await collectWorkspaceSnapshot(dir)).complete,
       };
       sse(res, { type: "complete", result });
       return res.end();
