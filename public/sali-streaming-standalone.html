@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="th">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sali · Streaming Terminal</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#eee;background:#101019;color-scheme:dark}body{max-width:820px;margin:8vh auto;padding:24px}h1{font-size:28px}p{color:#aaa}textarea,pre{box-sizing:border-box;width:100%;border:1px solid #353047;border-radius:12px;background:#191523;color:#eee;padding:16px;font:14px/1.6 monospace}pre{min-height:220px;max-height:55vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}button,select{padding:10px 16px;border-radius:8px;border:1px solid #555;background:#302343;color:white}button:disabled{opacity:.5}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}#status{margin:20px 0;color:#cbb3ff}
+</style>
+<h1>🌊 Sali Streaming Terminal</h1>
+<p>Output สดผ่าน SSE · ปุ่มหยุดยกเลิกคำขอได้</p>
+<p><strong>Demo เป็นข้อมูลจำลอง ไม่ได้รันคำสั่งจริง</strong> เลือก Real API เพื่อใช้ runner เมื่อเปิดหน้านี้ผ่านแอป</p>
+<form id="form">
+<textarea id="command" rows="3" aria-label="คำสั่ง">npm --version</textarea>
+<div class="row"><label>โหมด <select id="mode"><option value="demo">Demo (จำลอง)</option><option value="real">Real API</option></select></label><button id="run">รัน</button><button id="stop" type="button" disabled>หยุด</button></div>
+</form>
+<div id="status" role="status" aria-live="polite">พร้อม · Demo</div>
+<pre id="output" aria-label="Terminal output"></pre>
+<p>Real API ใช้ /api/sandbox.stream บน origin เดียวกัน ไม่ส่งคำสั่งไปยังเว็บภายนอก</p>
+<script type="module">
+const form=document.querySelector('#form'), mode=document.querySelector('#mode'), command=document.querySelector('#command'), status=document.querySelector('#status'), output=document.querySelector('#output'), run=document.querySelector('#run'), stop=document.querySelector('#stop');
+const workspace='standalone_'+crypto.randomUUID(); let active;
+stop.onclick=()=>active?.abort();
+function event(e){
+ if(e.type==='status') status.textContent=e.message||e.status;
+ if(e.type==='output'){output.textContent=(output.textContent+e.text).slice(-64000);output.scrollTop=output.scrollHeight;}
+ if(e.type==='error') status.textContent=e.error;
+ if(e.type==='complete'){status.textContent=`${e.result.status} · exit ${e.result.exitCode??'—'}`;if(e.result.error)output.textContent+='\n'+e.result.error;}
+}
+function delay(ms,signal){return new Promise((resolve,reject)=>{const cancel=()=>{clearTimeout(timer);reject(new DOMException('Stopped','AbortError'));};const timer=setTimeout(()=>{signal.removeEventListener('abort',cancel);resolve();},ms);signal.addEventListener('abort',cancel,{once:true});if(signal.aborted)cancel();});}
+form.onsubmit=async e=>{
+ e.preventDefault();if(active||!command.value.trim())return;
+ const ac=new AbortController();active=ac;run.disabled=true;stop.disabled=false;mode.disabled=true;output.textContent='';status.textContent='กำลังเชื่อมต่อ…';
+ try{
+  if(mode.value==='demo'){
+   for(const text of ['[DEMO] รับคำสั่งจำลอง\n','[DEMO] กำลังส่ง output ตัวอย่าง\n','[DEMO] เสร็จแล้ว — ไม่ได้รันคำสั่งจริง\n']){await delay(500,ac.signal);event({type:'output',text});}
+   status.textContent='Demo complete (จำลอง)';
+  }else{
+   if(location.protocol==='file:')throw Error('เปิดผ่าน /sali-streaming-standalone.html บนแอปก่อนใช้ Real API');
+   const response=await fetch('/api/sandbox.stream',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({cmd:command.value,workspace}),signal:AbortSignal.any([ac.signal,AbortSignal.timeout(150000)])});
+   if(!response.ok)throw Error((await response.json()).error||`HTTP ${response.status}`);
+   const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',complete=false;
+   try{while(true){const {value,done}=await reader.read();buffer+=decoder.decode(value,{stream:!done});let boundary;
+    while((boundary=buffer.indexOf('\n\n'))>=0){const frame=buffer.slice(0,boundary);buffer=buffer.slice(boundary+2);const data=frame.split('\n').filter(l=>l.startsWith('data:')).map(l=>l.slice(5).trimStart()).join('\n');if(data&&data!=='[DONE]'){const ev=JSON.parse(data);event(ev);if(ev.type==='complete')complete=true;}}
+    if(buffer.length>1000000)throw Error('SSE event too large');if(done||complete)break;
+   }}finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
+   if(!complete)throw Error('Stream จบโดยไม่มีผลลัพธ์');
+  }
+ }catch(error){status.textContent=ac.signal.aborted?'⛔ หยุดแล้ว':`ผิดพลาด: ${error.message}`;}
+ finally{active=null;run.disabled=false;stop.disabled=true;mode.disabled=false;}
+};
+</script>
+</html>

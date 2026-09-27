@@ -1,3 +1,6 @@
+import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
+import { isRunnerRuntime } from "@/types/sandbox";
+import { StreamCollector } from "@/lib/sandbox-streaming-client";
 import {
   useEffect,
   useMemo,
@@ -78,6 +81,9 @@ export function SaliAgent({
   leading?: ReactNode;
 }) {
   const sandbox = useSandbox();
+  const [workspace] = useState(() => "sandbox_" + crypto.randomUUID());
+  const [live, setLive] = useState<{ output: string; steps: string[] } | null>(null);
+  const runLock = useRef(false);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [typeHint, setTypeHint] = useState<CommandType>("auto");
@@ -91,7 +97,7 @@ export function SaliAgent({
   useEffect(() => {
     const el = scroller.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, sandbox.busy]);
+  }, [messages, sandbox.busy, live]);
 
   useEffect(() => {
     if (!initialSkill || bootRef.current || sandbox.skills.length === 0) return;
@@ -107,6 +113,7 @@ export function SaliAgent({
   }
 
   async function openSkill(skill: SkillInfo) {
+    if (runLock.current || sandbox.busy) return;
     setActiveSkill(skill);
     setSkillsOpen(false);
     push({
@@ -123,7 +130,13 @@ export function SaliAgent({
 
   async function runCommand(cmd: string, type: CommandType = typeHint) {
     const command = cmd.trim();
-    if (!command || sandbox.busy) return;
+    if (!command || sandbox.busy || runLock.current) return;
+    const resolved = type === "auto" ? detectSandboxInput(command).runtime : type;
+    const streaming = isRunnerRuntime(resolved) || resolved === "unknown";
+    const risk = streaming ? assessSandboxRisk(command) : { dangerous: false, riskReason: "" };
+    if (risk.dangerous && !window.confirm(`${risk.riskReason}\n\n${command}\n\nอนุญาตให้รันคำสั่งนี้?`)) return;
+    runLock.current = true;
+    setLive(streaming ? { output: "", steps: ["รับคำสั่ง…"] } : null);
     setDraft("");
     push({
       id: uid("m"),
@@ -133,11 +146,17 @@ export function SaliAgent({
       type,
       createdAt: Date.now(),
     });
-    const result = await sandbox.execute(command, {
-      skill: activeSkill?.id,
-      type: type === "auto" ? undefined : type,
-    });
-    push({ id: uid("m"), role: "agent", result, createdAt: Date.now() });
+    try {
+      const collector = new StreamCollector({
+        onStatusChange: steps => setLive(current => current ? { ...current, steps } : current),
+        onOutputChange: output => setLive(current => current ? { ...current, output } : current),
+      });
+      const options = { skill: activeSkill?.id, workspace, type: type === "auto" ? undefined : type, allowDangerous: risk.dangerous };
+      const result = streaming
+        ? await sandbox.executeStream(command, { ...options, onEvent: event => collector.handle(event) })
+        : await sandbox.execute(command, options);
+      push({ id: uid("m"), role: "agent", result: { ...result, output: result.output || collector.output || undefined }, createdAt: Date.now() });
+    } finally { runLock.current = false; setLive(null); }
   }
 
   function submit(e?: FormEvent) {
@@ -167,7 +186,7 @@ export function SaliAgent({
               Sali Sandbox Agent
             </h1>
             <p className="truncate text-[11px] text-muted">
-              รันคำสั่งในแซนด์บ็อกแยก • โหลด Grok Skills • Live Preview
+              SSE Streaming • Output สด • Grok Skills • Live Preview
             </p>
           </div>
         </div>
@@ -281,7 +300,13 @@ export function SaliAgent({
                 ),
               )}
 
-              {sandbox.busy ? <FlowStatus skill={activeSkill} /> : null}
+              {sandbox.busy && live ? <div className="overflow-hidden rounded-2xl border border-border bg-elevated" data-testid="sandbox-live-output">
+                <div className="border-b border-border p-3 text-xs" role="status" aria-live="polite">
+                  <span className="font-semibold text-primary">🌊 Sandbox · Live</span>
+                  {live.steps.map((step, i) => <div key={i} className="mt-1 text-muted">{i === live.steps.length - 1 ? "⟳" : "✓"} {step}</div>)}
+                </div>
+                <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs">{live.output || "รอ output จาก runner…"}<span className="animate-pulse"> ▌</span></pre>
+              </div> : sandbox.busy ? <FlowStatus skill={activeSkill} /> : null}
             </div>
           </div>
 

@@ -1,3 +1,4 @@
+import { loadSkill } from "@/lib/sandbox/skills.server";
 import { createFileRoute } from "@tanstack/react-router";
 import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
 import {
@@ -5,6 +6,7 @@ import {
   DEFAULT_SANDBOX_RUNNER_URL,
   isRunnerRuntime,
   type CommandType,
+  type SkillContent,
 } from "@/types/sandbox";
 
 const MAX_BODY_BYTES = 96 * 1024;
@@ -54,13 +56,24 @@ async function handle(request: Request): Promise<Response> {
       { status: 409, headers: corsHeaders() },
     );
   }
+  let attachedSkill: SkillContent | undefined;
+  if (parsed.data.skill) {
+    const loaded = await loadSkill(parsed.data.skill, parsed.data.reference);
+    if (!loaded.ok) return Response.json({ error: loaded.error }, { status: loaded.status, headers: corsHeaders() });
+    attachedSkill = loaded.skill;
+  }
   const runtime = resolveRuntime(cmd, type);
   const encoder = new TextEncoder();
   const abort = new AbortController();
   let closed = false;
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (v: unknown) => { if (!closed) event(controller, encoder, v); };
+      const send = (v: unknown) => {
+        if (closed) return;
+        const value = v as { type?: string; result?: Record<string, unknown> };
+        event(controller, encoder, value.type === "complete" && value.result && attachedSkill
+          ? { ...value, result: { ...value.result, skill: attachedSkill } } : v);
+      };
       const close = () => { if (!closed) { closed = true; controller.close(); } };
       const started = Date.now();
       try {

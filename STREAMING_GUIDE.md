@@ -49,3 +49,66 @@ the literal dot. Do not rename to `sandbox.stream.ts`, which becomes a slash rou
   login and model compliance manually after deployment.
 - Typecheck/build passed. Full `npm test` currently reports 9 failures in existing
   PWA metadata/environment expectations; the TypeScript suites run separately pass.
+
+## Streaming-first Sandbox page
+
+`/sandbox` now uses `SaliAgentStreaming`. Shell commands go through SSE by default,
+with a live status list, bounded terminal output, a live caret and Stop. Final
+results stay in the conversation. One workspace is retained for the lifetime of
+this page; reloading creates a new workspace. HTML, CSS/JS previews, JSON and
+skill-only requests still use their non-executing JSON path. Selected skills are
+included in the SSE completion result.
+
+Use the framework-independent client without importing React:
+
+```ts
+import { streamSandboxCommand, StreamCollector } from '@/lib/sandbox-streaming-client';
+const controller = new AbortController();
+const collector = new StreamCollector({
+  onStatusChange: steps => console.log(steps),
+  onOutputChange: output => console.log(output),
+  onComplete: result => console.log(result.status),
+});
+await streamSandboxCommand('npm --version', undefined, event => collector.handle(event), {
+  signal: controller.signal,
+  workspace: 'demo_session',
+});
+// controller.abort() stops a pending request.
+```
+
+The shared parser handles UTF-8 across byte boundaries, CRLF, multiline SSE data,
+EOF without a final blank line and optional `data: [DONE]`. A valid `complete`
+event is still required. Malformed events fail explicitly; output and status
+history in the collector are bounded to 64,000 characters and 30 items.
+
+Native wire contract (not Anthropic's API):
+
+```text
+data: {"type":"status","status":"running","message":"กำลังรัน…"}
+
+data: {"type":"output","stream":"stdout","text":"hello\n"}
+
+data: {"type":"complete","result":{"success":true,"status":"success","type":"bash","exitCode":0}}
+
+```
+
+### Standalone demo
+
+Open `public/sali-streaming-standalone.html` directly for **mock mode** (clearly
+labelled; no commands execute). For real output, serve the app and open
+`/sali-streaming-standalone.html`, then choose **Real API**. It uses same-origin
+POST requests. Dangerous commands are rejected, not automatically approved.
+
+### Timing and validation
+
+Output renders as runner chunks arrive; there is no artificial character delay.
+“Claude-like” describes the live interaction, not protocol compatibility. There
+is **no guarantee** of zero latency, TTFB under 100ms, 40% speedup or 1–2 MB memory:
+network, runner cold starts, process buffering and hosting affect measurements.
+SSE parser/collector tests run with:
+
+```sh
+node --experimental-strip-types --test src/lib/sandbox-streaming-client.test.ts
+curl -N http://localhost:8080/api/sandbox.stream -H 'Content-Type: application/json' \
+  -d '{"cmd":"npm --version","workspace":"demo_session"}'
+```
