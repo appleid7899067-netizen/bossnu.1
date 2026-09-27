@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { Menu, Phone, X } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { AppBuilderView } from "@/components/app-builder-view";
-import { ChatThread } from "@/components/chat-thread";
+import { ChatThread, type SandboxRunView } from "@/components/chat-thread";
 import { Composer } from "@/components/composer";
 import { Discover } from "@/components/discover";
 import { LuminaWordmark } from "@/components/lumina-mark";
@@ -39,7 +39,7 @@ export function AppShell({ search }: { search: Search }) {
   const [imageError, setImageError] = useState<string | null>(null);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [streamStatus, setStreamStatus] = useState<string>("");
-  const [workSteps, setWorkSteps] = useState<string[]>([]);
+  const [workSteps, setWorkSteps] = useState<string[]>([]);\n  const [sandboxRun, setSandboxRun] = useState<SandboxRunView | null>(null);
   const [voiceEnabled, setVoiceEnabledState] = useState(true);
   const [callOpen, setCallOpen] = useState(false);
   const [builderProject, setBuilderProject] = useState<BuilderProject | undefined>(undefined);
@@ -88,7 +88,7 @@ export function AppShell({ search }: { search: Search }) {
     setBusyChat(true);
     setStreamingId(assistantId);
     const sandboxDetection = detectSandboxInput(content);
-    setStreamStatus("กำลังวิเคราะห์คำขอ…");
+    setSandboxRun(null);\n    setStreamStatus("กำลังวิเคราะห์คำขอ…");
     setWorkSteps([
       "วิเคราะห์คำขอ",
       sandboxDetection.runtime !== "unknown" ? "ตรวจพบ " + sandboxDetection.label : "ตรวจสอบวิธีทำงาน",
@@ -99,18 +99,18 @@ export function AppShell({ search }: { search: Search }) {
 
     let sandboxNote = "";
     if (sandboxDetection.runtime !== "unknown" && sandboxDetection.command && ["node", "python", "bash", "go", "rust", "java", "cpp"].includes(sandboxDetection.runtime)) {
-      setStreamStatus("กำลังรันในแซนด์บ็อกจริง…");
+      setStreamStatus("กำลังรันในแซนด์บ็อกจริง…");\n      setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: "กำลังรัน…" });
       setWorkSteps((steps) => [...steps, "กำลังรันในแซนด์บ็อกจริง"]);
       try {
         const result = await executeSandbox(sandboxDetection);
-        const output = [result?.stdout, result?.stderr].filter(Boolean).join("\\n").trim();
+        const output = [result?.stdout, result?.stderr].filter(Boolean).join("\\n").trim();\n        setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: result?.status === "running" ? "กำลังทำงาน" : result?.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด", output, previewUrl: result ? sandboxPreviewUrl(result) : null });
         sandboxNote = output ? "\\n\\n**ผลการรัน Sandbox**\\n\\n\`\`\`text\\n" + output + "\\n\`\`\`" : "";
         const preview = result ? sandboxPreviewUrl(result) : null;
         if (preview) sandboxNote += "\\n\\n:::sandbox-preview " + preview + "\\n";
         setWorkSteps((steps) => [...steps, result?.status === "running" ? "เว็บกำลังทำงานและเปิด Preview" : result?.status === "success" ? "Sandbox รันสำเร็จ" : "Sandbox แจ้งข้อผิดพลาด"]);
         setStreamStatus(result?.status === "running" ? "เปิด Live Preview แล้ว…" : "ตรวจผล Sandbox แล้ว…");
       } catch (error) {
-        sandboxNote = "\\n\\n**Sandbox:** " + (error instanceof Error ? error.message : "รัน Sandbox ไม่สำเร็จ");
+        const errorText = error instanceof Error ? error.message : "รัน Sandbox ไม่สำเร็จ";\n        setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: "ผิดพลาด", output: errorText });\n        sandboxNote = "\\n\\n**Sandbox:** " + errorText;
         setWorkSteps((steps) => [...steps, "Sandbox พบข้อผิดพลาด"]);
       }
     }
