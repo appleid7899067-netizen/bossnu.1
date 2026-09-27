@@ -283,6 +283,13 @@ export function formatWorkspaceContext(files: WorkspaceFile[], memories: Workspa
     .slice(0, 12)
     .map(item => `- ${item.key}: ${item.value.slice(0, 3000)}`)
     .join("\n");
+  // Learned skills are private to this Agent workspace and are injected into the
+  // next task so the Agent can actually reuse what it previously proved.
+  const learnedSkills = files
+    .filter(file => file.path.startsWith("skills/learned/") && file.path.endsWith(".md"))
+    .slice(-20)
+    .map(file => `--- ${file.path} ---\n${file.content.slice(0, 5000)}`)
+    .join("\n");
   const project = files.filter(file => file.path.startsWith("project/") && !file.path.endsWith("/.gitkeep"));
   const tree = project.slice(0, 120).map(file => `- ${file.path} (${file.content.length} chars)`).join("\n");
   return [
@@ -293,6 +300,7 @@ export function formatWorkspaceContext(files: WorkspaceFile[], memories: Workspa
     project.length > 120 ? `…และอีก ${project.length - 120} ไฟล์` : "",
     "Persistent memory:",
     memory || "ไม่มีความจำที่เกี่ยวข้อง",
+    learnedSkills ? "Private learned skills:\n" + learnedSkills : "ยังไม่มีทักษะที่ Agent เรียนรู้",
   ].filter(Boolean).join("\n");
 }
 
