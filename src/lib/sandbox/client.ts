@@ -13,9 +13,12 @@ export type SandboxExecutionResult = {
 
 const runner = (import.meta.env.VITE_SANDBOX_RUNNER_URL || "").replace(/\/$/, "");
 
-export async function executeSandbox(detection: SandboxDetection): Promise<SandboxExecutionResult | null> {
-  if (!runner || !detection.command) return null;
-  if (!["node", "python", "bash", "go", "rust", "java", "cpp"].includes(detection.runtime)) return null;
+export async function executeSandbox(detection: SandboxDetection): Promise<SandboxExecutionResult> {
+  if (!runner) throw new Error("ยังไม่ได้ตั้งค่า VITE_SANDBOX_RUNNER_URL เพื่อเชื่อมต่อ Sandbox Runner");
+  if (!detection.command) throw new Error("ไม่พบคำสั่งสำหรับ Sandbox");
+  if (!["node", "python", "bash", "go", "rust", "java", "cpp"].includes(detection.runtime)) {
+    throw new Error(`ยังไม่รองรับ runtime: ${detection.runtime}`);
+  }
 
   const response = await fetch(runner + "/execute", {
     method: "POST",

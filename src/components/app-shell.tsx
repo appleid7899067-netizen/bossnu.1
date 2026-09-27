@@ -23,6 +23,22 @@ import { cn, uid } from "@/lib/utils";
 import { detectSandboxInput } from "@/lib/sandbox/detect";
 import { executeSandbox, sandboxPreviewUrl } from "@/lib/sandbox/client";
 
+function sandboxPreviewDocument(runtime: string, source: string) {
+  const safeScript = source.replace(/<\/script/gi, "<\\/script");
+  if (runtime === "html") {
+    const document = /<!doctype\s+html|<html(?:\s|>)/i.test(source)
+      ? source
+      : `<!doctype html><html lang="th"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>${source}</body></html>`;
+    return document;
+  }
+  if (runtime === "javascript") {
+    return `<!doctype html><html lang="th"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="app"></div><script>${safeScript}</script></body></html>`;
+  }
+  const style = runtime === "css" ? source : "";
+  const tailwind = runtime === "tailwind" ? '<script src="https://cdn.tailwindcss.com"></script>' : "";
+  return `<!doctype html><html lang="th"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${style}</style>${tailwind}</head><body><main class="p-6"><h1 class="text-2xl font-bold">Live preview</h1><p class="mt-2">ปรับแต่งตัวอย่างด้วย ${runtime === "css" ? "CSS" : "Tailwind CSS"}</p></main></body></html>`;
+}
+
 export function AppShell({ search }: { search: Search }) {
   const navigate = useNavigate();
   const store = useAppStore();
@@ -100,7 +116,18 @@ export function AppShell({ search }: { search: Search }) {
     go({ view: "chat", c: id });
 
     let sandboxNote = "";
-    if (sandboxDetection.runtime !== "unknown" && sandboxDetection.command && ["node", "python", "bash", "go", "rust", "java", "cpp"].includes(sandboxDetection.runtime)) {
+    if (sandboxDetection.webPreview && sandboxDetection.code && ["html", "javascript", "css", "tailwind"].includes(sandboxDetection.runtime)) {
+      setSandboxRun({
+        runtime: sandboxDetection.runtime,
+        label: sandboxDetection.label,
+        command: "browser sandbox",
+        status: "Preview พร้อมแล้ว",
+        previewHtml: sandboxPreviewDocument(sandboxDetection.runtime, sandboxDetection.code),
+      });
+      setWorkSteps((steps) => [...steps, "ตรวจพบโค้ดเว็บ", "แสดง Live Preview ในแชท"]);
+      setStreamStatus("สร้าง Live Preview แล้ว…");
+      sandboxNote = "แสดงตัวอย่างโค้ดใน Live Preview ที่แนบไว้ในแชทแล้วค่ะ";
+    } else if (sandboxDetection.runtime !== "unknown" && sandboxDetection.command && ["node", "python", "bash", "go", "rust", "java", "cpp"].includes(sandboxDetection.runtime)) {
       setStreamStatus("กำลังรันในแซนด์บ็อกจริง…");
       setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: "กำลังรัน…" });
       setWorkSteps((steps) => [...steps, "กำลังรันในแซนด์บ็อกจริง"]);

@@ -12,6 +12,7 @@ export type SandboxRunView = {
   status: string;
   output?: string;
   previewUrl?: string | null;
+  previewHtml?: string;
 };
 
 export function ChatThread({
@@ -37,7 +38,7 @@ export function ChatThread({
     const el = scroller.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages, streamingId, autoScroll]);
+  }, [messages, streamingId, autoScroll, sandboxRun]);
 
   function onScroll() {
     const el = scroller.current;
@@ -66,6 +67,7 @@ export function ChatThread({
             onDelete={() => onDeleteMessage?.(m.id)}
           />
         ))}
+        {sandboxRun?.previewHtml ? <SandboxHtmlPreview html={sandboxRun.previewHtml} /> : null}
       </div>
     </div>
   );
@@ -250,5 +252,17 @@ function WorkStatus({
         </div>
       </div>
     </div>
+  );
+}
+
+function SandboxHtmlPreview({ html }: { html: string }) {
+  return (
+    <section className="ml-10 w-full max-w-[720px] overflow-hidden rounded-2xl border border-border bg-white shadow-sm sm:ml-11">
+      <div className="flex h-9 items-center justify-between border-b border-border bg-elevated px-3 text-xs font-medium text-muted">
+        <span>🌐 Sandbox • Live Preview</span>
+        <span className="text-success">แยกกรอบปลอดภัย</span>
+      </div>
+      <iframe title="Sandbox HTML preview" sandbox="allow-scripts" srcDoc={html} className="h-[min(55vh,520px)] w-full bg-white" />
+    </section>
   );
 }
