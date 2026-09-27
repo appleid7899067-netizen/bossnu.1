@@ -33,7 +33,7 @@ export async function runAgentLoop(opts: {
   const plan = buildCowPlan(goal, selectedSkills.map(skill => skill.name));
   opts.onPhase?.("goal", "🎯 เป้าหมาย");
   opts.onText(`\n> 🎯 เป้าหมาย: ${goal.slice(0, 300)}\n`);
-  const max = Math.min(6, Math.max(0, opts.maxRuns ?? 6));
+  const max = Math.min(4, Math.max(0, opts.maxRuns ?? 4));
 
   while (!opts.signal.aborted) {
     core.setPhase("plan");
@@ -118,9 +118,9 @@ export async function runAgentLoop(opts: {
 
       if (opts.signal.aborted) return;
 
-      const passed = result.status === "success";
+      const passed = result.status === "success" && (result.exitCode == null || result.exitCode === 0) && !result.error;
       core.setPhase("verify");
-      opts.onPhase?.("verify", passed ? "🔍 Verify • ผ่านการตรวจสอบเบื้องต้น" : "🔍 Verify • ตรวจพบปัญหา");
+      opts.onPhase?.("verify", passed ? "🔍 Verify • ผ่านจากผลรันจริง" : "🔍 Verify • ตรวจพบปัญหา");
 
       if (!passed) {
         core.setPhase("fix");
