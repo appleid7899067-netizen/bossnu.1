@@ -75,6 +75,7 @@ export async function streamChat(opts: {
     const activeSkills = settings.agentSkills.filter((s) => s.enabled).map((s) => s.name).join(", ");
     const memories = settings.memory.slice(0, 12).map((m) => `- ${m.content}`).join("\n");
     const agent = settings.agentProfiles[0];
+    const learnedSkills = settings.learnedSkills.slice(0, 20).map((s) => `- ${s.name} [${s.runtime}] tested: ${s.pattern} | uses: ${s.uses}`).join("\n");
 
     const system = [
       `Persona: คุณคือ ${settings.personality.name} ผู้ช่วย AI ผู้หญิงของผู้ใช้`,
@@ -86,6 +87,7 @@ export async function streamChat(opts: {
       agent?.instructions ?? "",
       `สกิลที่เปิดใช้งาน: ${activeSkills || "ไม่มี"}`,
       memories ? `ความจำที่บันทึกไว้:\n${memories}` : "ไม่มีความจำที่บันทึกไว้",
+      learnedSkills ? `ทักษะจากโค้ดที่เคยทดสอบผ่าน:\n${learnedSkills}` : "ยังไม่มีทักษะโค้ดที่ทดสอบผ่าน",
       "ห้ามอ้างว่าทำสิ่งที่ยังไม่ได้ทำจริง",
       buildSkillContext(latestUser),
     ].filter(Boolean).join("\n");
