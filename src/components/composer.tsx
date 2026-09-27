@@ -20,7 +20,9 @@ export function Composer({
   voiceEnabled?: boolean;
   onToggleVoice?: () => void;
 }) {
-  const ref = useRef<HTMLTextAreaElement>(null);\n  const fileRef = useRef<HTMLInputElement>(null);\n  const [toolsOpen, setToolsOpen] = useState(false);
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [toolsOpen, setToolsOpen] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
