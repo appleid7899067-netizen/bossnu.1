@@ -8,6 +8,7 @@ import {
   readWorkspaceFile,
   recallWorkspaceMemory,
   rememberWorkspace,
+  learnWorkspaceSkill,
   updateWorkspaceTask,
   upsertWorkspaceFile,
 } from "@/lib/ai/boss-workspace";
@@ -15,7 +16,7 @@ import { syncStatus } from "@/lib/workspace/sync.server";
 
 type Body = {
   workspaceId?: string;
-  action?: "list" | "read" | "write" | "delete" | "context" | "task" | "remember" | "sync-status";
+  action?: "list" | "read" | "write" | "delete" | "context" | "task" | "remember" | "learn-skill" | "sync-status";
   path?: string;
   content?: string;
   goal?: string;
@@ -26,6 +27,8 @@ type Body = {
   value?: string;
   source?: string;
   limit?: number;
+  name?: string;
+  runtime?: string;
 };
 
 const str = (value: unknown, max: number) => (typeof value === "string" ? value.slice(0, max) : "");
@@ -84,6 +87,17 @@ export const Route = createFileRoute("/api/workspace")({
             await ensureBossWorkspace(workspaceId);
             await rememberWorkspace(workspaceId, key, body.value.slice(0, 8000), str(body.source, 40) || "conversation");
             return Response.json({ ok: true });
+          }
+          if (action === "learn-skill") {
+            if (!body.name || !body.runtime || !body.goal || !body.path) return bad("learn-skill ต้องมี name, runtime, goal และ command");
+            const skill = await learnWorkspaceSkill(workspaceId, {
+              name: str(body.name, 160),
+              runtime: str(body.runtime, 30),
+              command: str(body.path, 32000),
+              goal: str(body.goal, 4000),
+              evidence: str(body.value, 12000),
+            });
+            return Response.json({ ok: true, skill });
           }
           if (action === "sync-status") {
             return Response.json({ ok: true, sync: await syncStatus(workspaceId, Number(body.limit) || 10) });
