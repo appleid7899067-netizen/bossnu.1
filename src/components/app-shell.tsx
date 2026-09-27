@@ -13,7 +13,7 @@ import { SettingsView } from "@/components/settings-view";
 import { SaliCallView } from "@/components/sali-call-view";
 import { Button } from "@/components/ui/button";
 import { generateMindMap, generateStudioImage } from "@/lib/ai/client";
-import { runAgentLoop } from "@/lib/ai/agent-loop";
+import { runAgentLoop, type AgentPhase } from "@/lib/ai/agent-loop";
 import { terminalTranscript, modelResult, type RunCall } from "@/lib/ai/sandbox-tool";
 import { isRunnerRuntime } from "@/types/sandbox";
 import { streamChat } from "@/lib/ai/stream";
@@ -110,7 +110,7 @@ export function AppShell({ search }: { search: Search }) {
     const ac = new AbortController();
     abortRef.current = ac;
     setDraft(""); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
-    setStreamStatus("กำลังวิเคราะห์คำขอ…"); setWorkSteps(["วิเคราะห์คำขอ"]);
+    setStreamStatus("กำลังวางแผน…"); setWorkSteps(["🎯 เป้าหมาย"]);
     stopVoice(); go({ view: "chat", c: id });
     let reply = "";
     const append = (text: string) => { reply += text; store.patchAssistant(id, assistantId, { content: reply }); };
@@ -163,10 +163,29 @@ export function AppShell({ search }: { search: Search }) {
         messages: history, signal: ac.signal, tools,
         maxRuns: detection.command && tools && store.personality.autoSandbox ? 5 : 6,
         execute,
+        onPhase: (phase: AgentPhase, detail?: string) => {
+          const labels: Record<AgentPhase, string> = {
+            goal: "🎯 เป้าหมาย",
+            plan: "🧠 Plan • กำลังวางแผน",
+            act: "🛠️ Act • กำลังลงมือ",
+            run: "💻 Run • กำลังรัน",
+            observe: "👀 Observe • กำลังอ่านผล",
+            verify: "🔍 Verify • กำลังตรวจสอบ",
+            fix: "🐛 Fix • พบปัญหา กำลังแก้",
+            answer: "💬 Answer • กำลังตอบในแชท",
+          };
+          setStreamStatus(detail || labels[phase]);
+          setWorkSteps(steps => {
+            const next = [...steps];
+            const label = labels[phase];
+            if (next[next.length - 1] !== label) next.push(label);
+            return next.slice(-10);
+          });
+        },
         onText: text => { append(text); if (!text.startsWith("\n\n```sandbox")) speakRealtime(text); },
         model: async (messages, onText) => {
           let failure = "";
-          setStreamStatus("กำลังสร้างคำตอบ…");
+          setStreamStatus("🧠 Plan • กำลังวางแผน…");
           await streamChat({ messages, mode: chatMode, signal: ac.signal, tools, latestUser: content,
             onEvent: event => {
               if (ac.signal.aborted) return;
