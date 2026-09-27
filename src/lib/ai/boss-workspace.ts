@@ -28,6 +28,16 @@ export type WorkspaceMemory = {
   updatedAt: string;
 };
 
+export type WorkspaceSyncEvidence = {
+  saved: number;
+  deleted: number;
+  total: number;
+  verified: boolean;
+  complete: boolean;
+  missing: string[];
+  mismatched: string[];
+};
+
 function safePath(input: string): string {
   let path = input.trim().split(String.fromCharCode(92)).join("/");
   while (path.startsWith("/")) path = path.slice(1);
@@ -113,17 +123,52 @@ export async function listProjectFiles(id: string, limit = 40): Promise<Workspac
   return files.filter(file => file.path.startsWith("project/")).slice(0, Math.min(Math.max(limit, 1), 80));
 }
 
-export async function saveProjectFiles(id: string, files: Array<{ path: string; content: string }>) {
+export async function saveProjectFiles(
+  id: string,
+  files: Array<{ path: string; content: string }>,
+  options: { complete?: boolean } = {},
+): Promise<WorkspaceSyncEvidence> {
   const workspaceId = await ensureBossWorkspace(id);
-  let saved = 0;
+  const incoming = new Map<string, string>();
   for (const file of files.slice(0, 80)) {
     if (typeof file?.path !== "string" || typeof file?.content !== "string") continue;
     const path = safePath(file.path);
     if (!path.startsWith("project/")) continue;
-    await upsertWorkspaceFile(workspaceId, path, file.content);
+    incoming.set(path, safeContent(file.content));
+  }
+
+  let saved = 0;
+  for (const [path, content] of incoming) {
+    await upsertWorkspaceFile(workspaceId, path, content);
     saved++;
   }
-  return saved;
+
+  let deleted = 0;
+  if (options.complete) {
+    const existing = await listProjectFiles(workspaceId, 80);
+    for (const file of existing) {
+      if (!incoming.has(file.path)) {
+        await deleteWorkspaceFile(workspaceId, file.path);
+        deleted++;
+      }
+    }
+  }
+
+  const stored = await listProjectFiles(workspaceId, 80);
+  const storedMap = new Map(stored.map(file => [file.path, file.content]));
+  const missing = [...incoming.keys()].filter(path => !storedMap.has(path));
+  const mismatched = [...incoming.keys()].filter(
+    path => storedMap.has(path) && storedMap.get(path) !== incoming.get(path),
+  );
+  return {
+    saved,
+    deleted,
+    total: stored.length,
+    verified: missing.length === 0 && mismatched.length === 0 && (!options.complete || stored.length === incoming.size),
+    complete: Boolean(options.complete),
+    missing,
+    mismatched,
+  };
 }
 
 export async function deleteWorkspaceFile(id: string, path: string) {
