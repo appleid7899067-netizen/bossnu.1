@@ -453,7 +453,7 @@ export function AppShell({ search }: { search: Search }) {
               <div><p className="text-sm font-semibold">🤖 ตัวแทน AI</p><p className="text-[11px] text-muted">ตั้งค่าบุคลิก • สกิล • ตัวแทน • ความจำ • Sandbox</p></div>
               <button type="button" onClick={() => setAgentSettingsOpen(false)} className="grid size-9 place-items-center rounded-xl bg-clay text-muted hover:text-fg" aria-label="ปิด"><X className="size-4" /></button>
             </div>
-            <div className="min-h-0 flex-1"><SettingsView /></div>
+            <div className="min-h-0 flex-1 overflow-hidden"><SettingsView /></div>
           </div>
         </div>
       ) : null}
