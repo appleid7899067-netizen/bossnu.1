@@ -5,6 +5,7 @@ import { titleFromPrompt, uid } from "@/lib/utils";
 
 const MAX_CHATS=40, MAX_MAPS=16, MAX_IMAGES=12, MAX_MESSAGES=48;
 const defaultSkills=[
+{id:"sandbox-terminal",name:"Sandbox Terminal",description:"รัน npm, npx, git, python3 จริงใน workspace ของแชต",enabled:true},
 {id:"research",name:"Research",description:"ค้นคว้าและสรุปข้อมูล",enabled:true},
 {id:"web-search",name:"Web Search",description:"ค้นข้อมูลล่าสุดและแหล่งอ้างอิง",enabled:true},
 {id:"coding",name:"Coding",description:"เขียนและแก้โค้ด",enabled:true},
@@ -15,7 +16,7 @@ const defaultSkills=[
 {id:"verification",name:"Verification",description:"ตรวจผลก่อนรายงานว่าสำเร็จ",enabled:true},
 ] as AgentSkill[];
 const defaultAgent:AgentProfile={id:"slii",name:"สลี่",role:"Primary Agent",instructions:"ผู้ช่วย AI ผู้หญิงที่น่ารัก เป็นกันเอง ลงมือทำก่อน อธิบายสั้น และตรวจผลก่อนบอกว่าสำเร็จ",skills:defaultSkills.map(s=>s.id),createdAt:Date.now()};
-const defaultPersonality:PersonalitySettings={name:"สลี่",tone:"น่ารัก อ่อนโยน เป็นกันเอง ขี้อ้อนเล็กน้อย แต่ทำงานจริงและกระชับ",actFirst:true,thaiFirst:true,warm:true};
+const defaultPersonality:PersonalitySettings={name:"สลี่",tone:"น่ารัก อ่อนโยน เป็นกันเอง ขี้อ้อนเล็กน้อย แต่ทำงานจริงและกระชับ",actFirst:true,thaiFirst:true,warm:true,autoSandbox:true,darkMode:true};
 
 type AppState={
 conversations:Conversation[]; activeChatId:string|null; maps:SavedMap[]; activeMapId:string|null; images:StudioImage[]; hydrated:boolean;
@@ -44,10 +45,10 @@ addAgentProfile:profile=>set(s=>({agentProfiles:[...s.agentProfiles,profile]})),
 addMemory:content=>set(s=>({memory:[{id:uid("mem"),content,createdAt:Date.now()},...s.memory].slice(0,100)})),deleteMemory:id=>set(s=>({memory:s.memory.filter(m=>m.id!==id)})),
 saveLearnedSkill:skill=>set(s=>{
   const existing=s.learnedSkills.find(x=>x.pattern===skill.pattern && x.runtime===skill.runtime);
-  if(existing)return {learnedSkills:s.learnedSkills.map(x=>x.id===existing.id?{...x,...skill,result:"passed",createdAt:Date.now(),uses:x.uses+1}:x)};
-  return {learnedSkills:[{...skill,id:uid("skill"),createdAt:Date.now(),uses:1},...s.learnedSkills].slice(0,200)};
+  if(existing)return {learnedSkills:s.learnedSkills.map(x=>x.id===existing.id?{...x,...skill,createdAt:Date.now(),lastTestedAt:Date.now(),uses:x.uses+1}:x)};
+  return {learnedSkills:[{...skill,id:uid("skill"),createdAt:Date.now(),uses:1,lastTestedAt:Date.now()},...s.learnedSkills].slice(0,200)};
 }),
 useLearnedSkill:id=>set(s=>({learnedSkills:s.learnedSkills.map(x=>x.id===id?{...x,uses:x.uses+1}:x)})),
-}),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({conversations:s.conversations,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory,learnedSkills:s.learnedSkills})}));
+}),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({conversations:s.conversations,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory,learnedSkills:s.learnedSkills}),merge:(persisted,current)=>{const p=(persisted??{}) as Partial<AppState>;return {...current,...p,agentSkills:[...(p.agentSkills??current.agentSkills),...defaultSkills.filter(d=>!(p.agentSkills??current.agentSkills).some(s=>s.id===d.id))],personality:{...current.personality,...(p.personality??{})}};}}));
 
 export function getConversation(id:string|null){if(!id)return undefined;return useAppStore.getState().conversations.find(c=>c.id===id);}

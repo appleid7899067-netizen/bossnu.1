@@ -32,12 +32,14 @@ export function ChatThread({
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!autoScroll) return;
     const el = scroller.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    // Keep the viewport anchored to the bottom without smooth-scroll feedback loops.
+    bottomRef.current?.scrollIntoView({ block: "end", behavior: "auto" });
   }, [messages, streamingId, autoScroll, sandboxRun]);
 
   function onScroll() {
@@ -47,7 +49,7 @@ export function ChatThread({
   }
 
   return (
-    <div ref={scroller} onScroll={onScroll} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain scroll-smooth">
+    <div ref={scroller} onScroll={onScroll} className="chat-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
       <div className="mx-auto flex w-full min-w-0 max-w-[1180px] flex-col gap-5 px-3 py-5 sm:px-5 sm:py-7 lg:px-7">
         {messages.length === 0 ? (
           <div className="flex min-h-[45vh] items-center justify-center text-center">
@@ -68,6 +70,7 @@ export function ChatThread({
           />
         ))}
         {sandboxRun?.previewHtml ? <SandboxHtmlPreview html={sandboxRun.previewHtml} /> : null}
+        <div ref={bottomRef} aria-hidden="true" className="h-px w-full shrink-0" />
       </div>
     </div>
   );
@@ -220,7 +223,7 @@ function WorkStatus({
                 <>
                   <div className="px-3 py-2 text-muted">ผลลัพธ์</div>
                   <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-[10px] leading-relaxed text-muted">
-                    {sandboxRun.output}
+                    {sandboxRun.output}{sandboxRun.status === "running" ? <span className="animate-pulse"> ▌</span> : null}
                   </pre>
                 </>
               ) : null}

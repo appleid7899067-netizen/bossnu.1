@@ -318,3 +318,14 @@ skill / reference / node / python / bash / html / json / error / 400 / 404) ท�
 - [ ] Authentication (เมื่อเปิดโหมดบัญชีผู้ใช้)
 - [ ] Monitoring / logging ฝั่ง runner
 - [ ] Production hardening (per-user quota, queue)
+
+## Sali chat terminal (v4)
+
+Chat now supports a bounded `<run lang="bash">` tool loop, streaming output and
+conversation-scoped workspaces. See [STREAMING_GUIDE.md](STREAMING_GUIDE.md) for
+the protocol, tests and escaped route filename. See
+[sandbox-runner/README.md](sandbox-runner/README.md) for deployment and security
+limits. Redeploy the runner with its updated Dockerfile (Git/curl/Python included).
+Settings playground uses the same app API rather than external Runlet requests;
+Java/C++ still need a runner image containing those compilers. Puter login is
+required for real model-driven chat; automated E2E uses a deterministic fixture.

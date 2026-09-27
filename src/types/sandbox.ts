@@ -237,6 +237,9 @@ export const CommandRequestSchema = z
     reference: referenceSchema.optional(),
     /** Runtime hint; `auto` detects from the command text. */
     type: z.enum(COMMAND_TYPES).optional(),
+    /** Explicit user approval required for commands classified as dangerous. */
+    workspace: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/).optional(),
+    allowDangerous: z.boolean().optional(),
   })
   .refine((value) => Boolean(value.cmd || value.skill), {
     message: "ต้องส่ง cmd หรือ skill อย่างน้อยหนึ่งอย่าง",
@@ -272,6 +275,8 @@ export const CommandResultSchema = z.looseObject({
   steps: z.array(z.string()).optional(),
   /** Skill ids whose triggers matched the command (when none was attached). */
   suggestions: z.array(z.string()).optional(),
+  dangerous: z.boolean().optional(),
+  riskReason: z.string().optional(),
   error: z.string().optional(),
   detail: z.string().optional(),
 });

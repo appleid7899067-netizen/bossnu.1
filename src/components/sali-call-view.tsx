@@ -103,6 +103,7 @@ export function SaliCallView({
         { role: "user" as const, content: text },
       ];
       await streamChat({
+        tools: false,
         messages: prior,
         mode: "instant",
         onEvent: (event) => {

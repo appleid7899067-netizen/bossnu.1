@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
-import { SaliAgent } from "@/components/sali-agent";
+import { SaliAgentStreaming } from "@/components/sali-agent-streaming";
 
 type SandboxSearch = { skill?: string };
 
@@ -24,7 +24,7 @@ function SandboxPage() {
   const { skill } = Route.useSearch();
   return (
     <div className="h-dvh overflow-hidden bg-bg text-fg">
-      <SaliAgent
+      <SaliAgentStreaming
         initialSkill={skill}
         leading={
           <Link

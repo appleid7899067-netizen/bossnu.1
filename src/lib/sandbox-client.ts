@@ -27,18 +27,24 @@ import {
 export type SandboxClientOptions = {
   /** Origin + path of the API. Defaults to same-origin `/api/sandbox`. */
   baseUrl?: string;
-  /** Abort requests that take longer than this (ms). Default 90s. */
+  /** Abort requests that take longer than this (ms). Default 150s. */
   timeoutMs?: number;
   /** Custom fetch (tests, server-side usage). */
   fetch?: typeof fetch;
 };
 
+export type { SandboxStreamEvent } from "./sandbox-streaming-client";
+import { streamSandboxCommand, type SandboxStreamEvent } from "./sandbox-streaming-client";
+
 export type ExecuteOptions = {
   /** Attach a Grok skill to the run (its content is returned with the result). */
+  workspace?: string;
   skill?: string;
   /** Runtime hint; omit for auto-detection. */
   type?: CommandType;
   signal?: AbortSignal;
+  /** Explicit approval from the user for a command classified as dangerous. */
+  allowDangerous?: boolean;
 };
 
 export class SandboxClient {
@@ -48,7 +54,7 @@ export class SandboxClient {
 
   constructor(options: SandboxClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? SANDBOX_API_PATH).replace(/\/+$/, "");
-    this.timeoutMs = options.timeoutMs ?? 90_000;
+    this.timeoutMs = options.timeoutMs ?? 150_000;
     this.fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));
   }
 
@@ -73,6 +79,19 @@ export class SandboxClient {
     return this.post({ skill, reference, type: "skill" });
   }
 
+  /** Stream a command through the same central Sandbox API. */
+  async executeStream(cmd: string, options: ExecuteOptions & { onEvent?: (event: SandboxStreamEvent) => void } = {}): Promise<CommandResult> {
+    try {
+      return await streamSandboxCommand(cmd, options.skill, options.onEvent, {
+        ...options, baseUrl: this.baseUrl, fetch: this.fetchImpl, timeoutMs: this.timeoutMs,
+      });
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      return errorResult(message, { status: /timeout/i.test(message) ? "timeout" : "error" });
+    }
+  }
+
   /** Run a command; the server detects the runtime unless `type` is given. */
   async execute(cmd: string, options: ExecuteOptions = {}): Promise<CommandResult> {
     const command = cmd.trim();
@@ -80,7 +99,7 @@ export class SandboxClient {
     if (command.length > SANDBOX_LIMITS.commandChars) {
       return errorResult(`คำสั่งยาวเกิน ${SANDBOX_LIMITS.commandChars.toLocaleString()} ตัวอักษร`);
     }
-    return this.post({ cmd: command, skill: options.skill, type: options.type }, options.signal);
+    return this.post({ cmd: command, workspace: options.workspace, skill: options.skill, type: options.type, allowDangerous: options.allowDangerous }, options.signal);
   }
 
   executeNode(cmd: string, options: Omit<ExecuteOptions, "type"> = {}) {
@@ -157,6 +176,7 @@ export const sandboxClient = new SandboxClient();
 export type SandboxHistoryEntry = {
   id: string;
   cmd?: string;
+  workspace?: string;
   skill?: string;
   type?: CommandType;
   result: CommandResult;
@@ -237,7 +257,12 @@ export function useSandbox(options: UseSandboxOptions = {}) {
       setBusy(true);
       setError(null);
       try {
-        const result = await task(controller.signal);
+        let result: CommandResult;
+        try { result = await task(controller.signal); }
+        catch (error) {
+          result = errorResult(controller.signal.aborted ? "ยกเลิกคำสั่งแล้ว" : error instanceof Error ? error.message : "Streaming failed", { type: controller.signal.aborted ? "aborted" : "error" });
+        }
+        if (abortRef.current !== controller) return result;
         setLastResult(result);
         setError(result.success ? null : (result.error ?? null));
         record({ ...meta, result });
@@ -262,6 +287,14 @@ export function useSandbox(options: UseSandboxOptions = {}) {
     [client, run],
   );
 
+  const executeStream = useCallback(
+    (cmd: string, opts: ExecuteOptions & { onEvent?: (event: SandboxStreamEvent) => void } = {}) =>
+      run(signal => client.executeStream(cmd, { ...opts, signal,
+        onEvent: event => { if (!signal.aborted) opts.onEvent?.(event); },
+      }), { cmd, skill: opts.skill, type: opts.type }),
+    [client, run],
+  );
+
   const loadSkill = useCallback(
     (skill: string, reference?: string) =>
       run(() => client.loadSkill(skill, reference), { skill, type: "skill" }),
@@ -270,8 +303,6 @@ export function useSandbox(options: UseSandboxOptions = {}) {
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
-    abortRef.current = null;
-    setBusy(false);
   }, []);
 
   const clearHistory = useCallback(() => {
@@ -296,6 +327,7 @@ export function useSandbox(options: UseSandboxOptions = {}) {
     clearHistory,
     stop,
     execute,
+    executeStream,
     loadSkill,
     getSkills: client.getSkills.bind(client),
     executeNode: (cmd: string, opts: Omit<ExecuteOptions, "type"> = {}) =>

@@ -1,3 +1,4 @@
+import { SANDBOX_TOOL_PROMPT } from "./sandbox-tool";
 import type { ChatMode } from "@/lib/types";
 import { buildSkillContext } from "@/lib/skills";
 import { useAppStore } from "@/lib/store";
@@ -60,6 +61,8 @@ export async function streamChat(opts: {
   messages: { role: "user" | "assistant"; content: string }[];
   mode: ChatMode;
   signal?: AbortSignal;
+  tools?: boolean;
+  latestUser?: string;
   onEvent: (event: StreamEvent) => void;
 }) {
   try {
@@ -70,12 +73,12 @@ export async function streamChat(opts: {
     opts.onEvent({ type: "start", id: streamId });
 
     const latestUser =
-      [...opts.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+      opts.latestUser ?? [...opts.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     const settings = useAppStore.getState();
-    const activeSkills = settings.agentSkills.filter((s) => s.enabled).map((s) => s.name).join(", ");
+    const activeSkills = settings.agentSkills.filter((s) => s.enabled && (s.id !== "sandbox-terminal" || opts.tools === true)).map((s) => s.name).join(", ");
     const memories = settings.memory.slice(0, 12).map((m) => `- ${m.content}`).join("\n");
     const agent = settings.agentProfiles[0];
-    const learnedSkills = settings.learnedSkills.slice(0, 20).map((s) => `- ${s.name} [${s.runtime}] tested: ${s.pattern} | uses: ${s.uses}`).join("\n");
+    const learnedSkills = settings.learnedSkills.slice(0, 30).map((s) => `- ${s.name} [${s.runtime}] result: ${s.result} | command: ${s.pattern} | evidence: ${s.evidence.slice(0, 240)} | uses: ${s.uses}`).join("\n");
 
     const system = [
       `Persona: คุณคือ ${settings.personality.name} ผู้ช่วย AI ผู้หญิงของผู้ใช้`,
@@ -90,6 +93,7 @@ export async function streamChat(opts: {
       learnedSkills ? `ทักษะจากโค้ดที่เคยทดสอบผ่าน:\n${learnedSkills}` : "ยังไม่มีทักษะโค้ดที่ทดสอบผ่าน",
       "ห้ามอ้างว่าทำสิ่งที่ยังไม่ได้ทำจริง",
       buildSkillContext(latestUser),
+      opts.tools === true && settings.agentSkills.some(s => s.id === "sandbox-terminal" && s.enabled) ? SANDBOX_TOOL_PROMPT : "Terminal execution is unavailable this turn; do not emit run blocks.",
     ].filter(Boolean).join("\n");
 
     const response = await puter.ai.chat(

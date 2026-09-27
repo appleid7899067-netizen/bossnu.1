@@ -1,3 +1,4 @@
+import { assessSandboxRisk } from "@/lib/sandbox/detect";
 /**
  * Sali Sandbox Agent API — `/api/sandbox`
  *
@@ -34,7 +35,7 @@ import {
 } from "@/types/sandbox";
 
 const MAX_BODY_BYTES = 96 * 1024;
-const DEFAULT_RUNNER_TIMEOUT_MS = 60_000;
+const DEFAULT_RUNNER_TIMEOUT_MS = 140_000;
 
 // ---------------------------------------------------------------------------
 // Runner configuration
@@ -174,6 +175,8 @@ async function runOnRunner(
   label: string,
   command: string,
   steps: string[],
+  workspace?: string,
+  signal?: AbortSignal,
 ): Promise<{ result: CommandResult; httpStatus: number }> {
   const runner = runnerConfig();
   steps.push(`ส่งไปรันที่ Sandbox Runner (${runtime})`);
@@ -184,8 +187,8 @@ async function runOnRunner(
     response = await fetch(`${runner.url}/execute`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ language: runtime, command }),
-      signal: AbortSignal.timeout(runner.timeoutMs),
+      body: JSON.stringify({ language: runtime, command, workspace }),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(runner.timeoutMs)]) : AbortSignal.timeout(runner.timeoutMs),
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
@@ -428,11 +431,15 @@ async function handlePost(request: Request): Promise<Response> {
       suggestions,
     });
   }
+  const risk = assessSandboxRisk(action.command);
+  if (risk.dangerous && !parsed.data.allowDangerous) return fail(409, risk.riskReason || "ต้องอนุญาตก่อนรันคำสั่งอันตราย");
   const { result, httpStatus } = await runOnRunner(
     action.runtime,
     action.label,
     action.command,
     steps,
+    parsed.data.workspace,
+    request.signal,
   );
   return json({ ...result, skill, suggestions }, httpStatus);
 }

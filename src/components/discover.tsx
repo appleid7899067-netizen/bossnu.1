@@ -3,6 +3,8 @@ import { Bot, GitBranch, ImageIcon, MessageSquare, Sparkles, SquareTerminal } fr
 import type { AppView } from "@/lib/types";
 
 const PROMPTS = [
+  { title: "ติดตั้งแพ็กเกจจริง", body: "ใช้ Sandbox Terminal ติดตั้ง dayjs แล้วพิมพ์วันที่วันนี้ แสดงผลที่รันจริง" },
+  { title: "ทดสอบ Python และ Git", body: "ใช้ Sandbox Terminal ตรวจเวอร์ชัน Python และ Git แล้วใช้ Python คำนวณผลรวม 1 ถึง 100" },
   { title: "Write a story", body: "Write a short, imaginative story about a city that wakes up under the ocean." },
   { title: "Explain a concept", body: "Explain quantum computing in simple terms, with a helpful analogy." },
   { title: "Plan a trip", body: "Help me plan a relaxing three-day trip with great food and local highlights." },
