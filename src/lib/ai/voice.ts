@@ -1,206 +1,40 @@
+// Puter-backed multi-character TTS for Boss call mode.
+// Distinct provider voice IDs are persisted per device and can be selected from the call UI.
 const hasSpeech = typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
-
-export type VoiceMode = "cute" | "warm" | "calm" | "bright" | "special" | "deep" | "sweet" | "professional" | "anime" | "elegant" | "energetic" | "whisper" | "story" | "coding";
-export const VOICE_MODES: { id: VoiceMode; label: string; description: string; rate: number; pitch: number }[] = [
-  { id: "cute", label: "😊 น่ารักใสๆ", description: "เสียงสูง สดใส คุยทั่วไป", rate: 1.08, pitch: 1.28 },
-  { id: "warm", label: "🥰 อ่อนโยนอบอุ่น", description: "นุ่ม ฟังสบาย ปลอบใจ", rate: 0.96, pitch: 1.08 },
-  { id: "calm", label: "😌 สงบผ่อนคลาย", description: "ช้า ชัด ก่อนนอน", rate: 0.82, pitch: 0.94 },
-  { id: "bright", label: "✨ ร่าเริงสดใส", description: "เร็ว มีพลัง ให้กำลังใจ", rate: 1.16, pitch: 1.22 },
-  { id: "special", label: "💜 ที่รักพิเศษ", description: "นุ่มลึก เป็นส่วนตัว", rate: 0.92, pitch: 1.02 },
-  { id: "deep", label: "🌙 ลึกหนักแน่น", description: "ต่ำ มั่นคง สรุปสำคัญ", rate: 0.88, pitch: 0.82 },
-  { id: "sweet", label: "🍬 หวานละมุน", description: "เสียงผู้หญิงหวาน นุ่ม ฟังง่าย", rate: 1.02, pitch: 1.34 },
-  { id: "professional", label: "💼 ผู้ช่วยมืออาชีพ", description: "ชัด สุภาพ เหมาะกับงาน", rate: 0.98, pitch: 1.12 },
-  { id: "anime", label: "🌸 อนิเมะสาวสดใส", description: "สดใส ขี้เล่น พลังงานสูง", rate: 1.12, pitch: 1.48 },
-  { id: "elegant", label: "👑 หรูสง่างาม", description: "นุ่ม เรียบ สุขุม มีระดับ", rate: 0.9, pitch: 1.18 },
-  { id: "energetic", label: "⚡ สาวพลังงานสูง", description: "กระฉับกระเฉง เหมาะกับการลุยงาน", rate: 1.22, pitch: 1.3 },
-  { id: "whisper", label: "🌌 กระซิบเบาๆ", description: "ช้า นุ่ม เหมาะกับช่วงผ่อนคลาย", rate: 0.78, pitch: 1.18 },
-  { id: "story", label: "📖 นักเล่านิทาน", description: "มีจังหวะ เหมาะกับเรื่องยาว", rate: 0.86, pitch: 1.24 },
-  { id: "coding", label: "👩‍💻 สาว Coding", description: "ชัด กระชับ เหมาะกับงานโค้ด", rate: 0.94, pitch: 1.1 },
+export type VoiceMode = "luna"|"mira"|"aria"|"nami"|"nova"|"elly"|"vera"|"kaiya";
+export type VoiceProfile = {id:VoiceMode;label:string;description:string;provider:"gemini";model:string;voice:string;instructions:string;rate:number;pitch:number};
+const MODEL="gemini-3.1-flash-tts-preview";
+export const VOICE_PROFILES:VoiceProfile[]=[
+{id:"luna",label:"Luna · อบอุ่น",description:"ผู้ช่วยหลัก นุ่มและเป็นธรรมชาติ",provider:"gemini",model:MODEL,voice:"Kore",instructions:"Speak Thai naturally, warmly and clearly. Calm friendly assistant character.",rate:1,pitch:1},
+{id:"mira",label:"Mira · สดใส",description:"ร่าเริง กระฉับกระเฉง",provider:"gemini",model:MODEL,voice:"Leda",instructions:"Speak Thai with bright energy and a lively conversational character.",rate:1.04,pitch:1},
+{id:"aria",label:"Aria · มืออาชีพ",description:"สุขุม ชัดเจน เหมาะกับงาน",provider:"gemini",model:MODEL,voice:"Aoede",instructions:"Speak Thai professionally, composed, articulate and confident.",rate:.96,pitch:1},
+{id:"nami",label:"Nami · หวาน",description:"นุ่ม น่ารัก ฟังสบาย",provider:"gemini",model:MODEL,voice:"Callirrhoe",instructions:"Speak Thai softly with a sweet, gentle and playful character.",rate:1,pitch:1},
+{id:"nova",label:"Nova · สายเทค",description:"มั่นใจ กระชับ เหมาะกับ Coding",provider:"gemini",model:MODEL,voice:"Autonoe",instructions:"Speak Thai clearly and confidently like a skilled software engineer. Keep technical explanations crisp.",rate:.98,pitch:1},
+{id:"elly",label:"Elly · นักเล่าเรื่อง",description:"นุ่ม มีจังหวะ เล่าเรื่องเก่ง",provider:"gemini",model:MODEL,voice:"Achernar",instructions:"Speak Thai like an engaging storyteller with expressive pacing and natural pauses.",rate:.94,pitch:1},
+{id:"vera",label:"Vera · Executive",description:"สงบ หรู สุขุม",provider:"gemini",model:MODEL,voice:"Erinome",instructions:"Speak Thai elegantly and calmly, concise and polished like an executive assistant.",rate:.92,pitch:1},
+{id:"kaiya",label:"Kaiya · Anime",description:"สดใส มีคาแรกเตอร์ชัด",provider:"gemini",model:MODEL,voice:"Pulcherrima",instructions:"Speak Thai with an expressive animated character, playful reactions and clear pronunciation.",rate:1.06,pitch:1}
 ];
-
-export type VoiceSettings = {
-  enabled: boolean;
-  mode: VoiceMode;
-  source: "puter" | "device";
-  rate: number;
-  pitch: number;
-  volume: number;
-  voiceName: string;
-};
-
-const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
-  enabled: true,
-  mode: "warm",
-  source: "puter",
-  rate: 1,
-  pitch: 1.08,
-  volume: 1,
-  voiceName: "",
-};
-
-let settings: VoiceSettings = DEFAULT_VOICE_SETTINGS;
-let pending = "";
-let speaking = false;
-
-function loadSettings() {
-  if (!hasSpeech) return;
-  try {
-    const raw = window.localStorage.getItem("bossnu-voice-settings");
-    if (raw) settings = { ...DEFAULT_VOICE_SETTINGS, ...JSON.parse(raw) };
-  } catch {
-    settings = DEFAULT_VOICE_SETTINGS;
-  }
-}
-
-loadSettings();
-
-function saveSettings() {
-  if (!hasSpeech) return;
-  try {
-    window.localStorage.setItem("bossnu-voice-settings", JSON.stringify(settings));
-  } catch { /* intentionally ignored */ }
-}
-
-function pickThaiVoice() {
-  if (!hasSpeech) return null;
-  const voices = window.speechSynthesis.getVoices();
-  if (settings.voiceName) {
-    const selected = voices.find((v) => v.name === settings.voiceName);
-    if (selected) return selected;
-  }
-  return voices.find((v) => /^th(-|_)/i.test(v.lang))
-    ?? voices.find((v) => /thai/i.test(v.name))
-    ?? null;
-}
-
-function cleanSpeechText(value: string) {
-  return value
-    .replace(/\x60\x60\x60[\s\S]*?\x60\x60\x60/g, " ")
-    .replace(/\x60([^\x60]+)\x60/g, "$1")
-    .replace(/[#*_>]/g, "")
-    .replace(/https?:\/\/\S+/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function speakNext() {
-  if (!hasSpeech || !settings.enabled || speaking || !pending.trim()) return;
-
-  const match = pending.match(/^(.{40,220}?[.!?。！？\n])(?:\s+|$)/);
-  if (!match) return;
-
-  const text = cleanSpeechText(match[1]);
-  pending = pending.slice(match[0].length);
-
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "th-TH";
-  utterance.rate = settings.rate;
-  utterance.pitch = settings.pitch;
-  utterance.volume = settings.volume;
-
-  const voice = pickThaiVoice();
-  if (voice) utterance.voice = voice;
-
-  speaking = true;
-  utterance.onend = () => {
-    speaking = false;
-    speakNext();
-  };
-  utterance.onerror = () => {
-    speaking = false;
-    speakNext();
-  };
-
-  window.speechSynthesis.resume();
-  window.speechSynthesis.speak(utterance);
-}
-
-function createUtterance(text: string) {
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "th-TH";
-  utterance.rate = settings.rate;
-  utterance.pitch = settings.pitch;
-  utterance.volume = settings.volume;
-
-  const voice = pickThaiVoice();
-  if (voice) utterance.voice = voice;
-
-  return utterance;
-}
-
-export function isVoiceSupported() {
-  return hasSpeech;
-}
-
-export function getVoiceSettings(): VoiceSettings {
-  return { ...settings };
-}
-
-export function getAvailableVoices(): { name: string; lang: string }[] {
-  if (!hasSpeech) return [];
-  return window.speechSynthesis.getVoices().map((voice) => ({
-    name: voice.name,
-    lang: voice.lang,
-  }));
-}
-
-export function applyVoiceMode(mode: VoiceMode) {
-  const preset = VOICE_MODES.find((item) => item.id === mode) ?? VOICE_MODES[1];
-  updateVoiceSettings({ mode, rate: preset.rate, pitch: preset.pitch });
-}
-
-export function updateVoiceSettings(patch: Partial<VoiceSettings>) {
-  settings = { ...settings, ...patch };
-  saveSettings();
-
-  if (!settings.enabled && hasSpeech) {
-    window.speechSynthesis.cancel();
-    pending = "";
-    speaking = false;
-  }
-}
-
-export function setVoiceEnabled(value: boolean) {
-  updateVoiceSettings({ enabled: value });
-  if (value) speakNext();
-}
-
-export function isVoiceEnabled() {
-  return settings.enabled;
-}
-
-export function speakRealtime(text: string) {
-  if (!hasSpeech || !settings.enabled) return;
-  pending += text;
-  speakNext();
-}
-
-export function isVoiceSpeaking() {
-  return speaking || (hasSpeech && window.speechSynthesis.speaking);
-}
-
-export function finishVoice() {
-  if (!hasSpeech || !settings.enabled) return;
-
-  const tail = pending.trim();
-  pending = "";
-  if (!tail) return;
-
-  const utterance = createUtterance(tail);
-  speaking = true;
-  utterance.onend = () => {
-    speaking = false;
-  };
-  utterance.onerror = () => {
-    speaking = false;
-  };
-
-  window.speechSynthesis.speak(utterance);
-}
-
-export function stopVoice() {
-  if (!hasSpeech) return;
-  window.speechSynthesis.cancel();
-  pending = "";
-  speaking = false;
-}
+export const VOICE_MODES=VOICE_PROFILES;
+export type VoiceSettings={enabled:boolean;mode:VoiceMode;source:"puter"|"device";rate:number;pitch:number;volume:number;voiceName:string};
+const DEFAULT:VoiceSettings={enabled:true,mode:"luna",source:"puter",rate:1,pitch:1,volume:1,voiceName:"Kore"};
+let settings:VoiceSettings=DEFAULT,pending="",speaking=false,audio:HTMLAudioElement|null=null;
+function save(){try{localStorage.setItem("bossnu-voice-settings",JSON.stringify(settings))}catch{}}
+try{const raw=typeof window!=="undefined"?localStorage.getItem("bossnu-voice-settings"):null;if(raw)settings={...DEFAULT,...JSON.parse(raw)}}catch{settings=DEFAULT}
+function profile(){return VOICE_PROFILES.find(v=>v.id===settings.mode)||VOICE_PROFILES[0]}
+async function puter(){const w=window as any;if(w.puter?.ai?.txt2speech)return w.puter;await new Promise<void>((res,rej)=>{const s=document.createElement("script");s.src="https://js.puter.com/v2/";s.onload=()=>res();s.onerror=()=>rej(new Error("Puter TTS unavailable"));document.head.appendChild(s)});return (window as any).puter}
+function clean(v:string){return v.replace(/\x60\x60\x60[\s\S]*?\x60\x60\x60/g," ").replace(/https?:\/\/\S+/g," ").replace(/[#*_>]/g,"").replace(/\s+/g," ").trim()}
+async function device(text:string){if(!hasSpeech)return;await new Promise<void>(res=>{const u=new SpeechSynthesisUtterance(text);u.lang="th-TH";u.rate=settings.rate*profile().rate;u.pitch=settings.pitch*profile().pitch;u.volume=settings.volume;u.onend=()=>res();u.onerror=()=>res();speechSynthesis.speak(u)})}
+async function puterSpeak(text:string){const p=profile();const x=await puter();const a=await x.ai.txt2speech(text,{provider:p.provider,model:p.model,voice:p.voice,language:"th-TH",instructions:p.instructions,response_format:"mp3"});audio=a;a.volume=settings.volume;await a.play()}
+export function getVoiceProfiles(){return VOICE_PROFILES.map(v=>({...v}))}
+export function getVoiceSettings(){return {...settings}}
+export function applyVoiceMode(mode:VoiceMode){const p=VOICE_PROFILES.find(v=>v.id===mode)||VOICE_PROFILES[0];settings={...settings,mode:p.id,source:"puter",voiceName:p.voice,rate:p.rate,pitch:p.pitch};save()}
+export function updateVoiceSettings(patch:Partial<VoiceSettings>){settings={...settings,...patch};save();if(!settings.enabled)stopVoice()}
+export function setVoiceEnabled(v:boolean){updateVoiceSettings({enabled:v})}
+export function isVoiceEnabled(){return settings.enabled}
+export function speakRealtime(text:string){if(!settings.enabled)return;pending+=text;const m=pending.match(/^([\s\S]{80,260}?[.!?。！？\n])(?:\s+|$)/);if(!m)return;pending=pending.slice(m[0].length);const t=clean(m[1]);if(!t)return;speaking=true;void (settings.source==="puter"?puterSpeak(t).catch(()=>device(t)):device(t)).finally(()=>{speaking=false})}
+export async function speakText(text:string){if(!settings.enabled)return;stopVoice();const t=clean(text);if(!t)return;speaking=true;try{if(settings.source==="puter")await puterSpeak(t);else await device(t)}catch{try{await device(t)}catch{}}finally{speaking=false}}
+export function finishVoice(){const t=clean(pending);pending="";if(t)void speakText(t)}
+export function isVoiceSpeaking(){return speaking||!!audio&&!audio.paused||(hasSpeech&&speechSynthesis.speaking)}
+export function stopVoice(){pending="";speaking=false;if(audio){try{audio.pause();audio.currentTime=0}catch{}audio=null}if(hasSpeech)speechSynthesis.cancel()}
+export function getAvailableVoices(){if(!hasSpeech)return [];return speechSynthesis.getVoices().map(v=>({name:v.name,lang:v.lang}))}
+export function isVoiceSupported(){return typeof window!=="undefined"}
