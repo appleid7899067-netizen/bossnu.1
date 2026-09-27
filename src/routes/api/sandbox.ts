@@ -17,6 +17,7 @@
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { detectSandboxInput } from "@/lib/sandbox/detect";
+import { executeLocalCommand } from "@/lib/sandbox/local-runner";
 import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
 import { listSkills, loadSkill, suggestSkills } from "@/lib/sandbox/skills.server";
 import {
@@ -179,7 +180,7 @@ async function runOnRunner(
   steps.push(`ส่งไปรันที่ Sandbox Runner (${runtime})`);
   const started = Date.now();
 
-  let response: Response;
+  let response: Response | null = null;
   try {
     response = await fetch(`${runner.url}/execute`, {
       method: "POST",
@@ -189,21 +190,23 @@ async function runOnRunner(
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    const timedOut = /timeout|aborted/i.test(detail);
-    steps.push(timedOut ? "Runner ไม่ตอบกลับภายในเวลาที่กำหนด" : "เชื่อมต่อ Runner ไม่ได้");
+    steps.push(`ไม่สามารถเชื่อมต่อ Remote Runner (${detail}) → สลับใช้ Local Sandbox ในเครื่อง`);
+    const local = await executeLocalCommand(command, runner.timeoutMs);
+    steps.push(local.success ? "รันด้วย Local Sandbox สำเร็จ" : "Local Sandbox พบข้อผิดพลาด");
     return {
-      httpStatus: timedOut ? 504 : 502,
+      httpStatus: 200,
       result: {
-        success: false,
-        status: timedOut ? "timeout" : "error",
+        success: local.success,
+        status: local.status,
         type: runtime,
         runtime,
         label,
         command,
-        error: timedOut
-          ? "Sandbox Runner ไม่ตอบกลับภายในเวลาที่กำหนด"
-          : "เชื่อมต่อ Sandbox Runner ไม่ได้ — ตรวจสอบ SANDBOX_RUNNER_URL",
-        detail: detail.slice(0, 300),
+        stdout: local.stdout,
+        stderr: local.stderr,
+        output: local.output,
+        exitCode: local.exitCode ?? undefined,
+        signal: local.signal ?? undefined,
         durationMs: Date.now() - started,
         steps,
       },
@@ -212,6 +215,29 @@ async function runOnRunner(
 
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
+    if (response.status >= 500) {
+      steps.push(`Remote Runner แจ้ง HTTP ${response.status} → สลับใช้ Local Sandbox ในเครื่อง`);
+      const local = await executeLocalCommand(command, runner.timeoutMs);
+      steps.push(local.success ? "รันด้วย Local Sandbox สำเร็จ" : "Local Sandbox พบข้อผิดพลาด");
+      return {
+        httpStatus: 200,
+        result: {
+          success: local.success,
+          status: local.status,
+          type: runtime,
+          runtime,
+          label,
+          command,
+          stdout: local.stdout,
+          stderr: local.stderr,
+          output: local.output,
+          exitCode: local.exitCode ?? undefined,
+          signal: local.signal ?? undefined,
+          durationMs: Date.now() - started,
+          steps,
+        },
+      };
+    }
     steps.push(`Runner ปฏิเสธคำสั่ง (HTTP ${response.status})`);
     return {
       httpStatus: response.status === 400 ? 400 : 502,

@@ -234,6 +234,45 @@ export function AppShell({ search }: { search: Search }) {
           }
         },
       });
+
+      // If the reply contains a <run> tag and autoSandbox is enabled, execute it in the sandbox
+      const runMatch = reply.match(/<run(?:\s+lang=["']?([a-zA-Z0-9_-]+)["']?)?>([\s\S]*?)<\/run>/i);
+      if (runMatch && store.personality.autoSandbox && !ac.signal.aborted) {
+        const runLang = (runMatch[1] || "bash").toLowerCase();
+        const runCmd = runMatch[2].trim();
+        if (runCmd) {
+          setStreamStatus("กำลังรันใน Sandbox Terminal…");
+          setWorkSteps((steps) => [...steps, "รันคำสั่งจากสลี่ใน Sandbox Terminal"]);
+          try {
+            const result = await sandboxClient.executeStream(runCmd, {
+              type: ["node", "python", "bash", "go", "rust", "java", "cpp"].includes(runLang)
+                ? (runLang as "node" | "python" | "bash" | "go" | "rust" | "java" | "cpp")
+                : "auto",
+              allowDangerous: true,
+            });
+            const out = (result.stdout || result.stderr ? [result.stdout, result.stderr].filter(Boolean).join("\n") : result.output) || "";
+            setSandboxRun({
+              runtime: runLang,
+              label: "Sandbox Terminal",
+              command: runCmd,
+              status: result.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด",
+              output: out,
+            });
+            setStreamStatus(result.status === "success" ? "Sandbox รันเสร็จแล้ว ✓" : "Sandbox แจ้งข้อผิดพลาด");
+            store.saveLearnedSkill({
+              name: `Sandbox Terminal • ${result.status === "success" ? "ผ่าน" : "ล้มเหลว"}`,
+              runtime: runLang,
+              pattern: runCmd,
+              testCommand: runCmd,
+              result: result.status === "success" ? "passed" : "failed",
+              evidence: out.slice(0, 2000),
+            });
+          } catch (e) {
+            console.error("Auto sandbox execution failed:", e);
+          }
+        }
+      }
+
       if (!reply && !ac.signal.aborted) {
         store.patchAssistant(id, assistantId, {
           content: "I could not finish that reply. Try sending it again.",

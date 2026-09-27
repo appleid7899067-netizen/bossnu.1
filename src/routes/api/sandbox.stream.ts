@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
+import { streamLocalCommand } from "@/lib/sandbox/local-runner";
 import {
   CommandRequestSchema,
   DEFAULT_SANDBOX_RUNNER_URL,
@@ -61,18 +62,43 @@ async function handle(request: Request): Promise<Response> {
       const started = Date.now();
       try {
         send({ type: "status", status: "queued", message: "รับคำสั่ง Sandbox" });
-        const response = await fetch(runnerUrl() + "/execute/stream", {
-          method: "POST",
-          headers: { "content-type": "application/json", accept: "text/event-stream" },
-          body: JSON.stringify({ language: runtime, command: cmd }),
-          signal: AbortSignal.timeout(Number(process.env.SANDBOX_RUNNER_TIMEOUT_MS) || 120000),
-        });
-        if (!response.ok || !response.body) {
-          const data = await response.json().catch(() => null);
-          send({ type: "error", error: data?.error || `Sandbox Runner HTTP ${response.status}` });
-          send({ type: "complete", result: { success:false, status:"error", type:runtime, runtime, command:cmd, error:data?.error || `Runner HTTP ${response.status}`, durationMs:Date.now()-started } });
-          controller.close(); return;
+        let response: Response | null = null;
+        try {
+          response = await fetch(runnerUrl() + "/execute/stream", {
+            method: "POST",
+            headers: { "content-type": "application/json", accept: "text/event-stream" },
+            body: JSON.stringify({ language: runtime, command: cmd }),
+            signal: AbortSignal.timeout(Number(process.env.SANDBOX_RUNNER_TIMEOUT_MS) || 60000),
+          });
+        } catch {
+          response = null;
         }
+
+        if (!response || !response.ok || !response.body) {
+          send({ type: "status", status: "running", message: "สลับใช้ Local Sandbox Runner ในเครื่อง…" });
+          const local = await streamLocalCommand(cmd, {
+            onStatus: (st, msg) => send({ type: "status", status: st, message: msg }),
+            onOutput: (stream, text) => send({ type: "output", stream, text }),
+          });
+          send({
+            type: "complete",
+            result: {
+              success: local.success,
+              status: local.status,
+              type: runtime,
+              runtime,
+              command: cmd,
+              stdout: local.stdout,
+              stderr: local.stderr,
+              output: local.output,
+              exitCode: local.exitCode,
+              durationMs: Date.now() - started,
+            },
+          });
+          controller.close();
+          return;
+        }
+
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
@@ -106,7 +132,7 @@ async function handle(request: Request): Promise<Response> {
   return sseResponse(stream);
 }
 
-export const Route = createFileRoute("/api/sandbox.stream")({
+export const Route = createFileRoute("/api/sandbox/stream")({
   server: {
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: corsHeaders() }),

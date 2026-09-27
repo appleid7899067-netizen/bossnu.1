@@ -112,7 +112,7 @@ export class SandboxClient {
     const combined = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
     let response: Response;
     try {
-      response = await this.fetchImpl("/api/sandbox.stream", {
+      response = await this.fetchImpl("/api/sandbox/stream", {
         method: "POST",
         headers: { "content-type": "application/json", accept: "text/event-stream" },
         body: JSON.stringify(stripUndefined({ cmd: command, skill: options.skill, type: options.type, allowDangerous: options.allowDangerous })),

@@ -80,7 +80,7 @@ export function detectSandboxInput(input: string): SandboxDetection {
     return { runtime: "css", label: "CSS", code: value, confidence: "high", webPreview: true, dangerous: false };
   }
   if (htmlDocument(value)) {
-    return { runtime: "html", label: "HTML / Web", code: value, confidence: "high", webPreview: true };
+    return { runtime: "html", label: "HTML / Web", code: value, confidence: "high", webPreview: true, dangerous: false };
   }
   if (/^(?:const|let|var|function|class)\s+/m.test(value) || /(?:document|window)\.[A-Za-z_$]/.test(value)) {
     return { runtime: "javascript", label: "JavaScript", code: value, confidence: "medium", webPreview: true, dangerous: false };
@@ -95,15 +95,25 @@ export function detectSandboxInput(input: string): SandboxDetection {
   const command = commandDetection(value);
   if (command) return command;
 
-  if (/\b(npm|npx|pnpm|yarn|bun|pip|cargo|go|mvn|gradle|dotnet|composer|gem)\b/i.test(value)) {
+  // Thai or conversational text should be handled by the AI chat assistant,
+  // not directly piped into bash as a shell command!
+  const hasThai = /[\u0E00-\u0E7F]/.test(value);
+  if (hasThai) {
+    return { runtime: "unknown", label: "ข้อความทั่วไป", confidence: "low", webPreview: false, dangerous: false };
+  }
+
+  if (/\b(npm|npx|pnpm|yarn|bun|pip|cargo|go|mvn|gradle|dotnet|composer|gem)\s+([a-zA-Z0-9_-]+)/i.test(value)) {
     return withRisk({ runtime: "bash", label: "ตรวจพบ ecosystem command", command: value, confidence: "medium", webPreview: false });
   }
 
-  // Last resort: the main chat may send an arbitrary shell command without
-  // requiring the user to choose a language. The server still enforces limits.
-  if (/^[^\n]{2,32000}$/.test(value) && !/[?؟]$/.test(value)) {
-    return withRisk({ runtime: "bash", label: "คำสั่งทั่วไป / Auto", command: value, confidence: "low", webPreview: false });
+  // Shell commands with syntax like paths, flags, pipes, redirects, or chained commands
+  if (
+    /^(?:\.\/|\/|~|export\s+|source\s+|alias\s+)/.test(value) ||
+    /(?:&&|\|\||\||>|<|;)\s*[a-zA-Z]/.test(value) ||
+    /^[a-zA-Z0-9_.-]+(?:\s+-[a-zA-Z0-9_-]+|\s+--[a-zA-Z0-9_-]+)/.test(value)
+  ) {
+    return withRisk({ runtime: "bash", label: "คำสั่งทั่วไป / Auto", command: value, confidence: "medium", webPreview: false });
   }
 
-  return { runtime: "unknown", label: "คำสั่งทั่วไป", command: value, confidence: "low", webPreview: false, dangerous: false };
+  return { runtime: "unknown", label: "ข้อความทั่วไป", command: value, confidence: "low", webPreview: false, dangerous: false };
 }

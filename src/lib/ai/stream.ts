@@ -88,6 +88,10 @@ export async function streamChat(opts: {
       `สกิลที่เปิดใช้งาน: ${activeSkills || "ไม่มี"}`,
       memories ? `ความจำที่บันทึกไว้:\n${memories}` : "ไม่มีความจำที่บันทึกไว้",
       learnedSkills ? `ทักษะจากโค้ดที่เคยทดสอบผ่าน:\n${learnedSkills}` : "ยังไม่มีทักษะโค้ดที่ทดสอบผ่าน",
+      "ระบบ Sandbox Terminal:",
+      "- เมื่อผู้ใช้ต้องการรันคำสั่ง ตรวจสอบ ติดตั้งแพ็กเกจ หรือรันสคริปต์ในระบบ ให้ใส่คำสั่งในแท็ก <run lang=\"bash\">คำสั่ง</run> (หรือ lang=\"node\", lang=\"python\")",
+      "- ตัวอย่าง: <run lang=\"bash\">tmpdir=\"$(mktemp -d)\" && cd \"$tmpdir\" && npm init -y >/dev/null 2>&1 && npm install dayjs >/dev/null 2>&1 && node -e \"const dayjs=require('dayjs'); console.log(dayjs().format('YYYY-MM-DD'))\"</run>",
+      "- ระบบจะเรนเดอร์เป็นกล่อง Sandbox Terminal พร้อมปุ่มรันและแสดงผลลัพธ์การทำงานจริงทันที",
       "ห้ามอ้างว่าทำสิ่งที่ยังไม่ได้ทำจริง",
       buildSkillContext(latestUser),
     ].filter(Boolean).join("\n");
