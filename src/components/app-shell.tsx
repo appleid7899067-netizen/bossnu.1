@@ -39,7 +39,8 @@ export function AppShell({ search }: { search: Search }) {
   const [imageError, setImageError] = useState<string | null>(null);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [streamStatus, setStreamStatus] = useState<string>("");
-  const [workSteps, setWorkSteps] = useState<string[]>([]);\n  const [sandboxRun, setSandboxRun] = useState<SandboxRunView | null>(null);
+  const [workSteps, setWorkSteps] = useState<string[]>([]);
+  const [sandboxRun, setSandboxRun] = useState<SandboxRunView | null>(null);
   const [voiceEnabled, setVoiceEnabledState] = useState(true);
   const [callOpen, setCallOpen] = useState(false);
   const [builderProject, setBuilderProject] = useState<BuilderProject | undefined>(undefined);
@@ -88,7 +89,8 @@ export function AppShell({ search }: { search: Search }) {
     setBusyChat(true);
     setStreamingId(assistantId);
     const sandboxDetection = detectSandboxInput(content);
-    setSandboxRun(null);\n    setStreamStatus("กำลังวิเคราะห์คำขอ…");
+    setSandboxRun(null);
+    setStreamStatus("กำลังวิเคราะห์คำขอ…");
     setWorkSteps([
       "วิเคราะห์คำขอ",
       sandboxDetection.runtime !== "unknown" ? "ตรวจพบ " + sandboxDetection.label : "ตรวจสอบวิธีทำงาน",
@@ -99,11 +101,13 @@ export function AppShell({ search }: { search: Search }) {
 
     let sandboxNote = "";
     if (sandboxDetection.runtime !== "unknown" && sandboxDetection.command && ["node", "python", "bash", "go", "rust", "java", "cpp"].includes(sandboxDetection.runtime)) {
-      setStreamStatus("กำลังรันในแซนด์บ็อกจริง…");\n      setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: "กำลังรัน…" });
+      setStreamStatus("กำลังรันในแซนด์บ็อกจริง…");
+      setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: "กำลังรัน…" });
       setWorkSteps((steps) => [...steps, "กำลังรันในแซนด์บ็อกจริง"]);
       try {
         const result = await executeSandbox(sandboxDetection);
-        const output = [result?.stdout, result?.stderr].filter(Boolean).join("\\n").trim();\n        setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: result?.status === "running" ? "กำลังทำงาน" : result?.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด", output, previewUrl: result ? sandboxPreviewUrl(result) : null });
+        const output = [result?.stdout, result?.stderr].filter(Boolean).join("\\n").trim();
+        setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: result?.status === "running" ? "กำลังทำงาน" : result?.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด", output, previewUrl: result ? sandboxPreviewUrl(result) : null });
         if (result?.status === "success") {
           store.saveLearnedSkill({
             name: `Sandbox ${sandboxDetection.label}`,
@@ -121,7 +125,9 @@ export function AppShell({ search }: { search: Search }) {
         setWorkSteps((steps) => [...steps, result?.status === "running" ? "เว็บกำลังทำงานและเปิด Preview" : result?.status === "success" ? "Sandbox รันสำเร็จ" : "Sandbox แจ้งข้อผิดพลาด"]);
         setStreamStatus(result?.status === "running" ? "เปิด Live Preview แล้ว…" : "ตรวจผล Sandbox แล้ว…");
       } catch (error) {
-        const errorText = error instanceof Error ? error.message : "รัน Sandbox ไม่สำเร็จ";\n        setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: "ผิดพลาด", output: errorText });\n        sandboxNote = "\\n\\n**Sandbox:** " + errorText;
+        const errorText = error instanceof Error ? error.message : "รัน Sandbox ไม่สำเร็จ";
+        setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: "ผิดพลาด", output: errorText });
+        sandboxNote = "\\n\\n**Sandbox:** " + errorText;
         setWorkSteps((steps) => [...steps, "Sandbox พบข้อผิดพลาด"]);
       }
     }
