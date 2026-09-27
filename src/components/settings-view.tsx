@@ -1,7 +1,7 @@
 import { sandboxClient } from "@/lib/sandbox-client";
 import { assessSandboxRisk } from "@/lib/sandbox/detect";
 import { useEffect, useMemo, useState } from "react";
-import { Bot, Brain, Database, Download, FolderOpen, Play, Plus, Sparkles, Trash2, Upload, UserRound, WandSparkles } from "lucide-react";
+import { Bot, Brain, Database, Download, FolderOpen, FileText, Play, Plus, Save, Sparkles, Trash2, Upload, UserRound, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { PersonalitySettings } from "@/lib/types";
 import { exportBackup, useAppStore } from "@/lib/store";
@@ -38,11 +38,16 @@ const SANDBOX_DEFAULTS: Record<string, string> = {
 
 export function SettingsView() {
   const store = useAppStore();
-  const [tab, setTab] = useState<"personality"|"skills"|"agents"|"memory"|"profiles"|"sandbox"|"voice"|"data">("personality");
+  const [tab, setTab] = useState<"personality"|"skills"|"agents"|"memory"|"profiles"|"workspace"|"sandbox"|"voice"|"data">("personality");
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => getVoiceSettings());
   const [voiceList, setVoiceList] = useState<{ name: string; lang: string }[]>([]);
   const [newMemory, setNewMemory] = useState("");
   const [newAgent, setNewAgent] = useState("");
+  const [workspaceFiles, setWorkspaceFiles] = useState<{path:string;content:string;updatedAt:string}[]>([]);
+  const [workspaceFile, setWorkspaceFile] = useState("");
+  const [workspaceContent, setWorkspaceContent] = useState("");
+  const [workspaceBusy, setWorkspaceBusy] = useState(false);
+  const workspaceId = "default";
   const [saved, setSaved] = useState(false);
   const [sandboxWorkspace] = useState(() => "playground_" + crypto.randomUUID());
   const [sandboxLanguage, setSandboxLanguage] = useState("python");
@@ -130,7 +135,7 @@ printf %s ${quote(sandboxInput)} > stdin.txt
       </div>
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3">
         {[
-          ["personality","บุคลิค",Sparkles],["skills","สกิล",WandSparkles],["agents","ตัวแทน",Bot],["memory","ความจำ",Brain],["profiles","แฟ้มโปรไฟล์",FolderOpen],["voice","เสียง",Sparkles],["sandbox","Sandbox",Play],["data","ข้อมูล",Database],
+          ["personality","บุคลิค",Sparkles],["skills","สกิล",WandSparkles],["agents","ตัวแทน",Bot],["memory","ความจำ",Brain],["profiles","แฟ้มโปรไฟล์",FolderOpen],["workspace","ไฟล์ตัวแทน",FileText],["voice","เสียง",Sparkles],["sandbox","Sandbox",Play],["data","ข้อมูล",Database],
         ].map(([id,label,Icon]) => <button key={id as string} type="button" onClick={() => setTab(id as typeof tab)} className={cn("flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-sm",tab===id?"bg-elevated text-fg":"text-muted hover:bg-hover hover:text-fg")}><Icon className="size-4"/>{label as string}</button>)}
       </div>
 
@@ -145,9 +150,11 @@ printf %s ${quote(sandboxInput)} > stdin.txt
 
       {tab==="agents" ? <Panel title="ตัวแทน AI" icon={Bot}>
         <div className="mb-4 rounded-2xl border border-primary/20 bg-primary/5 p-4"><p className="text-sm font-semibold">ตัวแทนที่ดีควรมีอะไรบ้าง?</p><p className="mt-2 text-xs leading-relaxed text-muted">บทบาทที่ชัดเจน • คำสั่งการทำงาน • สกิลที่อนุญาต • การตรวจผลลัพธ์ • ขอบเขตความปลอดภัย และรูปแบบคำตอบ</p><div className="mt-3 grid gap-2 text-xs text-muted sm:grid-cols-2"><span>✓ รับเป้าหมายและวางแผน</span><span>✓ ลงมือทำตามสกิล</span><span>✓ ตรวจสอบก่อนรายงาน</span><span>✓ ขออนุญาตงานเสี่ยง</span></div></div>
-        <div className="grid gap-3 md:grid-cols-2">{store.agentProfiles.map(agent=><div key={agent.id} className="rounded-2xl bg-clay p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0 flex-1"><input value={agent.name} onChange={e=>store.updateAgentProfile(agent.id,{name:e.target.value})} className="w-full bg-transparent font-semibold outline-none"/><input value={agent.role} onChange={e=>store.updateAgentProfile(agent.id,{role:e.target.value})} className="mt-1 w-full bg-transparent text-xs text-muted outline-none" placeholder="บทบาท เช่น Coding Agent"/></div><button type="button" onClick={()=>store.deleteAgentProfile(agent.id)} className="text-subtle hover:text-fg"><Trash2 className="size-4"/></button></div><textarea value={agent.instructions} onChange={e=>store.updateAgentProfile(agent.id,{instructions:e.target.value})} rows={4} className="mt-3 w-full resize-none rounded-xl bg-bg/50 p-3 text-sm text-muted outline-none" placeholder="เขียน system instructions ของตัวแทน..."/><p className="mt-2 text-[11px] text-subtle">สกิลที่เปิดใช้: {agent.skills.length ? agent.skills.join(", ") : "ยังไม่ได้เลือก"}</p><div className="mt-3 flex flex-wrap gap-1.5">{skills.map(skill=><button key={skill.id} type="button" onClick={()=>store.updateAgentProfile(agent.id,{skills:agent.skills.includes(skill.id)?agent.skills.filter(id=>id!==skill.id):[...agent.skills,skill.id]})} className={cn("rounded-full px-2.5 py-1 text-[11px]",agent.skills.includes(skill.id)?"bg-fg text-bg":"bg-elevated text-muted")}>{skill.name}</button>)}</div></div>)}</div><div className="mt-4 flex gap-2"><input value={newAgent} onChange={e=>setNewAgent(e.target.value)} placeholder="ชื่อตัวแทนใหม่" className="min-w-0 flex-1 rounded-xl bg-clay px-3 py-2.5 outline-none"/><Button onClick={()=>{if(newAgent.trim()){store.addAgentProfile({id:crypto.randomUUID(),name:newAgent.trim(),role:"Custom Agent",instructions:"รับเป้าหมาย วางแผน ลงมือทำ ตรวจผล และสรุปสั้น ๆ หากพบงานอันตรายให้ขออนุญาตก่อน",skills:skills.filter(x=>x.enabled).map(x=>x.id),createdAt:Date.now()});setNewAgent("")}}}><Plus className="size-4"/>เพิ่ม</Button></div></Panel> : null}
+        <div className="grid gap-3 md:grid-cols-2">{store.agentProfiles.map(agent=><div key={agent.id} className="rounded-2xl bg-clay p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0 flex-1"><input value={agent.name} onChange={e=>store.updateAgentProfile(agent.id,{name:e.target.value})} className="w-full bg-transparent font-semibold outline-none"/><input value={agent.role} onChange={e=>store.updateAgentProfile(agent.id,{role:e.target.value})} className="mt-1 w-full bg-transparent text-xs text-muted outline-none" placeholder="บทบาท เช่น Coding Agent"/></div><button type="button" onClick={()=>store.deleteAgentProfile(agent.id)} className="text-subtle hover:text-fg"><Trash2 className="size-4"/></button></div><textarea value={agent.instructions} onChange={e=>store.updateAgentProfile(agent.id,{instructions:e.target.value})} rows={4} className="mt-3 w-full resize-none rounded-xl bg-bg/50 p-3 text-sm text-muted outline-none" placeholder="เขียน system instructions ของตัวแทน..."/><p className="mt-2 text-[11px] text-subtle">สกิลที่เปิดใช้: {agent.skills.length ? agent.skills.join(", ") : "ยังไม่ได้เลือก"}</p><div className="mt-3 flex flex-wrap gap-1.5">{skills.map(skill=><button key={skill.id} type="button" onClick={()=>store.updateAgentProfile(agent.id,{skills:agent.skills.includes(skill.id)?agent.skills.filter(id=>id!==skill.id):[...agent.skills,skill.id]})} className={cn("rounded-full px-2.5 py-1 text-[11px]",agent.skills.includes(skill.id)?"bg-fg text-bg":"bg-elevated text-muted")}>{skill.name}</button>)}</div></div>)}</div><div className="mt-4 flex gap-2"><input value={newAgent} onChange={e=>setNewAgent(e.target.value)} placeholder="ชื่อตัวแทนใหม่" className="min-w-0 flex-1 rounded-xl bg-clay px-3 py-2.5 outline-none"/><Button onClick={()=>{if(newAgent.trim()){store.addAgentProfile({id:crypto.randomUUID(),name:newAgent.trim(),role:"Custom Agent",instructions:"รับเป้าหมาย วางแผน ลงมือทำ ตรวจผล และสรุปสั้น ๆ หากพบงานอันตรายให้ขออนุญาตก่อน",skills:skills.filter(x=>x.enabled).map(x=>x.id),createdAt:Date.now(),defaultModel:"gpt-5.6-luna",workspaceId:"default",memoryScope:"shared"});setNewAgent("")}}}><Plus className="size-4"/>เพิ่ม</Button></div></Panel> : null}
 
       {tab==="memory" ? <Panel title="สมองความจำ" icon={Brain}><div className="mb-4 rounded-xl bg-clay p-3 text-sm text-muted">ความจำชุดนี้เก็บในเครื่องและถูกใช้เป็นบริบทของสลี่ในการสนทนาครั้งต่อไป</div><div className="space-y-2">{store.memory.map(item=><div key={item.id} className="flex items-start gap-3 rounded-xl bg-clay p-3"><div className="min-w-0 flex-1"><p className="text-sm">{item.content}</p><p className="mt-1 text-[11px] text-subtle">{new Date(item.createdAt).toLocaleString("th-TH")}</p></div><button type="button" onClick={()=>store.deleteMemory(item.id)} className="text-subtle hover:text-fg"><Trash2 className="size-4"/></button></div>)}</div><div className="mt-4 flex gap-2"><input value={newMemory} onChange={e=>setNewMemory(e.target.value)} placeholder="เช่น ชอบ UI แบบกว้างและเรียบ" className="min-w-0 flex-1 rounded-xl bg-clay px-3 py-2.5 outline-none"/><Button onClick={()=>{if(newMemory.trim()){store.addMemory(newMemory.trim());setNewMemory("")}}}><Plus className="size-4"/>จำ</Button></div></Panel> : null}
+
+      {tab==="workspace" ? <WorkspacePanel files={workspaceFiles} setFiles={setWorkspaceFiles} file={workspaceFile} setFile={setWorkspaceFile} content={workspaceContent} setContent={setWorkspaceContent} busy={workspaceBusy} setBusy={setWorkspaceBusy} workspaceId={workspaceId} /> : null}
 
       {tab==="profiles" ? <Panel title="แฟ้มโปรไฟล์ตัวแทน" icon={FolderOpen}><div className="grid gap-3 md:grid-cols-2">{store.agentProfiles.map(agent=><div key={agent.id} className="rounded-2xl bg-clay p-4"><div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-elevated"><Bot className="size-5"/></div><div><p className="font-medium">{agent.name}</p><p className="text-xs text-muted">{agent.role}</p></div></div><div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted"><span>สกิล {agent.skills.length}</span><span>สร้าง {new Date(agent.createdAt).toLocaleDateString("th-TH")}</span></div><div className="mt-3 rounded-xl bg-bg/50 p-3 text-xs leading-relaxed text-muted">{agent.instructions}</div></div>)}</div></Panel> : null}
 
@@ -267,4 +274,29 @@ function Panel({ title, icon: Icon, children }: { title: string; icon: typeof Sp
 
 function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
   return <button type="button" onClick={() => onChange(!value)} className="flex w-full items-center justify-between border-b border-border py-3 text-left text-sm last:border-b-0"><span>{label}</span><span className={cn("rounded-full px-3 py-1 text-xs", value ? "bg-fg text-bg" : "bg-clay text-muted")}>{value ? "เปิด" : "ปิด"}</span></button>;
+}
+
+function WorkspacePanel({files,setFiles,file,setFile,content,setContent,busy,setBusy,workspaceId}:{files:{path:string;content:string;updatedAt:string}[];setFiles:(v:{path:string;content:string;updatedAt:string}[])=>void;file:string;setFile:(v:string)=>void;content:string;setContent:(v:string)=>void;busy:boolean;setBusy:(v:boolean)=>void;workspaceId:string}) {
+  const load = async () => {
+    setBusy(true);
+    try { const r=await fetch("/api/workspace?workspace="+encodeURIComponent(workspaceId)); const d=await r.json(); if(!r.ok||!d.ok) throw new Error(d.error||"โหลดไฟล์ไม่สำเร็จ"); setFiles(d.files||[]); if(!file && d.files?.[0]) { setFile(d.files[0].path); setContent(d.files[0].content); } }
+    catch(e){ toast.error(e instanceof Error?e.message:"โหลด Workspace ไม่สำเร็จ"); } finally { setBusy(false); }
+  };
+  useEffect(()=>{ void load(); },[]);
+  const select=(path:string)=>{ const f=files.find(x=>x.path===path); if(f){setFile(f.path);setContent(f.content);} };
+  const save=async()=>{ if(!file.trim()) return; setBusy(true); try { const r=await fetch("/api/workspace",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({workspaceId,action:"write",path:file,content})}); const d=await r.json(); if(!r.ok||!d.ok) throw new Error(d.error||"บันทึกไม่สำเร็จ"); toast.success("บันทึกไฟล์แล้ว ✓"); await load(); } catch(e){toast.error(e instanceof Error?e.message:"บันทึกไม่สำเร็จ")} finally{setBusy(false)} };
+  const create=()=>{ const p=window.prompt("ชื่อไฟล์ เช่น agent/CODING.md"); if(!p) return; setFile(p); setContent("# "+p.split("/").pop()+"\n\n"); };
+  return <Panel title="Agent Workspace • ไฟล์ / ความรู้ / โปรไฟล์" icon={FileText}>
+    <div className="mb-3 rounded-xl bg-clay p-3 text-xs leading-relaxed text-muted">ห้องนี้คือพื้นที่ทำงานถาวรของตัวแทน: agent/ • memory/ • knowledge/ • skills/ • tasks/ • project/ รองรับอ่าน แก้ สร้าง และบันทึกไฟล์ผ่าน Workspace API</div>
+    <div className="grid gap-3 lg:grid-cols-[280px_1fr]">
+      <div className="min-h-[420px] rounded-2xl bg-clay p-2">
+        <div className="flex items-center justify-between px-2 py-2"><span className="text-xs font-semibold">Files</span><button type="button" onClick={create} className="rounded-lg bg-elevated px-2 py-1 text-xs"><Plus className="mr-1 inline size-3"/>ใหม่</button></div>
+        <div className="max-h-[360px] overflow-auto space-y-1">{files.map(f=><button key={f.path} type="button" onClick={()=>select(f.path)} className={cn("flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs",file===f.path?"bg-elevated text-fg":"text-muted hover:bg-hover")}><FileText className="size-3.5 shrink-0"/><span className="truncate">{f.path}</span></button>)}</div>
+      </div>
+      <div className="min-h-[420px] overflow-hidden rounded-2xl bg-[#111]">
+        <div className="flex items-center justify-between border-b border-white/10 px-3 py-2"><span className="truncate text-xs text-white/70">{file||"เลือกไฟล์"}</span><div className="flex gap-2"><button type="button" onClick={()=>void load()} className="rounded-lg bg-white/10 px-2 py-1 text-xs text-white/70">{busy?"กำลังโหลด…":"รีเฟรช"}</button><button type="button" onClick={()=>void save()} disabled={busy||!file} className="rounded-lg bg-white px-2 py-1 text-xs text-black disabled:opacity-40"><Save className="mr-1 inline size-3"/>บันทึก</button></div></div>
+        <textarea value={content} onChange={e=>setContent(e.target.value)} spellCheck={false} className="min-h-[370px] w-full resize-y bg-transparent p-4 font-mono text-sm leading-6 text-white outline-none" placeholder="เลือกไฟล์หรือสร้างไฟล์ใหม่"/>
+      </div>
+    </div>
+  </Panel>;
 }
