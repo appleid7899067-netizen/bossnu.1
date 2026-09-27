@@ -274,7 +274,14 @@ export function AppShell({ search }: { search: Search }) {
     return text.trim() ? ["ขยายคำสั่ง", "ลงมือทำทันที", "ตรวจผลลัพธ์"] : [];
   }
 
-  const quickActions = contextualActions(draft);\n  const roomTools = [\n    { id: "auto", label: "✨ Auto • ให้ Boss เลือกเครื่องมือ" },\n    { id: "sandbox", label: "💻 Sandbox • รัน / ทดสอบโค้ด" },\n    { id: "web", label: "🌐 Web • ค้นข้อมูลสด" },\n    { id: "github", label: "🐙 GitHub • ตรวจ / แก้ Repo" },\n    { id: "builder", label: "🧱 AI Builder • สร้างแอป" },\n  ];
+  const quickActions = contextualActions(draft);
+  const roomTools = [
+    { id: "auto", label: "✨ Auto • ให้ Boss เลือกเครื่องมือ" },
+    { id: "sandbox", label: "💻 Sandbox • รัน / ทดสอบโค้ด" },
+    { id: "web", label: "🌐 Web • ค้นข้อมูลสด" },
+    { id: "github", label: "🐙 GitHub • ตรวจ / แก้ Repo" },
+    { id: "builder", label: "🧱 AI Builder • สร้างแอป" },
+  ];
   const showDiscover = view === "chat" && !activeChat?.messages.length;
 
   return (
@@ -424,7 +431,9 @@ export function AppShell({ search }: { search: Search }) {
                 onStop={stopChat}
                 placeholder={showDiscover ? "Message PANUPANXBOSS…" : "Message PANUPANXBOSS…"}
                 busy={busyChat}
-                contextualActions={quickActions}\n                toolActions={roomTools}\n                activeTool={activeTool}\n                onToolAction={(tool) => {\n                  setActiveTool(tool);\n                  const prompts: Record<string, string> = {\n                    auto: "ทำงานแบบ Auto ให้ Boss เลือกเครื่องมือที่เหมาะสม",\n                    sandbox: "ใช้ Sandbox เพื่อรันและทดสอบงานนี้จริง",\n                    web: "ค้นข้อมูลสดจากเว็บและตรวจแหล่งข้อมูล",\n                    github: "ตรวจและทำงานกับ GitHub/Repo ที่เกี่ยวข้อง",\n                    builder: "ใช้โหมด AI Builder เพื่อสร้างหรือปรับแอปแบบครบวงจร",\n                  };\n                  const hint = prompts[tool];\n                  if (hint && !draft.trim()) setDraft(hint);\n                }}
+                contextualActions={quickActions}
+                toolActions={roomTools}
+                activeTool={activeTool}\n                onToolAction={(tool) => {\n                  setActiveTool(tool);\n                  const prompts: Record<string, string> = {\n                    auto: "ทำงานแบบ Auto ให้ Boss เลือกเครื่องมือที่เหมาะสม",\n                    sandbox: "ใช้ Sandbox เพื่อรันและทดสอบงานนี้จริง",\n                    web: "ค้นข้อมูลสดจากเว็บและตรวจแหล่งข้อมูล",\n                    github: "ตรวจและทำงานกับ GitHub/Repo ที่เกี่ยวข้อง",\n                    builder: "ใช้โหมด AI Builder เพื่อสร้างหรือปรับแอปแบบครบวงจร",\n                  };\n                  const hint = prompts[tool];\n                  if (hint && !draft.trim()) setDraft(hint);\n                }}
             voiceEnabled={voiceEnabled}
             onToggleVoice={() => {
               const next = !voiceEnabled;
