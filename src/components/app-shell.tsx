@@ -51,7 +51,7 @@ export function AppShell({ search }: { search: Search }) {
     reason: string;
   } | null>(null);
   const [voiceEnabled, setVoiceEnabledState] = useState(true);
-  const [callOpen, setCallOpen] = useState(false);
+  const [callOpen, setCallOpen] = useState(false);\n  const [activeTool, setActiveTool] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -273,7 +273,7 @@ export function AppShell({ search }: { search: Search }) {
     return text.trim() ? ["ขยายคำสั่ง", "ลงมือทำทันที", "ตรวจผลลัพธ์"] : [];
   }
 
-  const quickActions = contextualActions(draft);
+  const quickActions = contextualActions(draft);\n  const roomTools = [\n    { id: "auto", label: "✨ Auto • ให้ Boss เลือกเครื่องมือ" },\n    { id: "sandbox", label: "💻 Sandbox • รัน / ทดสอบโค้ด" },\n    { id: "web", label: "🌐 Web • ค้นข้อมูลสด" },\n    { id: "github", label: "🐙 GitHub • ตรวจ / แก้ Repo" },\n    { id: "builder", label: "🧱 AI Builder • สร้างแอป" },\n  ];
   const showDiscover = view === "chat" && !activeChat?.messages.length;
 
   return (
@@ -423,7 +423,7 @@ export function AppShell({ search }: { search: Search }) {
                 onStop={stopChat}
                 placeholder={showDiscover ? "Message PANUPANXBOSS…" : "Message PANUPANXBOSS…"}
                 busy={busyChat}
-                contextualActions={quickActions}
+                contextualActions={quickActions}\n                toolActions={roomTools}\n                activeTool={activeTool}\n                onToolAction={(tool) => {\n                  setActiveTool(tool);\n                  const prompts: Record<string, string> = {\n                    auto: "ทำงานแบบ Auto ให้ Boss เลือกเครื่องมือที่เหมาะสม",\n                    sandbox: "ใช้ Sandbox เพื่อรันและทดสอบงานนี้จริง",\n                    web: "ค้นข้อมูลสดจากเว็บและตรวจแหล่งข้อมูล",\n                    github: "ตรวจและทำงานกับ GitHub/Repo ที่เกี่ยวข้อง",\n                    builder: "ใช้โหมด AI Builder เพื่อสร้างหรือปรับแอปแบบครบวงจร",\n                  };\n                  const hint = prompts[tool];\n                  if (hint && !draft.trim()) setDraft(hint);\n                }}
             voiceEnabled={voiceEnabled}
             onToggleVoice={() => {
               const next = !voiceEnabled;
