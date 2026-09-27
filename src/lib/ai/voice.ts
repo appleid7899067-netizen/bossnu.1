@@ -148,7 +148,7 @@ export function speakRealtime(text: string) {
   speakNext();
 }
 
-export function finishVoice() {
+export function isVoiceSpeaking() {\n  return speaking || (hasSpeech && window.speechSynthesis.speaking);\n}\n\nexport function finishVoice() {
   if (!hasSpeech || !settings.enabled) return;
 
   const tail = pending.trim();
