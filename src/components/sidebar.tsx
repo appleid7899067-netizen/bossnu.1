@@ -17,7 +17,7 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
   onNewChat: () => void; onOpenChat: (id: string) => void; onDeleteChat: (id: string) => void; onOpenMap: (id: string) => void;
 }) {
   const store = useAppStore();
-  return <aside className="flex h-full min-h-0 w-[260px] shrink-0 flex-col border-r border-border bg-[#f8f9fb]">
+  return <aside className="flex h-full min-h-0 w-[260px] shrink-0 flex-col border-r border-border bg-bg">
     <div className="flex items-center justify-between px-4 py-4"><LuminaWordmark /></div>
     <div className="px-3"><Button className="h-11 w-full justify-center rounded-xl" onClick={onNewChat}><Plus className="size-4" />New chat</Button></div>
     <nav className="mt-4 flex flex-col gap-1 px-3">
