@@ -25,7 +25,7 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
       <NavItem active={view === "chat"} icon={MessageSquare} label="Chat" onClick={() => onView("chat")} />
       <NavItem active={view === "maps"} icon={GitBranch} label="History" onClick={() => onView("maps")} />
       <NavItem active={view === "studio"} icon={ImageIcon} label="Explore" onClick={() => onView("studio")} />
-      <NavItem active={view === "builder"} icon={Bot} label="DeepSeek V3" onClick={() => onView("builder")} />
+      <NavItem active={view === "builder"} icon={Bot} label="PANUPANXBOSS V3" onClick={() => onView("builder")} />
       <Link to="/sandbox" className="flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-sm font-medium text-muted transition-colors hover:bg-hover hover:text-fg" activeProps={{ className: "bg-elevated text-fg" }}>
         <SquareTerminal className="size-4 shrink-0" strokeWidth={1.8} />Sandbox
       </Link>

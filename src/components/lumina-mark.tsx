@@ -1,22 +1,20 @@
 import { cn } from "@/lib/utils";
 
-export function BossnuSileloMark({ className }: { className?: string }) {
+/** PANUPANXBOSS — the small orbit mark used throughout the app. */
+export function BossnuSileloMark({ className, animated = false }: { className?: string; animated?: boolean }) {
   return (
-    <svg viewBox="0 0 32 32" className={cn("shrink-0", className)} aria-label="DeepSeek">
-      <path d="M16 2.8c7.3 0 13.2 5.9 13.2 13.2S23.3 29.2 16 29.2 2.8 23.3 2.8 16 8.7 2.8 16 2.8Z" fill="currentColor" />
-      <path d="M8.1 17.6c2.1-3 4.2-4.3 6.3-4.1 2.7.2 4.1 3.6 7.2 3.6 1.3 0 2.5-.5 3.7-1.6-.5 4.5-4.2 7.8-8.8 7.8-4.3 0-7.8-2.4-8.4-5.7Z" fill="white" />
-      <circle cx="20.8" cy="12" r="1.1" fill="white" />
+    <svg viewBox="0 0 40 40" className={cn("shrink-0", animated && "brand-orbit", className)} aria-label="PANUPANXBOSS" role="img">
+      <defs><linearGradient id="boss-gradient" x1="4" y1="4" x2="36" y2="36"><stop stopColor="#a78bfa"/><stop offset="1" stopColor="#e879f9"/></linearGradient></defs>
+      <circle cx="20" cy="20" r="17" fill="url(#boss-gradient)" />
+      <path d="M12 28V11h8.2a5.8 5.8 0 0 1 0 11.6H16" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" />
+      <path d="m24 12 9 16M33 12l-9 16" fill="none" stroke="white" strokeWidth="2.7" strokeLinecap="round" />
+      <circle cx="33" cy="8" r="2" fill="#f0abfc" className={animated ? "brand-spark" : undefined} />
     </svg>
   );
 }
 
 export function LuminaWordmark({ compact = false }: { compact?: boolean }) {
-  return (
-    <div className="flex items-center gap-2.5 text-fg">
-      <BossnuSileloMark className="size-8 text-primary" />
-      {!compact ? <span className="font-display text-[19px] font-semibold tracking-tight">DeepSeek</span> : null}
-    </div>
-  );
+  return <div className="flex items-center gap-2.5 text-fg"><BossnuSileloMark animated className="size-8 text-primary" />{!compact ? <span className="font-display text-[17px] font-bold tracking-tight">PANUPANX<span className="text-primary">BOSS</span></span> : null}</div>;
 }
 
 export const LuminaMark = BossnuSileloMark;

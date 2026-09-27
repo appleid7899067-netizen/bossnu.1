@@ -192,12 +192,12 @@ function WorkStatus({
 }) {
   return (
     <div className="lumina-rise flex gap-3 sm:gap-4">
-      <div className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs text-primary">✦</div>
+      <div className="work-live mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs text-primary">✦</div>
       <div className="min-w-0 w-full max-w-[900px] rounded-2xl bg-clay/70 p-3">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="size-1.5 animate-pulse rounded-full bg-primary" />
-            <span className="text-xs font-semibold text-fg">{status}</span>
+            <span className="text-xs font-semibold text-fg">{status}<span className="work-dots" aria-hidden="true"><i /><i /><i /></span></span>
           </div>
           {sandboxRun ? (
             <span className="rounded-md bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">

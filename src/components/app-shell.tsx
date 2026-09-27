@@ -404,7 +404,7 @@ export function AppShell({ search }: { search: Search }) {
                 onChange={setDraft}
                 onSubmit={() => void send(draft, activeChat?.id)}
                 onStop={stopChat}
-                placeholder={showDiscover ? "Message DeepSeek…" : "Message DeepSeek…"}
+                placeholder={showDiscover ? "Message PANUPANXBOSS…" : "Message PANUPANXBOSS…"}
                 busy={busyChat}
                 contextualActions={quickActions}
             voiceEnabled={voiceEnabled}
