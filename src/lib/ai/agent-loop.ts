@@ -55,6 +55,7 @@ export async function runAgentLoop(opts: {
   opts.onText(`\n> 🎯 เป้าหมาย: ${goal.slice(0, 300)}\n`);
   const max = Math.min(4, Math.max(0, opts.maxRuns ?? 4));
   if (workspaceId) await createWorkspaceTask(workspaceId, goal, core.task.id);
+  let verified = false;
 
   while (!opts.signal.aborted) {
     core.setPhase("plan");
@@ -98,7 +99,7 @@ export async function runAgentLoop(opts: {
       core.complete();
       if (workspaceId) await updateWorkspaceTask(workspaceId, core.task.id, "done", core.task.attempts);
       if (workspaceId && raw.trim()) await rememberWorkspace(workspaceId, "latest-answer", raw, "conversation");
-      opts.onPhase?.("answer", "💬 Answer • ตอบผลในแชท");
+      opts.onPhase?.("answer", verified ? "💬 Answer • ตอบผลที่ตรวจแล้ว" : "💬 Answer • ตอบผลการสนทนา");
       return;
     }
 
@@ -155,6 +156,7 @@ export async function runAgentLoop(opts: {
         !result.error &&
         hasWorkspaceEvidence &&
         (result.workspaceFiles?.length === 0 || hasProjectEvidence);
+      verified = passed;
       core.setPhase("verify");
       opts.onPhase?.(
         "verify",
