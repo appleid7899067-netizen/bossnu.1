@@ -49,7 +49,7 @@ export function ChatThread({
 
   return (
     <div ref={scroller} onScroll={onScroll} className="chat-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
-      <div className="mx-auto flex w-full min-w-0 max-w-[1180px] flex-col gap-5 px-3 py-5 sm:px-5 sm:py-7 lg:px-7">
+      <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col gap-5 px-3 py-5 sm:px-5 sm:py-7 lg:px-7">
         {messages.length === 0 ? (
           <div className="flex min-h-[45vh] items-center justify-center text-center">
             <p className="text-sm text-muted">เริ่มคุยกับสลี่ได้เลยค่ะ</p>
@@ -193,7 +193,7 @@ function WorkStatus({
   return (
     <div className="lumina-rise flex gap-3 sm:gap-4">
       <div className="work-live mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs text-primary">✦</div>
-      <div className="min-w-0 w-full max-w-[900px] rounded-2xl bg-clay/70 p-3">
+      <div className="min-w-0 w-full max-w-[1100px] rounded-2xl bg-clay/70 p-3">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <span className="size-1.5 animate-pulse rounded-full bg-primary" />
