@@ -1,4 +1,5 @@
 import { assessSandboxRisk } from "@/lib/sandbox/detect";
+import { listProjectFiles, saveProjectFiles } from "@/lib/ai/boss-workspace";
 /**
  * Sali Sandbox Agent API — `/api/sandbox`
  *
@@ -181,13 +182,14 @@ async function runOnRunner(
   const runner = runnerConfig();
   steps.push(`ส่งไปรันที่ Sandbox Runner (${runtime})`);
   const started = Date.now();
+  const workspaceFiles = workspace ? await listProjectFiles(workspace, 60) : [];
 
   let response: Response;
   try {
     response = await fetch(`${runner.url}/execute`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ language: runtime, command, workspace }),
+      body: JSON.stringify({ language: runtime, command, workspace, workspaceFiles }),
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(runner.timeoutMs)]) : AbortSignal.timeout(runner.timeoutMs),
     });
   } catch (error) {
@@ -256,6 +258,8 @@ async function runOnRunner(
   );
 
   const exitCode = typeof data.exitCode === "number" ? data.exitCode : null;
+  const returnedFiles = Array.isArray(data.workspaceFiles) ? data.workspaceFiles as Array<{ path: string; content: string }> : [];
+  if (workspace && returnedFiles.length) await saveProjectFiles(workspace, returnedFiles);
   const error =
     status === "timeout"
       ? "หมดเวลาการรัน — Runner จำกัดเวลาต่อคำสั่ง"
