@@ -81,7 +81,14 @@ export function SaliAgent({
   leading?: ReactNode;
 }) {
   const sandbox = useSandbox();
-  const [workspace] = useState(() => "sandbox_" + crypto.randomUUID());
+  const [workspace] = useState(() => {
+    const key = "boss_workspace_id";
+    const existing = window.localStorage.getItem(key);
+    if (existing) return existing;
+    const created = "boss_" + crypto.randomUUID();
+    window.localStorage.setItem(key, created);
+    return created;
+  });
   const [live, setLive] = useState<{ output: string; steps: string[] } | null>(null);
   const runLock = useRef(false);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
