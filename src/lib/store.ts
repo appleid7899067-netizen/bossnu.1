@@ -24,7 +24,7 @@ personality:PersonalitySettings; agentSkills:AgentSkill[]; agentProfiles:AgentPr
 setHydrated:()=>void; newChat:(mode?:ChatMode)=>string; setActiveChat:(id:string|null)=>void; setChatMode:(id:string,mode:ChatMode)=>void;
 addUserMessage:(chatId:string,content:string)=>string; addCommandHistory:(item:Omit<CommandHistoryItem,"id"|"createdAt">)=>string; updateCommandHistory:(id:string,status:CommandHistoryItem["status"])=>void; startAssistant:(chatId:string)=>string; patchAssistant:(chatId:string,messageId:string,patch:Partial<Pick<ChatMessage,"content"|"thinking">>)=>void; removeEmptyAssistant:(chatId:string,messageId:string)=>void; deleteMessage:(chatId:string,messageId:string)=>void; deleteChat:(id:string)=>void;
 addMap:(map:SavedMap)=>void; setActiveMap:(id:string|null)=>void; deleteMap:(id:string)=>void; addImage:(image:StudioImage)=>void; deleteImage:(id:string)=>void;
-updatePersonality:(patch:Partial<PersonalitySettings>)=>void; toggleAgentSkill:(id:string)=>void; addAgentProfile:(profile:AgentProfile)=>void; deleteAgentProfile:(id:string)=>void; addMemory:(content:string)=>void; deleteMemory:(id:string)=>void; saveLearnedSkill:(skill:Omit<LearnedSkill,"id"|"createdAt"|"uses">)=>void; useLearnedSkill:(id:string)=>void;
+updatePersonality:(patch:Partial<PersonalitySettings>)=>void; toggleAgentSkill:(id:string)=>void; addAgentProfile:(profile:AgentProfile)=>void; updateAgentProfile:(id:string,patch:Partial<AgentProfile>)=>void; deleteAgentProfile:(id:string)=>void; addMemory:(content:string)=>void; deleteMemory:(id:string)=>void; saveLearnedSkill:(skill:Omit<LearnedSkill,"id"|"createdAt"|"uses">)=>void; useLearnedSkill:(id:string)=>void;
 };
 
 export const useAppStore=create<AppState>()(persist((set)=>({
@@ -43,7 +43,7 @@ deleteChat:id=>set(s=>({conversations:s.conversations.filter(c=>c.id!==id),activ
 addMap:map=>set(s=>({maps:[map,...s.maps].slice(0,MAX_MAPS),activeMapId:map.id})),setActiveMap:id=>set({activeMapId:id}),deleteMap:id=>set(s=>({maps:s.maps.filter(m=>m.id!==id),activeMapId:s.activeMapId===id?null:s.activeMapId})),
 addImage:image=>set(s=>({images:[image,...s.images].slice(0,MAX_IMAGES)})),deleteImage:id=>set(s=>({images:s.images.filter(img=>img.id!==id)})),
 updatePersonality:patch=>set(s=>({personality:{...s.personality,...patch}})),toggleAgentSkill:id=>set(s=>({agentSkills:s.agentSkills.map(skill=>skill.id===id?{...skill,enabled:!skill.enabled}:skill)})),
-addAgentProfile:profile=>set(s=>({agentProfiles:[...s.agentProfiles,profile]})),deleteAgentProfile:id=>set(s=>({agentProfiles:s.agentProfiles.filter(a=>a.id!==id)})),
+addAgentProfile:profile=>set(s=>({agentProfiles:[...s.agentProfiles,profile]})),updateAgentProfile:(id,patch)=>set(s=>({agentProfiles:s.agentProfiles.map(a=>a.id===id?{...a,...patch}:a)})),deleteAgentProfile:id=>set(s=>({agentProfiles:s.agentProfiles.filter(a=>a.id!==id)})),
 addMemory:content=>set(s=>({memory:[{id:uid("mem"),content,createdAt:Date.now()},...s.memory].slice(0,100)})),deleteMemory:id=>set(s=>({memory:s.memory.filter(m=>m.id!==id)})),
 saveLearnedSkill:skill=>set(s=>{
   const existing=s.learnedSkills.find(x=>x.pattern===skill.pattern && x.runtime===skill.runtime);
