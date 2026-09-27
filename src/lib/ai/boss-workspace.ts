@@ -108,6 +108,24 @@ export async function upsertWorkspaceFile(id: string, path: string, content: str
   `;
 }
 
+export async function listProjectFiles(id: string, limit = 40): Promise<WorkspaceFile[]> {
+  const files = await listWorkspaceFiles(id);
+  return files.filter(file => file.path.startsWith("project/")).slice(0, Math.min(Math.max(limit, 1), 80));
+}
+
+export async function saveProjectFiles(id: string, files: Array<{ path: string; content: string }>) {
+  const workspaceId = await ensureBossWorkspace(id);
+  let saved = 0;
+  for (const file of files.slice(0, 80)) {
+    if (typeof file?.path !== "string" || typeof file?.content !== "string") continue;
+    const path = safePath(file.path);
+    if (!path.startsWith("project/")) continue;
+    await upsertWorkspaceFile(workspaceId, path, file.content);
+    saved++;
+  }
+  return saved;
+}
+
 export async function deleteWorkspaceFile(id: string, path: string) {
   const workspaceId = await ensureBossWorkspace(id);
   const cleanPath = safePath(path);
