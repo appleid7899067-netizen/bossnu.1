@@ -148,11 +148,11 @@ function MdBlock({ text }: { text: string }) {
   return <>{blocks}</>;
 }
 
-function CodeBlock({ code, lang }: { code: string; lang?: string }) {
+function CodeBlock({ code, lang, live }: { code: string; lang?: string; live?: boolean }) {
   const isHtml = lang === "html" || lang === "htm";
   const [preview, setPreview] = useState(isHtml);
   return (
-    <div className="overflow-hidden rounded-lg bg-ink-soft">
+    <div className={cn("overflow-hidden rounded-lg bg-ink-soft", isHtml && live ? "html-live" : "")}>
       <div className="flex h-7 items-center justify-between border-b border-white/8 px-2.5 text-[10px] font-medium uppercase tracking-wide text-white/45">
         <span>{lang || "code"}</span>
         {isHtml ? <button type="button" onClick={() => setPreview(v => !v)} className="rounded px-1.5 py-0.5 text-[10px] text-white/60 hover:bg-white/8 hover:text-white">{preview ? "Code" : "Preview"}</button> : null}
@@ -178,7 +178,7 @@ export function Markdown({
     <div className={cn("flex flex-col gap-2 text-[0.9rem] leading-[1.55]", className)}>
       {parts.map((part, i) =>
         part.type === "code" ? (
-          <CodeBlock key={i} code={part.value} lang={part.lang} />
+          <CodeBlock key={i} code={part.value} lang={part.lang} live={live} />
         ) : (
           <MdBlock key={i} text={part.value} />
         ),
