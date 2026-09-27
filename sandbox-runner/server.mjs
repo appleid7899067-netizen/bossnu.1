@@ -1,5 +1,5 @@
 import http from "node:http";
-import { mkdtemp, rm, mkdir, stat, readdir, utimes } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, stat, readdir, utimes, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -105,6 +105,34 @@ function spawnProcess(command, args, cwd, timeoutMs, signal) {
     });
   });
 }
+const SYNC_MAX_FILES = 60;
+const SYNC_MAX_FILE_BYTES = 120000;
+const SYNC_SKIP = new Set(["node_modules", ".git", ".next", "dist", "build", "coverage", ".cache", "target"]);
+
+async function collectWorkspaceFiles(root) {
+  const result = [];
+  async function walk(dir, relative) {
+    if (result.length >= SYNC_MAX_FILES) return;
+    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (result.length >= SYNC_MAX_FILES || SYNC_SKIP.has(entry.name)) continue;
+      const full = join(dir, entry.name);
+      const rel = relative ? relative + "/" + entry.name : entry.name;
+      if (entry.isDirectory()) {
+        await walk(full, rel);
+      } else if (entry.isFile()) {
+        const info = await stat(full).catch(() => null);
+        if (!info || info.size > SYNC_MAX_FILE_BYTES) continue;
+        const content = await readFile(full).catch(() => null);
+        if (!content || content.includes(0)) continue;
+        result.push({ path: "project/" + rel, content: content.toString("utf8") });
+      }
+    }
+  }
+  await walk(join(root, "project"), "");
+  return result;
+}
+
 async function cloneWorkspace(dir) {
   if (!WORKSPACE_REPO) return;
   const r = await spawnProcess("git", ["clone", "--depth", "1", WORKSPACE_REPO, dir], tmpdir(), 60000);
