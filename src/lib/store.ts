@@ -44,8 +44,8 @@ addAgentProfile:profile=>set(s=>({agentProfiles:[...s.agentProfiles,profile]})),
 addMemory:content=>set(s=>({memory:[{id:uid("mem"),content,createdAt:Date.now()},...s.memory].slice(0,100)})),deleteMemory:id=>set(s=>({memory:s.memory.filter(m=>m.id!==id)})),
 saveLearnedSkill:skill=>set(s=>{
   const existing=s.learnedSkills.find(x=>x.pattern===skill.pattern && x.runtime===skill.runtime);
-  if(existing)return {learnedSkills:s.learnedSkills.map(x=>x.id===existing.id?{...x,...skill,result:"passed",createdAt:Date.now(),uses:x.uses+1}:x)};
-  return {learnedSkills:[{...skill,id:uid("skill"),createdAt:Date.now(),uses:1},...s.learnedSkills].slice(0,200)};
+  if(existing)return {learnedSkills:s.learnedSkills.map(x=>x.id===existing.id?{...x,...skill,createdAt:Date.now(),lastTestedAt:Date.now(),uses:x.uses+1}:x)};
+  return {learnedSkills:[{...skill,id:uid("skill"),createdAt:Date.now(),uses:1,lastTestedAt:Date.now()},...s.learnedSkills].slice(0,200)};
 }),
 useLearnedSkill:id=>set(s=>({learnedSkills:s.learnedSkills.map(x=>x.id===id?{...x,uses:x.uses+1}:x)})),
 }),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({conversations:s.conversations,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory,learnedSkills:s.learnedSkills}),merge:(persisted,current)=>{const p=(persisted??{}) as Partial<AppState>;return {...current,...p,personality:{...current.personality,...(p.personality??{})}};}}));
