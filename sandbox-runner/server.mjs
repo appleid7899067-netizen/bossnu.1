@@ -7,8 +7,8 @@ import { spawn } from "node:child_process";
 const PORT = Number(process.env.PORT || 8787);
 const MAX_BODY = 128 * 1024;
 const MAX_OUTPUT = 64 * 1024;
-const TIMEOUT_MS = Math.min(300000, Math.max(1000, Number(process.env.COMMAND_TIMEOUT_MS) || 120000));
-const DEV_TIMEOUT_MS = 120000;
+const TIMEOUT_MS = Math.min(300000, Math.max(1000, Number(process.env.COMMAND_TIMEOUT_MS || process.env.SANDBOX_TIMEOUT_MS) || 120000));
+const DEV_TIMEOUT_MS = Math.min(300000, Math.max(1000, Number(process.env.SANDBOX_DEV_TIMEOUT_MS) || 180000));
 const WORKSPACE_REPO = process.env.WORKSPACE_REPO || "";
 const sessions = new Map();
 
@@ -64,7 +64,7 @@ function send(res, status, body) {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": process.env.ALLOW_ORIGIN || "*",
     "access-control-allow-methods": "POST,GET,OPTIONS",
-    "access-control-allow-headers": "content-type",
+    "access-control-allow-headers": "content-type,authorization",
   });
   res.end(JSON.stringify(body));
 }
@@ -134,7 +134,6 @@ function startPersistent(command, args, cwd) {
 }
 async function prepareNode(dir) {
   const r = await spawnProcess("npm", ["install", "--no-audit", "--no-fund"], dir, DEV_TIMEOUT_MS);
-  if (r.exitCode !== 0) throw new Error(r.stderr || r.stdout || "npm_install_failed");
   return r;
 }
 function detectPort(session) {
@@ -149,7 +148,7 @@ function sseHeaders(res) {
     connection: "keep-alive",
     "access-control-allow-origin": process.env.ALLOW_ORIGIN || "*",
     "access-control-allow-methods": "POST,GET,OPTIONS",
-    "access-control-allow-headers": "content-type",
+    "access-control-allow-headers": "content-type,authorization",
   });
 }
 function sse(res, event) {
@@ -157,11 +156,10 @@ function sse(res, event) {
   res.write("data: " + JSON.stringify(event) + "\n\n");
 }
 async function executeStream(body, res) {
-  const language = String(body.language || "").toLowerCase();
+  const language = String(body.language || "bash").toLowerCase();
   const command = typeof body.command === "string" ? body.command.trim() : "";
   if (!command) throw new Error("command_required");
   if (command.length > 32000) throw new Error("command_too_large");
-  if (!["node","bash","python","go","rust","java","cpp"].includes(language)) throw new Error("unsupported_runtime");
   const dir = await acquireWorkspace(body.workspace);
   let keep = false;
   const started = Date.now();
@@ -169,8 +167,13 @@ async function executeStream(body, res) {
     sseHeaders(res);
     sse(res, { type: "status", status: "queued", message: "รับคำสั่ง Sandbox" });
     sse(res, { type: "status", status: "running", message: "กำลังรันจริงใน Sandbox Runner" });
-    if (language === "node" && /^npm\s+run\s+dev\b/i.test(command)) {
-      await prepareNode(dir);
+    if ((language === "node" || language === "javascript") && /^npm\s+run\s+dev\b/i.test(command)) {
+      const install = await prepareNode(dir);
+      if (install.exitCode !== 0) {
+        sse(res, { type: "output", stream: "stderr", text: install.stderr || install.stdout });
+        sse(res, { type: "complete", result: { success: false, status: "error", type: language, runtime: language, command, stdout: install.stdout, stderr: install.stderr, exitCode: install.exitCode, durationMs: Date.now() - started } });
+        return res.end();
+      }
       const session = startPersistent("npm", ["run", "dev", "--", "--host", "0.0.0.0"], dir);
       keep = true;
       const sendOutput = () => {
@@ -225,17 +228,17 @@ async function executeStream(body, res) {
 }
 
 async function execute(body, signal) {
-  const language = String(body.language || "").toLowerCase();
+  const language = String(body.language || "bash").toLowerCase();
   const command = typeof body.command === "string" ? body.command.trim() : "";
   if (!command) throw new Error("command_required");
   if (command.length > 32000) throw new Error("command_too_large");
-  if (!["node","bash","python","go","rust","java","cpp"].includes(language)) throw new Error("unsupported_runtime");
 
   const dir = await acquireWorkspace(body.workspace);
   let keep = false;
   try {
-    if (language === "node" && /^npm\s+run\s+dev\b/i.test(command)) {
-      await prepareNode(dir);
+    if ((language === "node" || language === "javascript") && /^npm\s+run\s+dev\b/i.test(command)) {
+      const install = await prepareNode(dir);
+      if (install.exitCode !== 0) return { status: "error", stdout: install.stdout, stderr: install.stderr, exitCode: install.exitCode };
       const session = startPersistent("npm", ["run", "dev", "--", "--host", "0.0.0.0"], dir);
       keep = true;
       await new Promise(r => setTimeout(r, 2200));
@@ -275,7 +278,7 @@ async function proxyPreview(req, res, sessionId, rest) {
 }
 const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") return send(res, 204, {});
-  if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, runner: "multi-runtime", version: 4, sessions: sessions.size });
+  if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, runner: "universal-shell", version: 4, sessions: sessions.size });
   if (req.method === "GET" && req.url && req.url.startsWith("/preview/")) {
     const parts = req.url.split("/").filter(Boolean);
     return proxyPreview(req, res, parts[1], parts.slice(2).join("/"));

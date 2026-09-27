@@ -20,6 +20,8 @@ for this feature. Never point a user's browser at localhost.
 {"language":"bash","command":"npm init -y && npm install dayjs","workspace":"chat_123"}
 ```
 
+- Direct runner commands default to Bash when `language` is omitted; other language
+  labels still execute the supplied shell command (toolchains must be installed).
 - `POST /execute`: JSON result (`status`, stdout/stderr, exitCode, durationMs).
 - `POST /execute/stream`: SSE `status`, `output`, `complete` events.
 - `GET /health`: version and current dev-session count.
@@ -32,7 +34,8 @@ for this feature. Never point a user's browser at localhost.
   after `WORKSPACE_TTL_MS` (default 24h), swept once per minute. Persistence is
   local to one runner: redeploys/restarts with ephemeral disks can lose files;
   multiple replicas do **not** share them. Mount a dedicated disk if needed.
-- `COMMAND_TIMEOUT_MS`: default 120s, bounded to 1–300s. App defaults: 140s proxy,
+- `COMMAND_TIMEOUT_MS` (or legacy `SANDBOX_TIMEOUT_MS`): default 120s, bounded to 1–300s.
+  `SANDBOX_DEV_TIMEOUT_MS` defaults to 180s, also bounded to 1–300s. App defaults: 140s proxy,
   150s browser. Keep hosting request duration limits consistent with these values.
 - 32,000-character command, 128 KiB request body; 64 KiB buffered stdout/stderr
   each, 64 KiB live output total. stdin closes immediately (use input redirection).

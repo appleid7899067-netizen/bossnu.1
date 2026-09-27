@@ -18,6 +18,13 @@ test('real runner: persistence, SSE, runtimes, validation, timeout and cancellat
     runner.stdout.on('data', c => { const m = c.toString().match(/listening on :(\d+)/); if (m) { clearTimeout(timer); resolve(m[1]); } });
   });
   const base = `http://127.0.0.1:${port}`;
+  // Preserve main's universal-shell contract: language is an optional label.
+  for (const language of [undefined, 'javascript', 'custom-toolchain']) {
+    const response = await fetch(base + '/execute', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ command: 'printf universal', language }) });
+    const result = await response.json();
+    assert.equal(result.status, 'success'); assert.equal(result.stdout, 'universal');
+  }
+
   const post = (path, command, workspace, signal) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'bash', command, workspace }), signal });
   const execute = async (command, workspace = 'chat_a') => (await post('/execute', command, workspace)).json();
   assert.equal((await execute('printf persistent > note.txt')).status, 'success');
