@@ -1,5 +1,20 @@
 [
   {
+    "id": "skill_1790497180401_h3lr1",
+    "name": "Shell • คำสั่งระบบ echo",
+    "runtime": "bash",
+    "pattern": "echo Arena Agent Mode Live",
+    "testCommand": "echo Arena Agent Mode Live",
+    "result": "passed",
+    "evidence": "Arena Agent Mode Live",
+    "output": "Arena Agent Mode Live",
+    "exitCode": 0,
+    "durationMs": 53,
+    "createdAt": 1790497180401,
+    "lastTestedAt": 1790497180401,
+    "uses": 1
+  },
+  {
     "id": "skill_1790496637777_hioex",
     "name": "PYTHON • python3 -c \"print('Python 3 math check:', …",
     "runtime": "python",
