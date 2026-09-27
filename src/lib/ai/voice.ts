@@ -2,6 +2,7 @@ const hasSpeech = typeof window !== "undefined" && "speechSynthesis" in window &
 
 export type VoiceSettings = {
   enabled: boolean;
+  source: "puter" | "device";
   rate: number;
   pitch: number;
   volume: number;
@@ -10,8 +11,9 @@ export type VoiceSettings = {
 
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   enabled: true,
+  source: "puter",
   rate: 1,
-  pitch: 1.3,
+  pitch: 1.08,
   volume: 1,
   voiceName: "",
 };
