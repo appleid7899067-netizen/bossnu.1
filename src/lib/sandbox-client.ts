@@ -33,6 +33,34 @@ export type SandboxClientOptions = {
   fetch?: typeof fetch;
 };
 
+export type SandboxStreamEvent =
+  | { type: "status"; status: string; message?: string }
+  | { type: "output"; stream: "stdout" | "stderr"; text: string }
+  | { type: "complete"; result: CommandResult }
+  | { type: "error"; error: string };
+
+async function consumeSandboxStream(body: ReadableStream<Uint8Array>, onEvent?: (event: SandboxStreamEvent) => void): Promise<CommandResult> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let final: CommandResult | null = null;
+  const emit = (event: SandboxStreamEvent) => { onEvent?.(event); if (event.type === "complete") final = event.result; };
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const lines = buffer.split("\n"); buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.startsWith("data:")) continue;
+        try { emit(JSON.parse(line.slice(5).trim()) as SandboxStreamEvent); } catch {}
+      }
+      if (done) break;
+    }
+    if (buffer.startsWith("data:")) { try { emit(JSON.parse(buffer.slice(5).trim()) as SandboxStreamEvent); } catch {} }
+  } finally { reader.releaseLock(); }
+  return final ?? errorResult("Streaming Sandbox จบโดยไม่มีผลลัพธ์");
+}
+
 export type ExecuteOptions = {
   /** Attach a Grok skill to the run (its content is returned with the result). */
   skill?: string;
@@ -71,6 +99,32 @@ export class SandboxClient {
   /** Load a skill's SKILL.md — or one of its `references/*.md` files. */
   async loadSkill(skill: string, reference?: string): Promise<CommandResult> {
     return this.post({ skill, reference, type: "skill" });
+  }
+
+  /** Stream a command through the same central Sandbox API. */
+  async executeStream(cmd: string, options: ExecuteOptions & { onEvent?: (event: SandboxStreamEvent) => void } = {}): Promise<CommandResult> {
+    const command = cmd.trim();
+    if (!command) return errorResult("ยังไม่มีคำสั่ง");
+    if (command.length > SANDBOX_LIMITS.commandChars) return errorResult(`คำสั่งยาวเกิน ${SANDBOX_LIMITS.commandChars.toLocaleString()} ตัวอักษร`);
+    const timeout = AbortSignal.timeout(this.timeoutMs);
+    const combined = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+    let response: Response;
+    try {
+      response = await this.fetchImpl("/api/sandbox.stream", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "text/event-stream" },
+        body: JSON.stringify(stripUndefined({ cmd: command, skill: options.skill, type: options.type })),
+        signal: combined,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return errorResult(/timeout|abort/i.test(message) ? "Sandbox ไม่ตอบกลับภายในเวลาที่กำหนด" : "เชื่อมต่อ Sandbox Streaming API ไม่ได้");
+    }
+    if (!response.ok || !response.body) {
+      const data = await response.json().catch(() => null);
+      return errorResult(messageFrom(data) ?? `Sandbox Streaming API ตอบกลับ HTTP ${response.status}`);
+    }
+    return consumeSandboxStream(response.body, options.onEvent);
   }
 
   /** Run a command; the server detects the runtime unless `type` is given. */
