@@ -1,5 +1,5 @@
 import http from "node:http";
-import { mkdtemp, rm, mkdir, stat, readdir, utimes, readFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, stat, readdir, utimes, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -108,6 +108,20 @@ function spawnProcess(command, args, cwd, timeoutMs, signal) {
 const SYNC_MAX_FILES = 60;
 const SYNC_MAX_FILE_BYTES = 120000;
 const SYNC_SKIP = new Set(["node_modules", ".git", ".next", "dist", "build", "coverage", ".cache", "target"]);
+
+async function seedWorkspace(dir, files) {
+  if (!Array.isArray(files)) return;
+  for (const item of files.slice(0, SYNC_MAX_FILES)) {
+    if (!item || typeof item.path !== "string" || typeof item.content !== "string") continue;
+    if (!item.path.startsWith("project/") || item.path.includes("..")) continue;
+    if (Buffer.byteLength(item.content, "utf8") > SYNC_MAX_FILE_BYTES) continue;
+    const relative = item.path.slice("project/".length);
+    if (!relative || relative.includes("\\") || relative.split("/").some(part => !part || part === "." || part === ".." || SYNC_SKIP.has(part))) continue;
+    const target = join(dir, "project", relative);
+    await mkdir(join(target, ".."), { recursive: true });
+    await writeFile(target, item.content, "utf8");
+  }
+}
 
 async function collectWorkspaceFiles(root) {
   const result = [];
