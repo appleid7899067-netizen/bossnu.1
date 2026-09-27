@@ -50,7 +50,7 @@ function saveSettings() {
   if (!hasSpeech) return;
   try {
     window.localStorage.setItem("bossnu-voice-settings", JSON.stringify(settings));
-  } catch {}
+  } catch { /* intentionally ignored */ }
 }
 
 function pickThaiVoice() {

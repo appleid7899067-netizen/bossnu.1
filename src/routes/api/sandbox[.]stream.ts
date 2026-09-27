@@ -124,7 +124,7 @@ async function handle(request: Request): Promise<Response> {
                 completed = true;
                 send({ type:"complete", result:{ ...ev.result, durationMs: ev.result?.durationMs ?? Date.now()-started } });
               } else send(ev);
-            } catch {}
+            } catch { /* intentionally ignored */ }
           }
           if (done) break;
         }

@@ -23,7 +23,7 @@ export async function generateMindMap(input: { topic: string }) {
       },
     );
     const raw = String((response as { message?: { content?: unknown } }).message?.content ?? response);
-    const json = raw.replace(/^\`\`\`json\s*/i, "").replace(/\s*\`\`\`$/i, "").trim();
+    const json = raw.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
     const parsed = JSON.parse(json) as MindMapData;
     if (!parsed.topic || !Array.isArray(parsed.branches)) throw new Error("bad shape");
     return { ok: true as const, map: parsed };
@@ -91,7 +91,7 @@ export async function generateAppBuilder(input: { request: string; project: impo
       normalize: true,
     });
     const raw = String((response as { message?: { content?: unknown } }).message?.content ?? response);
-    const clean = raw.replace(/^\`\`\`json\s*/i, "").replace(/\s*\`\`\`$/i, "").trim();
+    const clean = raw.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
     const parsed = JSON.parse(clean) as import("@/lib/types").BuilderProject;
     if (!parsed.title || !parsed.entry || !Array.isArray(parsed.files) || parsed.files.length < 1) throw new Error("Builder returned an invalid project.");
     const files = parsed.files.filter((f) => f && typeof f.path === "string" && typeof f.content === "string").slice(0, 30);
