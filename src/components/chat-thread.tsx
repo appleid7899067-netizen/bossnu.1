@@ -46,8 +46,8 @@ export function ChatThread({
   }
 
   return (
-    <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
-      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 px-3 py-5 sm:px-5 sm:py-7 lg:px-7">
+    <div ref={scroller} onScroll={onScroll} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain scroll-smooth">
+      <div className="mx-auto flex w-full min-w-0 max-w-[1180px] flex-col gap-5 px-3 py-5 sm:px-5 sm:py-7 lg:px-7">
         {messages.length === 0 ? (
           <div className="flex min-h-[45vh] items-center justify-center text-center">
             <p className="text-sm text-muted">เริ่มคุยกับสลี่ได้เลยค่ะ</p>
@@ -106,7 +106,7 @@ function MessageBubble({
   return (
     <div className="lumina-rise group flex gap-3 sm:gap-4">
       <LuminaMark className="mt-0.5 size-7 shrink-0 text-primary" />
-      <div className="min-w-0 max-w-[1080px] flex-1 text-[13px] leading-[1.55]">
+      <div className="min-w-0 max-w-[1080px] flex-1 break-words text-[14px] leading-[1.65] [overflow-wrap:anywhere] sm:text-[13px] sm:leading-[1.55]">
         {message.thinking ? <ThinkingBlock text={message.thinking} live={live && !message.content} /> : null}
         {empty ? (
           <p className="lumina-shimmer text-sm font-medium">กำลังคิด…</p>

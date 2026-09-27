@@ -234,7 +234,7 @@ export function Markdown({
   const firstWebIndex = parts.findIndex((part) => part.type === "code" && isWebLang(part.lang));
 
   return (
-    <div className={cn("flex flex-col gap-2 text-[0.9rem] leading-[1.55]", className)}>
+    <div className={cn("flex min-w-0 max-w-full flex-col gap-2 text-[0.9rem] leading-[1.55] [overflow-wrap:anywhere]", className)}>
       {parts.map((part, i) =>
         part.type === "code" ? (
           <div key={i} className="contents">
