@@ -203,6 +203,7 @@ async function executeStream(body, res) {
   if (!command) throw new Error("command_required");
   if (command.length > 32000) throw new Error("command_too_large");
   const dir = await acquireWorkspace(body.workspace);
+  await seedWorkspace(dir, body.workspaceFiles);
   let keep = false;
   const started = Date.now();
   try {
@@ -236,6 +237,7 @@ async function executeStream(body, res) {
         output: [session.stdout(), session.stderr()].filter(Boolean).join("\n").trim().slice(-MAX_OUTPUT),
         sessionId: session.id, port, previewPath: "/preview/" + session.id + "/",
         durationMs: Date.now() - started,
+        workspaceFiles: await collectWorkspaceFiles(dir),
       };
       sse(res, { type: "complete", result });
       return res.end();
@@ -261,7 +263,7 @@ async function executeStream(body, res) {
     child.stderr.on("data", c => { stderr=append(stderr,c); output("stderr", c); });
     await new Promise(resolve => {
       child.on("error", e => { stderr=append(stderr,e); });
-      child.on("close", code => { clearTimeout(timer); res.off("close", cancel); cancel(); const status=timedOut?"timeout":code===0?"success":"error"; sse(res,{type:"complete",result:{success:status==="success",status,type:language,runtime:language,command,stdout,stderr,output:[stdout,stderr].filter(Boolean).join("\n").trim(),exitCode:code,durationMs:Date.now()-started}}); resolve(); });
+      child.on("close", code => { clearTimeout(timer); res.off("close", cancel); cancel(); const status=timedOut?"timeout":code===0?"success":"error"; sse(res,{type:"complete",result:{success:status==="success",status,type:language,runtime:language,command,stdout,stderr,output:[stdout,stderr].filter(Boolean).join("\n").trim(),exitCode:code,durationMs:Date.now()-started,workspaceFiles:await collectWorkspaceFiles(dir)}}); resolve(); });
     });
     return res.end();
   } finally {
