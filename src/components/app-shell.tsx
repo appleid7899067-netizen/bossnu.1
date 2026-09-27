@@ -42,6 +42,12 @@ export function AppShell({ search }: { search: Search }) {
   const [streamStatus, setStreamStatus] = useState<string>("");
   const [workSteps, setWorkSteps] = useState<string[]>([]);
   const [sandboxRun, setSandboxRun] = useState<SandboxRunView | null>(null);
+  const [dangerousApproval, setDangerousApproval] = useState<{
+    content: string;
+    chatId?: string;
+    mode?: ChatMode;
+    reason: string;
+  } | null>(null);
   const [voiceEnabled, setVoiceEnabledState] = useState(true);
   const [callOpen, setCallOpen] = useState(false);
   const [builderProject, setBuilderProject] = useState<BuilderProject | undefined>(undefined);
@@ -83,9 +89,20 @@ export function AppShell({ search }: { search: Search }) {
     });
   }
 
-  async function send(text: string, chatId?: string, mode?: ChatMode) {
+  async function send(text: string, chatId?: string, mode?: ChatMode, allowDangerous = false) {
     const content = text.trim();
     if (!content || busyChat) return;
+    const sandboxDetection = detectSandboxInput(content);
+    if (sandboxDetection.command && sandboxDetection.dangerous && !allowDangerous) {
+      setDangerousApproval({
+        content,
+        chatId,
+        mode,
+        reason: sandboxDetection.riskReason ?? "คำสั่งนี้อาจกระทบไฟล์ ระบบ หรือ process",
+      });
+      return;
+    }
+    setDangerousApproval(null);
     const id = chatId ?? store.newChat(mode ?? "instant");
     const convo = useAppStore.getState().conversations.find((c) => c.id === id);
     const chatMode = mode ?? convo?.mode ?? "instant";
@@ -94,7 +111,6 @@ export function AppShell({ search }: { search: Search }) {
     setDraft("");
     setBusyChat(true);
     setStreamingId(assistantId);
-    const sandboxDetection = detectSandboxInput(content);
     setSandboxRun(null);
     setStreamStatus("กำลังวิเคราะห์คำขอ…");
     setWorkSteps([
@@ -125,6 +141,7 @@ export function AppShell({ search }: { search: Search }) {
         let streamedOutput = "";
         const result = await sandboxClient.executeStream(sandboxDetection.command, {
           type: ["node","python","bash","go","rust","java","cpp"].includes(sandboxDetection.runtime) ? sandboxDetection.runtime as "node"|"python"|"bash"|"go"|"rust"|"java"|"cpp" : "auto",
+          allowDangerous,
           onEvent: (event) => {
             if (event.type === "status") {
               setStreamStatus(event.message || (event.status === "running" ? "กำลังรันในแซนด์บ็อกจริง…" : "กำลังเตรียม Sandbox…"));
@@ -139,16 +156,17 @@ export function AppShell({ search }: { search: Search }) {
         });
         const output = [result?.stdout, result?.stderr].filter(Boolean).join("\\n").trim() || streamedOutput.trim();
         setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: result?.status === "running" ? "กำลังทำงาน" : result?.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด", output, previewUrl: result?.previewUrl ?? null });
-        if (result?.status === "success") {
+        if (result) {
+          const passed = result.status === "success";
           store.saveLearnedSkill({
-            name: `Sandbox ${sandboxDetection.label}`,
+            name: `Sandbox ${sandboxDetection.label} • ${passed ? "ผ่าน" : "ล้มเหลว"}`,
             runtime: sandboxDetection.runtime,
             pattern: sandboxDetection.command,
             testCommand: sandboxDetection.command,
-            result: "passed",
-            evidence: output.slice(0, 2000) || "exitCode=0",
+            result: passed ? "passed" : "failed",
+            evidence: output.slice(0, 2000) || result.error || `status=${result.status}`,
           });
-          setWorkSteps((steps) => steps.includes("บันทึกทักษะที่ทดสอบผ่าน") ? steps : [...steps, "บันทึกทักษะที่ทดสอบผ่าน"]);
+          setWorkSteps((steps) => steps.includes(passed ? "บันทึกทักษะที่ทดสอบผ่าน" : "บันทึกบทเรียนจากการทดสอบ") ? steps : [...steps, passed ? "บันทึกทักษะที่ทดสอบผ่าน" : "บันทึกบทเรียนจากการทดสอบ"]);
         }
         sandboxNote = output ? "\\n\\n**ผลการรัน Sandbox**\\n\\n\`\`\`text\\n" + output + "\\n\`\`\`" : "";
         const preview = result?.previewUrl ?? null;
@@ -157,9 +175,17 @@ export function AppShell({ search }: { search: Search }) {
         setStreamStatus(result?.status === "running" ? "เปิด Live Preview แล้ว…" : "ตรวจผล Sandbox แล้ว…");
       } catch (error) {
         const errorText = error instanceof Error ? error.message : "รัน Sandbox ไม่สำเร็จ";
+        store.saveLearnedSkill({
+          name: `Sandbox ${sandboxDetection.label} • ล้มเหลว`,
+          runtime: sandboxDetection.runtime,
+          pattern: sandboxDetection.command,
+          testCommand: sandboxDetection.command,
+          result: "failed",
+          evidence: errorText.slice(0, 2000),
+        });
         setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: "ผิดพลาด", output: errorText });
         sandboxNote = "\\n\\n**Sandbox:** " + errorText;
-        setWorkSteps((steps) => [...steps, "Sandbox พบข้อผิดพลาด"]);
+        setWorkSteps((steps) => [...steps, "Sandbox พบข้อผิดพลาด", "บันทึกบทเรียนจากการทดสอบ"]);
       }
     }
 
@@ -495,6 +521,29 @@ export function AppShell({ search }: { search: Search }) {
               <button type="button" onClick={() => setAgentSettingsOpen(false)} className="grid size-9 place-items-center rounded-xl bg-clay text-muted hover:text-fg" aria-label="ปิด"><X className="size-4" /></button>
             </div>
             <div className="min-h-0 flex-1"><SettingsView /></div>
+          </div>
+        </div>
+      ) : null}
+      {dangerousApproval ? (
+        <div className="fixed inset-0 z-[120] grid place-items-center bg-fg/30 p-4 backdrop-blur-[2px]" role="alertdialog" aria-modal="true" aria-labelledby="dangerous-command-title" aria-describedby="dangerous-command-description">
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-elevated p-5 shadow-2xl">
+            <div className="mb-3">
+              <p id="dangerous-command-title" className="text-base font-semibold">⚠️ อนุญาตให้รันคำสั่งนี้ไหม?</p>
+              <p id="dangerous-command-description" className="mt-1 text-sm text-muted">{dangerousApproval.reason}</p>
+            </div>
+            <pre className="max-h-44 overflow-auto rounded-xl bg-bg p-3 text-xs text-fg">{dangerousApproval.content}</pre>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="rounded-xl px-4 py-2 text-sm text-muted hover:bg-clay hover:text-fg" onClick={() => setDangerousApproval(null)}>ไม่อนุญาต</button>
+              <button
+                type="button"
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-fg hover:bg-primary-hover"
+                onClick={() => {
+                  const pending = dangerousApproval;
+                  setDangerousApproval(null);
+                  void send(pending.content, pending.chatId, pending.mode, true);
+                }}
+              >อนุญาตให้รัน</button>
+            </div>
           </div>
         </div>
       ) : null}
