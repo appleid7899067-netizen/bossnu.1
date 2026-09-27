@@ -125,8 +125,7 @@ export function AppShell({ search }: { search: Search }) {
       }
       let output = "";
       setStreamStatus("กำลังรันใน Sandbox…");
-      store.addCommandHistory({ command: call.command, runtime: call.language, status: "running" });
-      store.addCommandHistory({ command: call.command, runtime: call.language, status: "running" });
+      const historyId = store.addCommandHistory({ command: call.command, runtime: call.language, status: "running" });
       setWorkSteps(steps => [...steps, `▶ ${call.command.slice(0, 80)}`]);
       setSandboxRun({ runtime: call.language, label: "Sandbox Terminal", command: call.command, status: "running", output });
       try {
@@ -141,11 +140,13 @@ export function AppShell({ search }: { search: Search }) {
           },
         });
         ac.signal.throwIfAborted();
+        store.updateCommandHistory(historyId, result.status === "success" ? "success" : "error");
         setSandboxRun(current => current ? { ...current, status: result.status, output: result.output || output || result.error, previewUrl: result.previewUrl } : current);
         setWorkSteps(steps => [...steps.slice(0, -1), `${result.status === "success" ? "✅" : "❌"} ${call.command.slice(0, 80)}`]);
         store.saveLearnedSkill({ name: `Sandbox ${call.language}`, runtime: call.language, pattern: call.command, testCommand: call.command, result: result.status === "success" ? "passed" : "failed", evidence: (result.output || output || result.error || result.status).slice(0, 2000) });
         return result;
       } catch (error) {
+        store.updateCommandHistory(historyId, ac.signal.aborted ? "aborted" : "error");
         setSandboxRun(current => current ? { ...current, status: ac.signal.aborted ? "aborted" : "error" } : current);
         throw error;
       }
