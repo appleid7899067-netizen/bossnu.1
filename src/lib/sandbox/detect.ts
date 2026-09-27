@@ -46,7 +46,13 @@ export function detectSandboxInput(input: string): SandboxDetection {
   if (/^(g\+\+|gcc|clang|clang\+\+)\s+/i.test(value) || /\.(cpp|cc|cxx|c)(?:\s|$)/i.test(value)) {
     return { runtime: "cpp", label: "C / C++", command: value, confidence: "high", webPreview: false };
   }
-  if (/@(?:tailwind|layer|apply|theme)\\b|\\b(tw|tailwindcss)\\b/i.test(value)) {\n    return { runtime: "tailwind", label: "Tailwind CSS", code: value, confidence: "high", webPreview: true };\n  }\n  if (/(^|\\n)\\s*[.#]?[a-zA-Z][^{]*\\{[\\s\\S]*:[^;{}]+;[\\s\\S]*\\}/.test(value)) {\n    return { runtime: "css", label: "CSS", code: value, confidence: "high", webPreview: true };\n  }\n  if (htmlDocument(value)) {
+  if (/@(?:tailwind|layer|apply|theme)\b|\b(tw|tailwindcss)\b/i.test(value)) {
+    return { runtime: "tailwind", label: "Tailwind CSS", code: value, confidence: "high", webPreview: true };
+  }
+  if (/(^|\n)\s*[.#]?[a-zA-Z][^{]*\{[\s\S]*:[^;{}]+;[\s\S]*\}/.test(value)) {
+    return { runtime: "css", label: "CSS", code: value, confidence: "high", webPreview: true };
+  }
+  if (htmlDocument(value)) {
     return { runtime: "html", label: "HTML / Web", code: value, confidence: "high", webPreview: true };
   }
   if (/^(?:const|let|var|function|class)\s+/m.test(value) || /(?:document|window)\.[A-Za-z_$]/.test(value)) {
