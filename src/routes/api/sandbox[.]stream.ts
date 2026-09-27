@@ -1,5 +1,7 @@
 import { loadSkill } from "@/lib/sandbox/skills.server";
 import { createFileRoute } from "@tanstack/react-router";
+import { loadSeed, publicRunnerResult, runnerBody, syncRunnerResult, type WorkspaceSeed } from "@/lib/workspace/sync.server";
+import { describeEvidence } from "@/lib/workspace/snapshot";
 import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
 import {
   CommandRequestSchema,
@@ -75,12 +77,25 @@ async function handle(request: Request): Promise<Response> {
       };
       const close = () => { if (!closed) { closed = true; controller.close(); } };
       const started = Date.now();
+      let seed: WorkspaceSeed | undefined;
+      /** Same Neon sync + read-back verification as the JSON route. */
+      const finish = async (result: Record<string, unknown>) => {
+        if (!workspace) return publicRunnerResult(result);
+        send({ type: "status", status: "syncing", message: "กำลัง Sync Workspace → Neon แล้วอ่านกลับเพื่อตรวจ" });
+        const evidence = await syncRunnerResult(workspace, result, { command: cmd, seedOk: seed?.ok });
+        send({ type: "status", status: evidence.verified && evidence.complete ? "verified" : "unverified", message: describeEvidence(evidence) });
+        return publicRunnerResult(result, evidence);
+      };
       try {
         send({ type: "status", status: "queued", message: "รับคำสั่ง Sandbox" });
+        if (workspace) {
+          seed = await loadSeed(workspace);
+          send({ type: "status", status: "seed", message: seed.ok ? `โหลด Workspace จาก Neon • ${seed.files.length} ไฟล์` : `โหลด Workspace จาก Neon ไม่สำเร็จ • ${seed.error}` });
+        }
         const response = await fetch(runnerUrl() + "/execute/stream", {
           method: "POST",
           headers: { "content-type": "application/json", accept: "text/event-stream" },
-          body: JSON.stringify({ language: runtime, command: cmd, workspace }),
+          body: runnerBody({ language: runtime, command: cmd, workspace, seed }),
           signal: AbortSignal.any([request.signal, abort.signal, AbortSignal.timeout(Number(process.env.SANDBOX_RUNNER_TIMEOUT_MS) || 140000)]),
         });
         // Only retry when the streaming endpoint is absent: never rerun a command
@@ -88,16 +103,17 @@ async function handle(request: Request): Promise<Response> {
         if (response.status === 404 || response.status === 405) {
           const legacy = await fetch(runnerUrl() + "/execute", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ language: runtime, command: cmd, workspace }),
+            body: runnerBody({ language: runtime, command: cmd, workspace, seed }),
             signal: AbortSignal.any([request.signal, abort.signal, AbortSignal.timeout(140000)]),
           });
           const result = await legacy.json();
           if (!legacy.ok) throw new Error(result.error || `Runner HTTP ${legacy.status}`);
-          const warning = "Legacy runner: live output and persistent workspace may be unavailable. Redeploy runner v4.";
+          const warning = "Legacy runner: live output and persistent workspace may be unavailable. Redeploy Sandbox Runner v5.";
           send({ type: "status", status: "running", message: warning });
           if (result.stdout) send({ type: "output", stream: "stdout", text: result.stdout });
           if (result.stderr) send({ type: "output", stream: "stderr", text: result.stderr });
-          send({ type: "complete", result: { ...result, success: result.status === "success", type: runtime, runtime, command: cmd,
+          const synced = await finish(result);
+          send({ type: "complete", result: { ...synced, success: result.status === "success", type: runtime, runtime, command: cmd,
             output: [result.stdout, result.stderr, warning].filter(Boolean).join("\n"), durationMs: Date.now() - started } });
           close(); return;
         }
@@ -111,6 +127,7 @@ async function handle(request: Request): Promise<Response> {
         const decoder = new TextDecoder();
         let buffer = "";
         let completed = false;
+        let runnerResult: Record<string, unknown> | null = null;
         while (true) {
           const { value, done } = await reader.read();
           buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
@@ -121,12 +138,13 @@ async function handle(request: Request): Promise<Response> {
               const ev = JSON.parse(line.slice(5).trim());
               if (ev.type === "complete") {
                 completed = true;
-                send({ type:"complete", result:{ ...ev.result, durationMs: ev.result?.durationMs ?? Date.now()-started } });
+                runnerResult = { ...ev.result, durationMs: ev.result?.durationMs ?? Date.now()-started };
               } else send(ev);
             } catch { /* intentionally ignored */ }
           }
           if (done) break;
         }
+        if (runnerResult) send({ type: "complete", result: await finish(runnerResult) });
         if (!completed) send({ type:"complete", result:{ success:false,status:"error",type:runtime,runtime,command:cmd,error:"Runner stream ended without a complete event",durationMs:Date.now()-started } });
         close();
       } catch (error) {

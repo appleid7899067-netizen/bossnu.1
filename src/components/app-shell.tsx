@@ -15,6 +15,8 @@ import { SaliCallView } from "@/components/sali-call-view";
 import { Button } from "@/components/ui/button";
 import { generateMindMap, generateStudioImage } from "@/lib/ai/client";
 import { runAgentLoop, type AgentPhase } from "@/lib/ai/agent-loop";
+import { createHttpWorkspace } from "@/lib/workspace/http-workspace";
+import type { ToolResult } from "@/lib/ai/sandbox-tool";
 import { terminalTranscript, modelResult, type RunCall } from "@/lib/ai/sandbox-tool";
 import { isRunnerRuntime } from "@/types/sandbox";
 import { streamChat } from "@/lib/ai/stream";
@@ -157,6 +159,7 @@ export function AppShell({ search }: { search: Search }) {
         throw error;
       }
     };
+    let priorResult: ToolResult | undefined;
     try {
       if (detection.webPreview && detection.code && ["html", "javascript", "css", "tailwind"].includes(detection.runtime)) {
         setSandboxRun({ runtime: detection.runtime, label: detection.label, command: "browser sandbox", status: "Preview พร้อมแล้ว", previewHtml: sandboxPreviewDocument(detection.runtime, detection.code) });
@@ -164,13 +167,17 @@ export function AppShell({ search }: { search: Search }) {
       } else if (tools && store.personality.autoSandbox && detection.command) {
         const call: RunCall = { language: isRunnerRuntime(detection.runtime) ? detection.runtime : "bash", command: detection.command };
         const result = await execute(call, allowDangerous);
+        priorResult = result;
         append(terminalTranscript(call, result));
         history.push({ role: "user", content: modelResult(call, result) });
       }
-      await runAgentLoop({
+      const summary = await runAgentLoop({
         messages: history, signal: ac.signal, tools,
         maxRuns: detection.command && tools && store.personality.autoSandbox ? 5 : 6,
         execute,
+        workspace: createHttpWorkspace(id),
+        requireWorkspaceSync: tools,
+        priorResult,
         onPhase: (phase: AgentPhase, detail?: string) => {
           const labels: Record<AgentPhase, string> = {
             goal: "🎯 เป้าหมาย",
@@ -206,7 +213,12 @@ export function AppShell({ search }: { search: Search }) {
         },
       });
       if (!reply && !ac.signal.aborted) append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
-      setStreamStatus(ac.signal.aborted ? "หยุดแล้ว ⛔" : "ตอบเสร็จแล้ว ✓");
+      setStreamStatus(
+        ac.signal.aborted || summary.status === "aborted" ? "หยุดแล้ว ⛔"
+          : summary.status === "unverified" ? "ยังตรวจสอบไม่ผ่าน ❌"
+            : summary.status === "limit" ? "ถึงขีดจำกัดการรัน ⚠️"
+              : summary.status === "verified" ? "ตรวจสอบผ่าน ✓" : "ตอบเสร็จแล้ว ✓",
+      );
     } catch (error) {
       if (ac.signal.aborted) { append("\n\n⛔ หยุดการทำงานแล้ว"); setStreamStatus("หยุดแล้ว ⛔"); }
       else { const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด"; append(`\n\n${message}`); toast.error(message); setStreamStatus("เกิดข้อผิดพลาด"); }
