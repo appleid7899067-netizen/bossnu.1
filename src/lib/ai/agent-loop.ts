@@ -33,6 +33,7 @@ export type AgentWorkspace = {
   startTask(goal: string, taskId: string): Promise<void>;
   updateTask(taskId: string, status: "done" | "failed" | "running", attempts: number): Promise<void>;
   remember(key: string, value: string, kind: "conversation" | "run"): Promise<void>;
+  learnSkill?(skill: { name: string; runtime: string; command: string; goal: string; evidence: string }): Promise<void>;
 };
 
 /**
@@ -217,6 +218,17 @@ export async function runAgentLoop(opts: {
           : `🔍 Verify • ไม่ผ่าน: ${lastVerdict.reasons[0]}`,
       );
       messages.push({ role: "user", content: observed });
+
+      if (lastVerdict.passed && workspace?.learnSkill) {
+        await safely(() => workspace.learnSkill!({
+          name: "Learned: " + call.language + " verified run",
+          runtime: call.language,
+          command: call.command,
+          goal,
+          evidence: observed,
+        }), undefined);
+        opts.onPhase?.("verify", "🧠 Learn • บันทึกทักษะส่วนตัวของ Agent แล้ว");
+      }
 
       if (!lastVerdict.passed) {
         core.setPhase("fix");
