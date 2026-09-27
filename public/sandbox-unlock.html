@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sandbox Unlock</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#17151c;color:#f7f4fb}*{box-sizing:border-box}body{margin:0;padding:24px;max-width:1200px;margin-inline:auto}h1{font-size:1.35rem;margin:0 0 6px}p{color:#b9b1c4;margin:0 0 18px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:800px){.grid{grid-template-columns:1fr}}section{border:1px solid #393241;border-radius:16px;background:#211d28;overflow:hidden}.bar{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #393241}.badge{font-size:.75rem;color:#bca8ff;background:#302649;padding:4px 8px;border-radius:99px}textarea{display:block;width:100%;min-height:480px;resize:vertical;border:0;outline:0;padding:16px;background:#141219;color:#e9ddff;font:13px/1.6 ui-monospace,SFMono-Regular,monospace}iframe{display:block;width:100%;height:480px;border:0;background:white}button{border:0;border-radius:9px;padding:8px 14px;background:#9d7cff;color:#120d1d;font-weight:700;cursor:pointer}button:hover{background:#b29aff}.note{font-size:.8rem;margin-top:14px;color:#8e849a}.note code{color:#d5c8ff}
+</style>
+</head>
+<body>
+<h1>🧪 Sandbox Unlock</h1>
+<p>ห้องทดลองสำหรับรัน HTML, CSS และ JavaScript — เปิดความสามารถที่จำเป็น แต่คงการแยก origin เพื่อปกป้องข้อมูลหลัก</p>
+<div class="grid"><section><div class="bar"><strong>โค้ด</strong><button id="run">▶ Run</button></div><textarea id="code" spellcheck="false"><!doctype html>
+<html><body>
+  <h2>Hello Sandbox 💜</h2>
+  <button onclick="document.querySelector('p').textContent='ทำงานแล้ว!'">ทดสอบ</button>
+  <p></p>
+  <script>console.log('sandbox ready');<\/script>
+</body></html></textarea></section><section><div class="bar"><strong>ผลลัพธ์</strong><span class="badge">isolated origin</span></div><iframe id="preview" sandbox="allow-scripts allow-forms allow-modals allow-popups"></iframe></section></div>
+<div class="note">ความปลอดภัย: iframe นี้ <code>ไม่มี allow-same-origin</code> และไม่มีสิทธิ์เข้าถึง cookies, localStorage, DOM ของหน้าหลัก หรือการนำทางหน้าหลักโดยตรง เปิดใช้เฉพาะความสามารถสำหรับการทดลองที่จำเป็น</div>
+<script>
+const code=document.getElementById('code'), preview=document.getElementById('preview');
+function run(){preview.srcdoc=code.value}
+document.getElementById('run').onclick=run; code.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();run()}}); run();
+</script>
+</body></html>
