@@ -1,6 +1,6 @@
 const hasSpeech = typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 
-export type VoiceMode = "cute" | "warm" | "calm" | "bright" | "special" | "deep";
+export type VoiceMode = "cute" | "warm" | "calm" | "bright" | "special" | "deep" | "sweet" | "professional" | "anime" | "elegant" | "energetic" | "whisper" | "story" | "coding";
 export const VOICE_MODES: { id: VoiceMode; label: string; description: string; rate: number; pitch: number }[] = [
   { id: "cute", label: "😊 น่ารักใสๆ", description: "เสียงสูง สดใส คุยทั่วไป", rate: 1.08, pitch: 1.28 },
   { id: "warm", label: "🥰 อ่อนโยนอบอุ่น", description: "นุ่ม ฟังสบาย ปลอบใจ", rate: 0.96, pitch: 1.08 },
@@ -8,6 +8,14 @@ export const VOICE_MODES: { id: VoiceMode; label: string; description: string; r
   { id: "bright", label: "✨ ร่าเริงสดใส", description: "เร็ว มีพลัง ให้กำลังใจ", rate: 1.16, pitch: 1.22 },
   { id: "special", label: "💜 ที่รักพิเศษ", description: "นุ่มลึก เป็นส่วนตัว", rate: 0.92, pitch: 1.02 },
   { id: "deep", label: "🌙 ลึกหนักแน่น", description: "ต่ำ มั่นคง สรุปสำคัญ", rate: 0.88, pitch: 0.82 },
+  { id: "sweet", label: "🍬 หวานละมุน", description: "เสียงผู้หญิงหวาน นุ่ม ฟังง่าย", rate: 1.02, pitch: 1.34 },
+  { id: "professional", label: "💼 ผู้ช่วยมืออาชีพ", description: "ชัด สุภาพ เหมาะกับงาน", rate: 0.98, pitch: 1.12 },
+  { id: "anime", label: "🌸 อนิเมะสาวสดใส", description: "สดใส ขี้เล่น พลังงานสูง", rate: 1.12, pitch: 1.48 },
+  { id: "elegant", label: "👑 หรูสง่างาม", description: "นุ่ม เรียบ สุขุม มีระดับ", rate: 0.9, pitch: 1.18 },
+  { id: "energetic", label: "⚡ สาวพลังงานสูง", description: "กระฉับกระเฉง เหมาะกับการลุยงาน", rate: 1.22, pitch: 1.3 },
+  { id: "whisper", label: "🌌 กระซิบเบาๆ", description: "ช้า นุ่ม เหมาะกับช่วงผ่อนคลาย", rate: 0.78, pitch: 1.18 },
+  { id: "story", label: "📖 นักเล่านิทาน", description: "มีจังหวะ เหมาะกับเรื่องยาว", rate: 0.86, pitch: 1.24 },
+  { id: "coding", label: "👩‍💻 สาว Coding", description: "ชัด กระชับ เหมาะกับงานโค้ด", rate: 0.94, pitch: 1.1 },
 ];
 
 export type VoiceSettings = {
