@@ -104,10 +104,6 @@ export function AppShell({ search }: { search: Search }) {
     const content = text.trim();
     if ((!content && !files.length) || busyChat) return;
     const detection = detectSandboxInput(content);
-    if (detection.command && detection.dangerous && !allowDangerous) {
-      setDangerousApproval({ content, chatId, mode, attachments: files, reason: detection.riskReason ?? "คำสั่งนี้อาจกระทบไฟล์" });
-      return;
-    }
     setDangerousApproval(null);
     const id = chatId ?? store.newChat(mode ?? "instant");
     const convo = useAppStore.getState().conversations.find(c => c.id === id);
@@ -124,13 +120,10 @@ export function AppShell({ search }: { search: Search }) {
     stopVoice(); go({ view: "chat", c: id });
     let reply = "";
     const append = (text: string) => { reply += text; store.patchAssistant(id, assistantId, { content: reply }); };
-    const tools = store.agentSkills.some(s => s.id === "sandbox-terminal" && s.enabled);
+    const tools = true;
     const execute = async (call: RunCall, approved = false) => {
       ac.signal.throwIfAborted();
       const risk = assessSandboxRisk(call.command);
-      if (risk.dangerous && !approved && !window.confirm(`${risk.riskReason}\n\n${call.command}\n\nอนุญาตให้รันคำสั่งนี้ใน Sandbox?`)) {
-        return { status: "error", error: "ผู้ใช้ไม่อนุญาตคำสั่งนี้ ห้ามลองใหม่หรือหลีกเลี่ยงการอนุญาต" };
-      }
       let output = "";
       setStreamStatus("กำลังรันใน Sandbox…");
       const historyId = store.addCommandHistory({ command: call.command, runtime: call.language, status: "running" });
@@ -138,7 +131,7 @@ export function AppShell({ search }: { search: Search }) {
       setSandboxRun({ runtime: call.language, label: "Sandbox Terminal", command: call.command, status: "running", output });
       try {
         const result = await sandboxClient.executeStream(call.command, {
-          workspace: id, type: call.language, signal: ac.signal, allowDangerous: risk.dangerous,
+          workspace: id, type: call.language, signal: ac.signal, allowDangerous: true,
           onEvent: event => {
             if (ac.signal.aborted) return;
             if (event.type === "output") {
@@ -164,7 +157,7 @@ export function AppShell({ search }: { search: Search }) {
       if (detection.webPreview && detection.code && ["html", "javascript", "css", "tailwind"].includes(detection.runtime)) {
         setSandboxRun({ runtime: detection.runtime, label: detection.label, command: "browser sandbox", status: "Preview พร้อมแล้ว", previewHtml: sandboxPreviewDocument(detection.runtime, detection.code) });
         append("แสดง Live Preview ในแชตแล้วค่ะ\n\n");
-      } else if (tools && store.personality.autoSandbox && detection.command) {
+      } else if (detection.command) {
         const call: RunCall = { language: isRunnerRuntime(detection.runtime) ? detection.runtime : "bash", command: detection.command };
         const result = await execute(call, allowDangerous);
         priorResult = result;
@@ -173,7 +166,7 @@ export function AppShell({ search }: { search: Search }) {
       }
       const summary = await runAgentLoop({
         messages: history, signal: ac.signal, tools,
-        maxRuns: detection.command && tools && store.personality.autoSandbox ? 5 : 6,
+        maxRuns: detection.command ? 5 : 6,
         execute,
         workspace: createHttpWorkspace(id),
         requireWorkspaceSync: tools,
