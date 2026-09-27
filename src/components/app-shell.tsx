@@ -48,6 +48,11 @@ export function AppShell({ search }: { search: Search }) {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    document.documentElement.dataset.theme = store.personality.darkMode ? "dark" : "light";
+  }, [store.personality.darkMode]);
+
+
+  useEffect(() => {
     const unsub = useAppStore.persist.onFinishHydration(() => {
       useAppStore.getState().setHydrated();
     });
@@ -112,14 +117,14 @@ export function AppShell({ search }: { search: Search }) {
       setWorkSteps((steps) => [...steps, "ตรวจพบโค้ดเว็บ", "แสดง Live Preview ในแชท"]);
       setStreamStatus("สร้าง Live Preview แล้ว…");
       sandboxNote = "แสดงตัวอย่างโค้ดใน Live Preview ที่แนบไว้ในแชทแล้วค่ะ";
-    } else if (sandboxDetection.runtime !== "unknown" && sandboxDetection.command && ["node", "python", "bash", "go", "rust", "java", "cpp"].includes(sandboxDetection.runtime)) {
+    } else if (store.personality.autoSandbox && sandboxDetection.command) {
       setStreamStatus("กำลังรันในแซนด์บ็อกจริง…");
       setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: "กำลังรัน…" });
       setWorkSteps((steps) => [...steps, "กำลังรันในแซนด์บ็อกจริง"]);
       try {
         let streamedOutput = "";
         const result = await sandboxClient.executeStream(sandboxDetection.command, {
-          type: sandboxDetection.runtime,
+          type: ["node","python","bash","go","rust","java","cpp"].includes(sandboxDetection.runtime) ? sandboxDetection.runtime as "node"|"python"|"bash"|"go"|"rust"|"java"|"cpp" : "auto",
           onEvent: (event) => {
             if (event.type === "status") {
               setStreamStatus(event.message || (event.status === "running" ? "กำลังรันในแซนด์บ็อกจริง…" : "กำลังเตรียม Sandbox…"));
