@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0c0c0d;
-  --color-surface: #161618;
-  --color-elevated: #1c1c1f;
-  --color-hover: #26262b;
-  --color-fg: #f4f4f5;
-  --color-muted: #a1a1aa;
-  --color-subtle: #71717a;
-  --color-primary: #c4a7ff;
-  --color-primary-fg: #2a174f;
-  --color-primary-hover: #d3bfff;
-  --color-border: #2a2a2e;
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-elevated: #f5f7fa;
+  --color-hover: #edf1f6;
+  --color-fg: #202124;
+  --color-muted: #6b7280;
+  --color-subtle: #9aa0a6;
+  --color-primary: #4d8bff;
+  --color-primary-fg: #ffffff;
+  --color-primary-hover: #3479f6;
+  --color-border: #e7e9ed;
   --color-danger: #ef4444;
   --color-success: #34d399;
-  --color-ring: #c4a7ff;
+  --color-ring: #4d8bff;
   --font-sans: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --radius-xs: 0.25rem;
@@ -23,8 +23,8 @@
   --radius-lg: 1rem;
   --radius-xl: 1.5rem;
   --radius-2xl: 1.75rem;
-  --shadow-border: 0 0 0 1px rgba(255, 255, 255, 0.08);
-  --shadow-prompt: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 50px rgba(0, 0, 0, 0.45);
+  --shadow-border: 0 0 0 1px rgba(31, 41, 55, 0.07);
+  --shadow-prompt: 0 2px 16px rgba(31, 41, 55, 0.08);
 }
 @layer base {
   html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
