@@ -3,7 +3,7 @@ export type CowMemory = { key: string; value: string; source: "conversation" | "
 export type CowTask = { id: string; goal: string; status: "active" | "done" | "failed"; attempts: number; createdAt: number; updatedAt: number };
 
 const MAX_MEMORY = 40;
-const memoryKey = (value: string) => value.trim().toLowerCase().replace(/\\s+/g, " ").slice(0, 180);
+const memoryKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 180);
 
 export class CowAgentCore {
   readonly task: CowTask;
