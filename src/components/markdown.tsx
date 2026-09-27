@@ -155,14 +155,14 @@ function CodeBlock({ code, lang, live }: { code: string; lang?: string; live?: b
     <div className={cn("overflow-hidden rounded-lg bg-ink-soft", isHtml && live ? "html-live" : "")}>
       <div className="flex h-7 items-center justify-between border-b border-white/8 px-2.5 text-[10px] font-medium uppercase tracking-wide text-white/45">
         <span>{lang || "code"}</span>
-        {isHtml ? <button type="button" onClick={() => setPreview(v => !v)} className="rounded px-1.5 py-0.5 text-[10px] text-white/60 hover:bg-white/8 hover:text-white">{preview ? "Code" : "Preview"}</button> : null}
+        {isHtml ? <button type="button" onClick={() => setPreview(v => !v)} className={cn("rounded px-2 py-1 text-[10px] font-semibold transition", preview ? "bg-primary/20 text-primary" : "bg-white/8 text-white/70 hover:bg-white/12 hover:text-white")}>{preview ? "‹ Code" : "▶ รันในแซนด์บ็อก"}</button> : null}
       </div>
       {preview && isHtml ? (
         <iframe title="HTML preview" sandbox="allow-scripts" srcDoc={code} className="h-[360px] w-full bg-white" />
       ) : (
         <pre className="overflow-x-auto px-3 py-2.5 font-mono text-[11px] leading-[1.45] text-primary-fg"><code>{code}</code></pre>
       )}
-      {isHtml ? <div className="border-t border-white/8 px-2.5 py-1 text-[10px] text-white/35">HTML • Live Preview</div> : null}
+      {isHtml ? <div className="flex items-center justify-between border-t border-white/8 px-2.5 py-1 text-[10px] text-white/35"><span>HTML • Sandboxed Live Preview</span><span>scripts จำกัดอยู่ใน iframe</span></div> : null}
     </div>
   );
 }
