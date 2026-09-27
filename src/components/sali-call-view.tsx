@@ -26,6 +26,7 @@ export function SaliCallView({
   const recognitionRef = useRef<any>(null);
   const activeRef = useRef(false);
   const processingRef = useRef(false);
+  const recognitionTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     activeRef.current = active;
@@ -71,15 +72,15 @@ export function SaliCallView({
         .map((result: any) => result[0]?.transcript ?? "")
         .join(" ")
         .trim();
-      if (finalText && !processingRef.current) void handleUserSpeech(finalText);
+      if (window.speechSynthesis?.speaking || processingRef.current) return;\n      if (finalText) void handleUserSpeech(finalText);
     };
     rec.onerror = () => {
       setListening(false);
-      if (activeRef.current && !muted) window.setTimeout(startRecognition, 500);
+      if (activeRef.current && !muted && !processingRef.current) recognitionTimerRef.current = window.setTimeout(startRecognition, 700);
     };
     rec.onend = () => {
       setListening(false);
-      if (activeRef.current && !muted) window.setTimeout(startRecognition, 250);
+      if (activeRef.current && !muted && !processingRef.current) recognitionTimerRef.current = window.setTimeout(startRecognition, 700);
     };
     recognitionRef.current = rec;
     try { rec.start(); } catch {}
@@ -141,7 +142,7 @@ export function SaliCallView({
     activeRef.current = true;
     setSeconds(0);
     setStatus("กำลังเชื่อมต่อ…");
-    const greeting = "สวัสดีค่ะ สลี่พร้อมคุยแล้วนะคะ พูดกับสลี่ได้เลย";
+    stopVoice();\n    try { recognitionRef.current?.stop(); } catch {}\n    const greeting = "สวัสดีค่ะ สลี่พร้อมคุยแล้วนะคะ พูดกับสลี่ได้เลย";
     addMessage("assistant", greeting);
     await new Promise((resolve) => setTimeout(resolve, 250));
     setSpeaking(true);
