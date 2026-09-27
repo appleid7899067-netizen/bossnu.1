@@ -308,10 +308,7 @@ test("emits og:image for a public host and prefers a custom card", () => {
     host: "wild-race.grok.me",
     site: { title: "Wild Race" },
   });
-  assert.match(
-    placeholder,
-    /property="og:image" content="https:\/\/og\.grok\.me\/v1\/card\.png\?host=wild-race\.grok\.me&amp;title=Wild%20Race"/,
-  );
+  assert.match(placeholder, /property="og:image" content="https:\/\/wild-race\.grok\.me\/og\.jpg"/);
   assert.match(placeholder, /property="og:image:width" content="1200"/);
 
   const custom = injectGrokPwaHead("<html><head></head></html>", {
@@ -328,10 +325,7 @@ test("placeholder og:image appends site.color when it is 6-digit hex", () => {
     host: "wild-race.grok.me",
     site: { title: "Wild Race", color: "#FF4D2E" },
   });
-  assert.match(
-    themed,
-    /property="og:image" content="https:\/\/og\.grok\.me\/v1\/card\.png\?host=wild-race\.grok\.me&amp;title=Wild%20Race&amp;color=FF4D2E"/,
-  );
+  assert.match(themed, /property="og:image" content="https:\/\/wild-race\.grok\.me\/og\.jpg"/);
 
   const invalid = injectGrokPwaHead("<html><head></head></html>", {
     host: "wild-race.grok.me",
