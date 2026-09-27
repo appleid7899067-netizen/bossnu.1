@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Menu, X } from "lucide-react";
+import { Menu, Phone, X } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { AppBuilderView } from "@/components/app-builder-view";
 import { ChatThread } from "@/components/chat-thread";
@@ -11,6 +11,7 @@ import { MindMapView } from "@/components/mind-map-view";
 import { Sidebar } from "@/components/sidebar";
 import { StudioView } from "@/components/studio-view";
 import { SettingsView } from "@/components/settings-view";
+import { SaliCallView } from "@/components/sali-call-view";
 import { Button } from "@/components/ui/button";
 import { generateMindMap, generateStudioImage } from "@/lib/ai/client";
 import { streamChat } from "@/lib/ai/stream";
@@ -38,6 +39,7 @@ export function AppShell({ search }: { search: Search }) {
   const [streamStatus, setStreamStatus] = useState<string>("");
   const [workSteps, setWorkSteps] = useState<string[]>([]);
   const [voiceEnabled, setVoiceEnabledState] = useState(true);
+  const [callOpen, setCallOpen] = useState(false);
   const [builderProject, setBuilderProject] = useState<BuilderProject | undefined>(undefined);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -301,7 +303,7 @@ export function AppShell({ search }: { search: Search }) {
             {drawer ? <X className="size-5" /> : <Menu className="size-5" />}
           </Button>
           <LuminaWordmark compact />
-          <span className="size-9" />
+          <Button variant="ghost" size="icon-sm" aria-label="โทรหาสลี่" onClick={() => setCallOpen(true)}><Phone className="size-5" /></Button>
         </header>
 
         {view === "maps" ? (
@@ -396,6 +398,20 @@ export function AppShell({ search }: { search: Search }) {
           </>
         )}
       </main>
+      {callOpen ? (
+        <SaliCallView
+          history={activeChat?.messages ?? []}
+          onClose={() => setCallOpen(false)}
+          onSaveMessage={(role, content) => {
+            if (!activeChat?.id) return;
+            if (role === "user") store.addUserMessage(activeChat.id, content);
+            else {
+              const id = store.startAssistant(activeChat.id);
+              store.patchAssistant(activeChat.id, id, { content });
+            }
+          }}
+        />
+      ) : null}
       {agentSettingsOpen ? (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-fg/25 p-0 backdrop-blur-[2px] sm:items-center sm:p-5" role="dialog" aria-modal="true" aria-label="ตั้งค่าตัวแทน AI">
           <button type="button" className="absolute inset-0 cursor-default" aria-label="ปิดหน้าต่างตั้งค่าตัวแทน" onClick={() => setAgentSettingsOpen(false)} />
