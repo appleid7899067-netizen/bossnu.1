@@ -193,8 +193,8 @@ export function Markdown({
       {parts.map((part, i) =>
         part.type === "code" ? (
           <CodeBlock key={i} code={part.value} lang={part.lang} live={live} />
-        ) : /^\\s*:::sandbox-preview\\s+https?:\\/\\/\\S+\\s*$/m.test(part.value.trim()) ? (
-          <SandboxPreview key={i} url={part.value.trim().match(/^:::sandbox-preview\\s+(https?:\\/\\/\\S+)\\s*$/)?.[1] || ""} />
+        ) : /^\s*:::sandbox-preview\s+https?:\/\/\S+\s*$/m.test(part.value.trim()) ? (
+          <SandboxPreview key={i} url={part.value.trim().match(/^:::sandbox-preview\s+(https?:\/\/\S+)\s*$/)?.[1] || ""} />
         ) : (
           <MdBlock key={i} text={part.value} />
         ),
