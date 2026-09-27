@@ -75,7 +75,7 @@ type ContentPart =
 function splitContent(src: string): ContentPart[] {
   const parts: ContentPart[] = [];
   const tokenRegex =
-    /```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```|<run(?:\s+lang=["']?([a-zA-Z0-9_-]+)["']?)?(?:\s+duration=["']?([^"'>]+)["']?)?(?:\s+status=["']?([^"'>]+)["']?)?(?:\s+output=["']?([^"'>]*)["']?)?>([\s\S]*?)<\/run>/gi;
+    /```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```|<run(?:\s+lang=["']?([a-zA-Z0-9_-]+)["']?)?(?:\s+duration=["']?([^"'>]+)["']?)?(?:\s+status=["']?([^"'>]+)["']?)?(?:\s+output=["']?([^"'>]*)["']?)?>([\s\S]*?)(?:<\/run>|$)/gi;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = tokenRegex.exec(src))) {
@@ -85,6 +85,7 @@ function splitContent(src: string): ContentPart[] {
     if (m[0].startsWith("```")) {
       parts.push({ type: "code", lang: m[1], value: m[2].replace(/\n$/, "") });
     } else {
+      const isClosed = m[0].endsWith("</run>");
       let cmd = (m[7] ?? "").trim();
       let output = m[6] || "";
       if (cmd.includes("<cmd>") && cmd.includes("</cmd>")) {
@@ -97,7 +98,7 @@ function splitContent(src: string): ContentPart[] {
         type: "run",
         lang: m[3] || "bash",
         duration: m[4],
-        status: m[5],
+        status: !isClosed ? "running" : m[5],
         output,
         value: cmd,
       });
@@ -542,10 +543,13 @@ export function Markdown({
 }) {
   const autoSandbox = useAppStore((s) => s.personality.autoSandbox);
   const cleanedText = text.replace(/\*{3,}/g, "").replace(/\/\/nn\//gi, "");
-  // Keep the DOM shape stable while tokens stream in. Promoting an unfinished
-  // table or code fence to a richer element mid-stream can confuse hydration
-  // and DOM reconciliation in mobile browsers.
-  if (live) {
+  // Keep the DOM shape stable while tokens stream in unless there is a run/agent block
+  if (
+    live &&
+    !cleanedText.includes("<run") &&
+    !cleanedText.includes("used Bash") &&
+    !cleanedText.includes("Ran commands")
+  ) {
     return <div className={cn("min-w-0 max-w-full whitespace-pre-wrap break-words text-[1rem] leading-[1.7] [overflow-wrap:anywhere]", className)}>{cleanedText}</div>;
   }
   const parts = splitContent(cleanedText);

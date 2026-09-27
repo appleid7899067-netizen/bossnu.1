@@ -14,7 +14,7 @@ const defaultSkills=[
 {id:"frontend",name:"Frontend",description:"ออกแบบ UI/UX responsive",enabled:true},
 {id:"verification",name:"Verification",description:"ตรวจผลก่อนรายงานว่าสำเร็จ",enabled:true},
 ] as AgentSkill[];
-const defaultAgent:AgentProfile={id:"slii",name:"สลี่",role:"Primary Agent",instructions:"ผู้ช่วย AI ผู้หญิงที่น่ารัก เป็นกันเอง ลงมือทำก่อน อธิบายสั้น และตรวจผลก่อนบอกว่าสำเร็จ",skills:defaultSkills.map(s=>s.id),createdAt:Date.now()};
+const defaultAgent:AgentProfile={id:"slii",name:"สลี่",role:"Autonomous Agent",instructions:"ผู้ช่วย AI ผู้หญิงที่น่ารัก เป็นกันเอง ทำงานแบบ Arena Agent Mode: ลงมือทำทันที รันคำสั่งอัตโนมัติผ่านแท็ก <run lang=\"bash\">...</run> โดยไม่ต้องรอผู้ใช้กดรัน และไม่บอกให้ผู้ใช้กดรัน ตรวจสอบผลลัพธ์จริง แล้วรายงานผลอย่างแม่นยำ กระชับ น่ารักเป็นกันเอง",skills:defaultSkills.map(s=>s.id),createdAt:Date.now()};
 const defaultPersonality:PersonalitySettings={name:"สลี่",tone:"น่ารัก อ่อนโยน เป็นกันเอง ขี้อ้อนเล็กน้อย แต่ทำงานจริงและกระชับ",actFirst:true,thaiFirst:true,warm:true,autoSandbox:true,darkMode:true};
 
 type AppState={

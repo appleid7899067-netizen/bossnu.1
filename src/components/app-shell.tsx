@@ -243,14 +243,19 @@ export function AppShell({ search }: { search: Search }) {
         },
       });
 
-      // If the reply contains a <run> tag and autoSandbox is enabled, execute it in the sandbox
-      const runMatch = reply.match(/<run(?:\s+lang=["']?([a-zA-Z0-9_-]+)["']?)?>([\s\S]*?)<\/run>/i);
-      if (runMatch && store.personality.autoSandbox && !ac.signal.aborted) {
-        const runLang = (runMatch[1] || "bash").toLowerCase();
-        const runCmd = runMatch[2].trim();
-        if (runCmd) {
-          setStreamStatus("กำลังรันใน Sandbox Terminal…");
-          setWorkSteps((steps) => [...steps, "รันคำสั่งจากสลี่ใน Sandbox Terminal"]);
+      // Execute all <run> blocks sequentially in the sandbox automatically
+      const runRegex = /<run(?:\s+lang=["']?([a-zA-Z0-9_-]+)["']?)?>([\s\S]*?)<\/run>/gi;
+      const allRuns = Array.from(reply.matchAll(runRegex));
+      if (allRuns.length > 0 && store.personality.autoSandbox && !ac.signal.aborted) {
+        let updatedReply = reply;
+        let lastOutput = "";
+        for (const runMatch of allRuns) {
+          const runLang = (runMatch[1] || "bash").toLowerCase();
+          const runCmd = runMatch[2].trim();
+          if (!runCmd) continue;
+
+          setStreamStatus(`กำลังรัน ${runLang} ใน Sandbox…`);
+          setWorkSteps((steps) => [...steps, `รัน ${runCmd.slice(0, 32)}…`]);
           try {
             const result = await sandboxClient.executeStream(runCmd, {
               type: ["node", "python", "bash", "go", "rust", "java", "cpp"].includes(runLang)
@@ -259,23 +264,16 @@ export function AppShell({ search }: { search: Search }) {
               allowDangerous: true,
             });
             const out = (result.stdout || result.stderr ? [result.stdout, result.stderr].filter(Boolean).join("\n") : result.output) || "";
+            lastOutput = out;
             const durationMs = result.durationMs || 160;
             const runStatus = result.status === "success" ? "success" : "error";
 
-            let updatedReply = reply.replace(
+            updatedReply = updatedReply.replace(
               runMatch[0],
               `<run lang="${runLang}" duration="${durationMs}ms" status="${runStatus}" output="${out.replace(/"/g, "&quot;")}">${runCmd}</run>`,
             );
 
-            if (/ขอรอผลการรันจาก\s*Sandbox\s*Terminal\s*ก่อนนะคะ/i.test(updatedReply)) {
-              updatedReply = updatedReply.replace(
-                /ขอรอผลการรันจาก\s*Sandbox\s*Terminal\s*ก่อนนะคะ/i,
-                out ? `\n\nผลการตรวจสอบจริงคือ: **${out}** ค่ะ ✓` : `\n\nรันคำสั่งเสร็จเรียบร้อยแล้วค่ะ ✓`,
-              );
-            }
-
-            reply = updatedReply;
-            store.patchAssistant(id, assistantId, { content: reply });
+            store.patchAssistant(id, assistantId, { content: updatedReply });
 
             setSandboxRun({
               runtime: runLang,
@@ -284,7 +282,6 @@ export function AppShell({ search }: { search: Search }) {
               status: result.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด",
               output: out,
             });
-            setStreamStatus(result.status === "success" ? "Sandbox รันเสร็จแล้ว ✓" : "Sandbox แจ้งข้อผิดพลาด");
             store.saveLearnedSkill({
               name: `Sandbox Terminal • ${result.status === "success" ? "ผ่าน" : "ล้มเหลว"}`,
               runtime: runLang,
@@ -297,6 +294,26 @@ export function AppShell({ search }: { search: Search }) {
             console.error("Auto sandbox execution failed:", e);
           }
         }
+
+        // Clean up any waiting phrasing if present
+        if (/ขอรอผลการรันจาก\s*Sandbox\s*Terminal\s*ก่อนนะคะ/i.test(updatedReply)) {
+          updatedReply = updatedReply.replace(
+            /ขอรอผลการรันจาก\s*Sandbox\s*Terminal\s*ก่อนนะคะ/i,
+            lastOutput ? `\n\nผลการตรวจสอบจริงคือ: **${lastOutput.trim()}** ค่ะ ✓` : `\n\nรันคำสั่งเสร็จเรียบร้อยแล้วค่ะ ✓`,
+          );
+        } else {
+          // If the AI message ended after the <run> tags without trailing commentary, append the result cleanly
+          const lastMatch = allRuns[allRuns.length - 1];
+          const afterRun = reply.slice(lastMatch.index! + lastMatch[0].length).trim();
+          if (!afterRun && lastOutput) {
+            updatedReply += `\n\nผลการตรวจสอบจริงคือ: **${lastOutput.trim()}** ค่ะ ✓`;
+          }
+        }
+
+        reply = updatedReply;
+        store.patchAssistant(id, assistantId, { content: reply });
+        setStreamStatus("Sandbox รันเสร็จแล้ว ✓");
+        window.setTimeout(() => setStreamStatus(""), 1200);
       }
 
       if (!reply && !ac.signal.aborted) {
