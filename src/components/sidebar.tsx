@@ -30,7 +30,13 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
       </Link>
       <NavItem active={view === "settings"} icon={Settings} label="Settings" onClick={() => onView("settings")} />
     </nav>
-    <div className="px-3 pt-3">
+    <div className="px-3 pt-3 space-y-1">
+      <button type="button" onClick={() => store.updatePersonality({ autoSandbox: !store.personality.autoSandbox })} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm text-muted transition-colors hover:bg-hover hover:text-fg" aria-label="สลับ Auto Terminal">
+        <span className="flex items-center gap-2"><SquareTerminal className="size-4" /> Auto Terminal</span>
+        <span className={cn("rounded-full px-2.5 py-1 text-[11px]", store.personality.autoSandbox ? "bg-fg text-bg" : "bg-elevated text-muted")}>
+          {store.personality.autoSandbox ? "เปิด" : "ปิด"}
+        </span>
+      </button>
       <button type="button" onClick={() => store.updatePersonality({ darkMode: !store.personality.darkMode })} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm text-muted transition-colors hover:bg-hover hover:text-fg" aria-label="สลับโหมดดาร์ก">
         <span className="flex items-center gap-2">🌙 โหมดดาร์ก</span>
         <span className={cn("rounded-full px-2.5 py-1 text-[11px]", store.personality.darkMode ? "bg-fg text-bg" : "bg-elevated text-muted")}>
