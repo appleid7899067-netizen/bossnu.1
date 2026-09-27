@@ -209,111 +209,145 @@ export function AppShell({ search }: { search: Search }) {
 
     let thinking = "";
     let reply = sandboxNote;
+    let iteration = 0;
+    const maxIterations = 5;
+    let currentHistory = [...history];
+
     try {
-      await streamChat({
-        messages: history,
-        mode: chatMode,
-        signal: ac.signal,
-        onEvent: (ev) => {
-          if (ev.type === "start") {
-            setStreamStatus("กำลังทำความเข้าใจคำขอ…");
-            setWorkSteps((steps) => steps.includes("ทำความเข้าใจคำขอ") ? steps : [...steps, "ทำความเข้าใจคำขอ"]);
-          } else if (ev.type === "block_start") {
-            const label = ev.blockType === "tool" ? "กำลังทำงานกับเครื่องมือ…" : ev.blockType === "thinking" ? "กำลังวางแผนคำตอบ…" : "กำลังสร้างคำตอบ…";
-            const step = ev.blockType === "tool" ? "เลือกและทำงานกับเครื่องมือ" : ev.blockType === "thinking" ? "วางแผนคำตอบ" : "สร้างคำตอบ";
-            setStreamStatus(label);
-            setWorkSteps((steps) => steps.includes(step) ? steps : [...steps, step]);
-          } else if (ev.type === "thinking") {
-            thinking += ev.text;
-            // เก็บ reasoning ไว้ในข้อความ แต่ UI แสดงเฉพาะสถานะงานแบบสรุป
-          } else if (ev.type === "text") {
-            setStreamStatus("กำลังตอบ…");
-            reply += ev.text;
-            speakRealtime(ev.text);
-            store.patchAssistant(id, assistantId, { content: reply });
-          } else if (ev.type === "done") {
-            finishVoice();
-            setWorkSteps((steps) => steps.includes("สร้างคำตอบ") ? steps : [...steps, "สร้างคำตอบ"]);
-            setStreamStatus("ตอบเสร็จแล้ว ✓");
-            window.setTimeout(() => setStreamStatus(""), 900);
-          } else if (ev.type === "error") {
-            setStreamStatus("เกิดข้อผิดพลาด");
-            toast.error(ev.error);
+      while (iteration < maxIterations && !ac.signal.aborted) {
+        iteration++;
+        let turnReply = "";
+
+        await streamChat({
+          messages: currentHistory,
+          mode: chatMode,
+          signal: ac.signal,
+          onEvent: (ev) => {
+            if (ev.type === "start") {
+              setStreamStatus(
+                iteration === 1
+                  ? "กำลังทำความเข้าใจคำขอ…"
+                  : `กำลังดำเนินการต่อเนื่องในรีโพ (รอบที่ ${iteration})…`,
+              );
+              setWorkSteps((steps) =>
+                steps.includes("ทำความเข้าใจคำขอ") ? steps : [...steps, "ทำความเข้าใจคำขอ"],
+              );
+            } else if (ev.type === "block_start") {
+              const label =
+                ev.blockType === "tool"
+                  ? "กำลังทำงานกับเครื่องมือ…"
+                  : ev.blockType === "thinking"
+                    ? "กำลังวางแผนคำตอบ…"
+                    : "กำลังสร้างคำตอบ…";
+              const step =
+                ev.blockType === "tool"
+                  ? "เลือกและทำงานกับเครื่องมือ"
+                  : ev.blockType === "thinking"
+                    ? "วางแผนคำตอบ"
+                    : "สร้างคำตอบ";
+              setStreamStatus(label);
+              setWorkSteps((steps) => (steps.includes(step) ? steps : [...steps, step]));
+            } else if (ev.type === "thinking") {
+              thinking += ev.text;
+            } else if (ev.type === "text") {
+              setStreamStatus("กำลังตอบ…");
+              turnReply += ev.text;
+              speakRealtime(ev.text);
+              const combinedReply = reply ? `${reply}\n\n${turnReply}` : turnReply;
+              store.patchAssistant(id, assistantId, { content: combinedReply });
+            } else if (ev.type === "done") {
+              finishVoice();
+              setWorkSteps((steps) =>
+                steps.includes("สร้างคำตอบ") ? steps : [...steps, "สร้างคำตอบ"],
+              );
+            } else if (ev.type === "error") {
+              setStreamStatus("เกิดข้อผิดพลาด");
+              toast.error(ev.error);
+            }
+          },
+        });
+
+        if (ac.signal.aborted) break;
+
+        // Execute all <run> blocks in this turn sequentially in the repository
+        const runRegex = /<run(?:\s+lang=["']?([a-zA-Z0-9_-]+)["']?)?>([\s\S]*?)<\/run>/gi;
+        const allRuns = Array.from(turnReply.matchAll(runRegex));
+
+        if (allRuns.length > 0 && store.personality.autoSandbox && !ac.signal.aborted) {
+          let updatedTurnReply = turnReply;
+          let lastOutput = "";
+          for (const runMatch of allRuns) {
+            const runLang = (runMatch[1] || "bash").toLowerCase();
+            const runCmd = runMatch[2].trim();
+            if (!runCmd) continue;
+
+            setStreamStatus(`กำลังรัน ${runLang} ในรีโพ…`);
+            setWorkSteps((steps) => [...steps, `รันในรีโพ: ${runCmd.slice(0, 32)}…`]);
+            try {
+              const result = await sandboxClient.executeStream(runCmd, {
+                type: ["node", "python", "bash", "go", "rust", "java", "cpp"].includes(runLang)
+                  ? (runLang as "node" | "python" | "bash" | "go" | "rust" | "java" | "cpp")
+                  : "auto",
+                allowDangerous: true,
+              });
+              const out =
+                (result.stdout || result.stderr
+                  ? [result.stdout, result.stderr].filter(Boolean).join("\n")
+                  : result.output) || "";
+              lastOutput = out;
+              const durationMs = result.durationMs || 160;
+              const runStatus = result.status === "success" ? "success" : "error";
+
+              updatedTurnReply = updatedTurnReply.replace(
+                runMatch[0],
+                `<run lang="${runLang}" duration="${durationMs}ms" status="${runStatus}" output="${out.replace(/"/g, "&quot;")}">${runCmd}</run>`,
+              );
+
+              const combined = reply ? `${reply}\n\n${updatedTurnReply}` : updatedTurnReply;
+              store.patchAssistant(id, assistantId, { content: combined });
+
+              setSandboxRun({
+                runtime: runLang,
+                label: "Repo Sandbox",
+                command: runCmd,
+                status: result.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด",
+                output: out,
+              });
+              store.saveLearnedSkill({
+                name: `Repo Sandbox • ${result.status === "success" ? "ผ่าน" : "ล้มเหลว"}`,
+                runtime: runLang,
+                pattern: runCmd,
+                testCommand: runCmd,
+                result: result.status === "success" ? "passed" : "failed",
+                evidence: out.slice(0, 2000),
+              });
+            } catch (e) {
+              console.error("Auto sandbox execution failed:", e);
+            }
           }
-        },
-      });
 
-      // Execute all <run> blocks sequentially in the sandbox automatically
-      const runRegex = /<run(?:\s+lang=["']?([a-zA-Z0-9_-]+)["']?)?>([\s\S]*?)<\/run>/gi;
-      const allRuns = Array.from(reply.matchAll(runRegex));
-      if (allRuns.length > 0 && store.personality.autoSandbox && !ac.signal.aborted) {
-        let updatedReply = reply;
-        let lastOutput = "";
-        for (const runMatch of allRuns) {
-          const runLang = (runMatch[1] || "bash").toLowerCase();
-          const runCmd = runMatch[2].trim();
-          if (!runCmd) continue;
+          reply = reply ? `${reply}\n\n${updatedTurnReply}` : updatedTurnReply;
+          store.patchAssistant(id, assistantId, { content: reply });
 
-          setStreamStatus(`กำลังรัน ${runLang} ใน Sandbox…`);
-          setWorkSteps((steps) => [...steps, `รัน ${runCmd.slice(0, 32)}…`]);
-          try {
-            const result = await sandboxClient.executeStream(runCmd, {
-              type: ["node", "python", "bash", "go", "rust", "java", "cpp"].includes(runLang)
-                ? (runLang as "node" | "python" | "bash" | "go" | "rust" | "java" | "cpp")
-                : "auto",
-              allowDangerous: true,
-            });
-            const out = (result.stdout || result.stderr ? [result.stdout, result.stderr].filter(Boolean).join("\n") : result.output) || "";
-            lastOutput = out;
-            const durationMs = result.durationMs || 160;
-            const runStatus = result.status === "success" ? "success" : "error";
+          // Provide execution output back to Sali so she can continue autonomously
+          currentHistory = [
+            ...currentHistory,
+            { role: "assistant", content: updatedTurnReply },
+            {
+              role: "user",
+              content: `[ผลการรันคำสั่งในรีโพ]:\n\`\`\`\n${lastOutput.slice(0, 3000) || "(คำสั่งสำเร็จ ไม่มี output)"}\n\`\`\`\nกรุณาดำเนินการขั้นตอนถัดไปในรีโพอย่างต่อเนื่องจนกระทั่งงานเสร็จสมบูรณ์ หากต้องการรันคำสั่งหรือแก้ไขไฟล์เพิ่มให้ใส่แท็ก <run> ได้ทันที หรือหากงานเสร็จสมบูรณ์แล้วให้สรุปผลการทำงานให้ชัดเจน`,
+            },
+          ];
 
-            updatedReply = updatedReply.replace(
-              runMatch[0],
-              `<run lang="${runLang}" duration="${durationMs}ms" status="${runStatus}" output="${out.replace(/"/g, "&quot;")}">${runCmd}</run>`,
-            );
-
-            store.patchAssistant(id, assistantId, { content: updatedReply });
-
-            setSandboxRun({
-              runtime: runLang,
-              label: "Sandbox Terminal",
-              command: runCmd,
-              status: result.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด",
-              output: out,
-            });
-            store.saveLearnedSkill({
-              name: `Sandbox Terminal • ${result.status === "success" ? "ผ่าน" : "ล้มเหลว"}`,
-              runtime: runLang,
-              pattern: runCmd,
-              testCommand: runCmd,
-              result: result.status === "success" ? "passed" : "failed",
-              evidence: out.slice(0, 2000),
-            });
-          } catch (e) {
-            console.error("Auto sandbox execution failed:", e);
-          }
-        }
-
-        // Clean up any waiting phrasing if present
-        if (/ขอรอผลการรันจาก\s*Sandbox\s*Terminal\s*ก่อนนะคะ/i.test(updatedReply)) {
-          updatedReply = updatedReply.replace(
-            /ขอรอผลการรันจาก\s*Sandbox\s*Terminal\s*ก่อนนะคะ/i,
-            lastOutput ? `\n\nผลการตรวจสอบจริงคือ: **${lastOutput.trim()}** ค่ะ ✓` : `\n\nรันคำสั่งเสร็จเรียบร้อยแล้วค่ะ ✓`,
-          );
+          setStreamStatus("สลี่กำลังดำเนินการขั้นต่อไปในรีโพ…");
         } else {
-          // If the AI message ended after the <run> tags without trailing commentary, append the result cleanly
-          const lastMatch = allRuns[allRuns.length - 1];
-          const afterRun = reply.slice(lastMatch.index! + lastMatch[0].length).trim();
-          if (!afterRun && lastOutput) {
-            updatedReply += `\n\nผลการตรวจสอบจริงคือ: **${lastOutput.trim()}** ค่ะ ✓`;
-          }
+          // No <run> blocks in this turn -> agent has finished all actions
+          reply = reply ? `${reply}\n\n${turnReply}` : turnReply;
+          store.patchAssistant(id, assistantId, { content: reply });
+          setStreamStatus("ตอบเสร็จแล้ว ✓");
+          window.setTimeout(() => setStreamStatus(""), 1200);
+          break;
         }
-
-        reply = updatedReply;
-        store.patchAssistant(id, assistantId, { content: reply });
-        setStreamStatus("Sandbox รันเสร็จแล้ว ✓");
-        window.setTimeout(() => setStreamStatus(""), 1200);
       }
 
       if (!reply && !ac.signal.aborted) {
