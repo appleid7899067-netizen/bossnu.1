@@ -96,9 +96,9 @@ export function SettingsView() {
 printf %s ${quote(sandboxInput)} > stdin.txt
 (${launch[sandboxLanguage]}) < stdin.txt`;
       const risk = assessSandboxRisk(sandboxCode);
-      if (risk.dangerous && !window.confirm(`${risk.riskReason}\n\nอนุญาตให้รันโค้ดนี้?`)) { setSandboxOutput("ยกเลิกแล้ว"); return; }
+      
       let output = "";
-      const data = await sandboxClient.executeStream(command, { type: "bash", workspace: sandboxWorkspace, allowDangerous: risk.dangerous,
+      const data = await sandboxClient.executeStream(command, { type: "bash", workspace: sandboxWorkspace, allowDangerous: true,
         onEvent: event => { if (event.type === "output") { output = (output + event.text).slice(-64000); setSandboxOutput(output); } },
       });
       if (data.error) throw new Error(data.error);
@@ -136,12 +136,12 @@ printf %s ${quote(sandboxInput)} > stdin.txt
 
       {tab==="personality" ? <div className="grid gap-4 md:grid-cols-2">
         <Panel title="บุคลิคหลัก" icon={Sparkles}><label className="block text-sm text-muted">ชื่อผู้ช่วย<input value={store.personality.name} onChange={e=>save({name:e.target.value})} className="mt-1 w-full rounded-xl bg-clay px-3 py-2.5 outline-none"/></label><label className="mt-3 block text-sm text-muted">โทนเสียง<textarea value={store.personality.tone} onChange={e=>save({tone:e.target.value})} rows={4} className="mt-1 w-full resize-none rounded-xl bg-clay px-3 py-2.5 outline-none"/></label></Panel>
-        <Panel title="พฤติกรรม" icon={UserRound}><Toggle label="ลงมือทำก่อนอธิบาย" value={store.personality.actFirst} onChange={v=>save({actFirst:v})}/><Toggle label="พูดภาษาไทยเป็นหลัก" value={store.personality.thaiFirst} onChange={v=>save({thaiFirst:v})}/><Toggle label="ตอบน่ารักแบบสลี่" value={store.personality.warm} onChange={v=>save({warm:v})}/><Toggle label="รันคำสั่งอัตโนมัติ" value={store.personality.autoSandbox} onChange={v=>save({autoSandbox:v})}/><Toggle label="โหมดดาร์ก" value={store.personality.darkMode} onChange={v=>save({darkMode:v})}/></Panel>
+        <Panel title="พฤติกรรม" icon={UserRound}><Toggle label="ลงมือทำก่อนอธิบาย" value={store.personality.actFirst} onChange={v=>save({actFirst:v})}/><Toggle label="พูดภาษาไทยเป็นหลัก" value={store.personality.thaiFirst} onChange={v=>save({thaiFirst:v})}/><Toggle label="ตอบน่ารักแบบสลี่" value={store.personality.warm} onChange={v=>save({warm:v})}/><Toggle label="โหมดดาร์ก" value={store.personality.darkMode} onChange={v=>save({darkMode:v})}/></Panel>
       </div> : null}
 
       {tab==="voice" ? <VoicePanel supported={isVoiceSupported()} settings={voiceSettings} voices={voiceList} onChange={changeVoice} /> : null}
 
-      {tab==="skills" ? <Panel title={`สกิลที่ใช้งาน • ${enabledCount}/${skills.length}`} icon={WandSparkles}><div className="grid gap-2 md:grid-cols-2">{skills.map(skill=><div key={skill.id} className="flex items-center justify-between rounded-xl bg-clay p-3"><div><p className="text-sm font-medium">{skill.name}</p><p className="text-xs text-muted">{skill.description}</p></div><button type="button" onClick={()=>store.toggleAgentSkill(skill.id)} className={cn("rounded-full px-3 py-1 text-xs",skill.enabled?"bg-fg text-bg":"bg-elevated text-muted")}>{skill.enabled?"เปิด":"ปิด"}</button></div>)}</div></Panel> : null}
+      {tab==="skills" ? <Panel title={`สกิลที่ใช้งาน • ${enabledCount}/${skills.length}`} icon={WandSparkles}><div className="grid gap-2 md:grid-cols-2">{skills.map(skill=><div key={skill.id} className="flex items-center justify-between rounded-xl bg-clay p-3"><div><p className="text-sm font-medium">{skill.name}</p><p className="text-xs text-muted">{skill.description}</p></div>{skill.id==="sandbox-terminal" ? <span className="rounded-full bg-fg px-3 py-1 text-xs text-bg">พร้อมใช้งาน</span> : <button type="button" onClick={()=>store.toggleAgentSkill(skill.id)} className={cn("rounded-full px-3 py-1 text-xs",skill.enabled?"bg-fg text-bg":"bg-elevated text-muted")}>{skill.enabled?"เปิด":"ปิด"}</button>}</div>)}</div></Panel> : null}
 
       {tab==="agents" ? <Panel title="ตัวแทน AI" icon={Bot}>
         <div className="mb-4 rounded-2xl border border-primary/20 bg-primary/5 p-4"><p className="text-sm font-semibold">ตัวแทนที่ดีควรมีอะไรบ้าง?</p><p className="mt-2 text-xs leading-relaxed text-muted">บทบาทที่ชัดเจน • คำสั่งการทำงาน • สกิลที่อนุญาต • การตรวจผลลัพธ์ • ขอบเขตความปลอดภัย และรูปแบบคำตอบ</p><div className="mt-3 grid gap-2 text-xs text-muted sm:grid-cols-2"><span>✓ รับเป้าหมายและวางแผน</span><span>✓ ลงมือทำตามสกิล</span><span>✓ ตรวจสอบก่อนรายงาน</span><span>✓ ขออนุญาตงานเสี่ยง</span></div></div>
