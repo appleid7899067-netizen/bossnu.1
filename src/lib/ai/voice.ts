@@ -150,7 +150,11 @@ export function speakRealtime(text: string) {
   speakNext();
 }
 
-export function isVoiceSpeaking() {\n  return speaking || (hasSpeech && window.speechSynthesis.speaking);\n}\n\nexport function finishVoice() {
+export function isVoiceSpeaking() {
+  return speaking || (hasSpeech && window.speechSynthesis.speaking);
+}
+
+export function finishVoice() {
   if (!hasSpeech || !settings.enabled) return;
 
   const tail = pending.trim();
