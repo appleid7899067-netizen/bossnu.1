@@ -131,11 +131,11 @@ export function SettingsView() {
         <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle">BOSS CONTROL</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">ตั้งค่าตัวแทนและสมอง</h1><p className="mt-1 text-sm text-muted">บุคลิก • สกิล • ตัวแทน • ความจำ • โปรไฟล์ • Sandbox</p></div>
         {saved ? <span className="text-xs text-muted">บันทึกแล้ว ✓</span> : null}
       </div>
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3">
-        {[
-          ["personality","บุคลิค",Sparkles],["skills","สกิล",WandSparkles],["learned",`ทักษะที่บันทึก (${store.learnedSkills.length})`,BookOpen],["history",`ประวัติคำสั่ง (${store.commandHistory.length})`,Terminal],["agents","ตัวแทน",Bot],["memory","ความจำ",Brain],["profiles","แฟ้มโปรไฟล์",FolderOpen],["voice","เสียง",Sparkles],["sandbox","Sandbox",Play],
-        ].map(([id,label,Icon]) => <button key={id as string} type="button" onClick={() => setTab(id as typeof tab)} className={cn("flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-sm",tab===id?"bg-elevated text-fg":"text-muted hover:bg-hover hover:text-fg")}><Icon className="size-4"/>{label as string}</button>)}
-      </div>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3">
+          {[
+            ["personality","บุคลิค",Sparkles],["skills","สกิล",WandSparkles],["learned",`ทักษะที่บันทึก (${store.learnedSkills.length})`,BookOpen],["history",`ประวัติคำสั่ง (${store.commandHistory.length})`,Terminal],["agents","ตัวแทน",Bot],["memory","ความจำ",Brain],["profiles","แฟ้มโปรไฟล์",FolderOpen],["voice","เสียง",Sparkles],["sandbox","Sandbox",Play],
+          ].map(([id,label,Icon]) => <button key={id as string} type="button" onClick={() => setTab(id as typeof tab)} className={cn("flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-sm",tab===id?"bg-elevated text-fg":"text-muted hover:bg-hover hover:text-fg")}><Icon className="size-4"/>{label as string}</button>)}
+        </div>
 
       {tab==="personality" ? <div className="grid gap-4 md:grid-cols-2">
         <Panel title="บุคลิคหลัก" icon={Sparkles}><label className="block text-sm text-muted">ชื่อผู้ช่วย<input value={store.personality.name} onChange={e=>save({name:e.target.value})} className="mt-1 w-full rounded-xl bg-clay px-3 py-2.5 outline-none"/></label><label className="mt-3 block text-sm text-muted">โทนเสียง<textarea value={store.personality.tone} onChange={e=>save({tone:e.target.value})} rows={4} className="mt-1 w-full resize-none rounded-xl bg-clay px-3 py-2.5 outline-none"/></label></Panel>
@@ -186,7 +186,7 @@ export function SettingsView() {
         )}
       </Panel> : null}
 
-      {tab==="history" ? <Panel title="ประวัติคำสั่ง (Command History)" icon={Terminal}>
+        {tab==="history" ? <Panel title="ประวัติคำสั่ง (Command History)" icon={Terminal}>
         <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-clay p-3.5 text-xs text-muted">
           <div>
             <p className="font-medium text-fg">บันทึกคำสั่งที่รันใน Repository ทั้งหมด</p>
@@ -241,7 +241,6 @@ export function SettingsView() {
           </div>
         )}
       </Panel> : null}
-
       {tab==="agents" ? <Panel title="ตัวแทน AI" icon={Bot}><div className="grid gap-3 md:grid-cols-2">{store.agentProfiles.map(agent=><div key={agent.id} className="rounded-2xl bg-clay p-4"><div className="flex items-start justify-between"><div><p className="font-semibold">{agent.name}</p><p className="text-xs text-muted">{agent.role}</p></div><button type="button" onClick={()=>store.deleteAgentProfile(agent.id)} className="text-subtle hover:text-fg"><Trash2 className="size-4"/></button></div><p className="mt-3 text-sm text-muted">{agent.instructions}</p></div>)}</div><div className="mt-4 flex gap-2"><input value={newAgent} onChange={e=>setNewAgent(e.target.value)} placeholder="ชื่อตัวแทนใหม่" className="min-w-0 flex-1 rounded-xl bg-clay px-3 py-2.5 outline-none"/><Button onClick={()=>{if(newAgent.trim()){store.addAgentProfile({id:crypto.randomUUID(),name:newAgent.trim(),role:"Custom Agent",instructions:"ทำงานตามเป้าหมายของผู้ใช้ ตรวจผลก่อนรายงาน",skills:[],createdAt:Date.now()});setNewAgent("")}}}><Plus className="size-4"/>เพิ่ม</Button></div></Panel> : null}
 
       {tab==="memory" ? <Panel title="สมองความจำ" icon={Brain}><div className="mb-4 rounded-xl bg-clay p-3 text-sm text-muted">ความจำชุดนี้เก็บในเครื่องและถูกใช้เป็นบริบทของสลี่ในการสนทนาครั้งต่อไป</div><div className="space-y-2">{store.memory.map(item=><div key={item.id} className="flex items-start gap-3 rounded-xl bg-clay p-3"><div className="min-w-0 flex-1"><p className="text-sm">{item.content}</p><p className="mt-1 text-[11px] text-subtle">{new Date(item.createdAt).toLocaleString("th-TH")}</p></div><button type="button" onClick={()=>store.deleteMemory(item.id)} className="text-subtle hover:text-fg"><Trash2 className="size-4"/></button></div>)}</div><div className="mt-4 flex gap-2"><input value={newMemory} onChange={e=>setNewMemory(e.target.value)} placeholder="เช่น ชอบ UI แบบกว้างและเรียบ" className="min-w-0 flex-1 rounded-xl bg-clay px-3 py-2.5 outline-none"/><Button onClick={()=>{if(newMemory.trim()){store.addMemory(newMemory.trim());setNewMemory("")}}}><Plus className="size-4"/>จำ</Button></div></Panel> : null}
