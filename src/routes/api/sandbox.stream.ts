@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { detectSandboxInput } from "@/lib/sandbox/detect";
+import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
 import {
   CommandRequestSchema,
   DEFAULT_SANDBOX_RUNNER_URL,
@@ -45,7 +45,14 @@ async function handle(request: Request): Promise<Response> {
   try { body = raw ? JSON.parse(raw) : {}; } catch { return Response.json({ error: "Body ต้องเป็น JSON" }, { status: 400, headers: corsHeaders() }); }
   const parsed = CommandRequestSchema.safeParse(body);
   if (!parsed.success || !parsed.data.cmd) return Response.json({ error: parsed.success ? "ต้องส่ง cmd" : parsed.error.issues[0]?.message }, { status: 400, headers: corsHeaders() });
-  const { cmd, type } = parsed.data;
+  const { cmd, type, allowDangerous } = parsed.data;
+  const risk = assessSandboxRisk(cmd);
+  if (risk.dangerous && !allowDangerous) {
+    return Response.json(
+      { error: "ต้องอนุญาตก่อนรันคำสั่งอันตราย", dangerous: true, riskReason: risk.riskReason },
+      { status: 409, headers: corsHeaders() },
+    );
+  }
   const runtime = resolveRuntime(cmd, type);
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
