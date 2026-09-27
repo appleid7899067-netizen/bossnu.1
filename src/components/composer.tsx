@@ -1,4 +1,4 @@
-import { useEffect, useRef, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowUp, Paperclip, Square, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,7 @@ export function Composer({
   voiceEnabled?: boolean;
   onToggleVoice?: () => void;
 }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const ref = useRef<HTMLTextAreaElement>(null);\n  const fileRef = useRef<HTMLInputElement>(null);\n  const [toolsOpen, setToolsOpen] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
