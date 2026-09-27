@@ -66,6 +66,16 @@ test("plan: skipped (binary/too-large) files are kept, not deleted", () => {
   assert.deepEqual(plan.unsyncable, ["project/huge.bin"]);
 });
 
+test("verified sync evidence lists exact added, modified, and deleted paths for the chat activity feed", () => {
+  const { snapshot } = normalizeSnapshot(v5({ "project/edit.ts": "new", "project/add.ts": "added" }), h);
+  const plan = planSync(stored({ "project/edit.ts": "old", "project/delete.ts": "gone" }), snapshot!);
+  const evidence = verifyReadBack(snapshot!, stored({ "project/edit.ts": "new", "project/add.ts": "added" }), plan, h);
+  assert.equal(evidence.verified, true);
+  assert.deepEqual(evidence.addedFiles, ["project/add.ts"]);
+  assert.deepEqual(evidence.modifiedFiles, ["project/edit.ts"]);
+  assert.deepEqual(evidence.deletedFiles, ["project/delete.ts"]);
+});
+
 test("verify: read-back equal → verified; stale/missing/extra rows → not verified", () => {
   const { snapshot } = normalizeSnapshot(v5({ "project/a": "A", "project/b": "B" }), h);
   const plan = planSync([], snapshot!);

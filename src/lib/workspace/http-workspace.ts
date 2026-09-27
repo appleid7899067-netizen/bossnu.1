@@ -1,5 +1,11 @@
 import type { AgentWorkspace } from "../ai/agent-loop.ts";
 
+/** Stable per-account workspace; fall back to the chat id until auth resolves. */
+export function agentWorkspaceIdFor(userId: string | null | undefined, fallbackChatId: string) {
+  if (!userId?.trim()) return fallbackChatId;
+  return `agent-${userId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80)}`;
+}
+
 /** Browser adapter: the agent loop talks to Neon only through /api/workspace. */
 export function createHttpWorkspace(workspaceId: string, fetcher: typeof fetch = fetch): AgentWorkspace {
   const call = async <T,>(body: Record<string, unknown>): Promise<T> => {
@@ -24,6 +30,9 @@ export function createHttpWorkspace(workspaceId: string, fetcher: typeof fetch =
     },
     async remember(key, value, kind) {
       await call({ action: "remember", key, value, source: kind });
+    },
+    async writeFile(path, content) {
+      await call({ action: "write", path, content });
     },
   };
 }

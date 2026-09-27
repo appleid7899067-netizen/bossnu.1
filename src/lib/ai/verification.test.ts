@@ -5,19 +5,21 @@ import { runAgentLoop, type AgentWorkspace } from "./agent-loop.ts";
 import type { ToolResult } from "./sandbox-tool.ts";
 
 const block = '<run lang="bash">\necho hi\n</run>\n';
-const synced = { verified: true, complete: true, added: 1, modified: 0, deleted: 0, missing: [], mismatched: [], unexpected: [], expectedCount: 1 };
-const ok: ToolResult = { status: "success", exitCode: 0, stdout: "ok", workspaceSync: synced };
+const synced = { verified: true, complete: true, added: 1, modified: 0, deleted: 0, missing: [], mismatched: [], unexpected: [], expectedCount: 1, manifestHash: "manifest-test" };
+const ok: ToolResult = { status: "success", exitCode: 0, stdout: "ok", workspaceSync: synced, workspaceFiles: [{ path: "project/index.html", size: 12, sha256: "file-hash" }] };
 const failing: ToolResult = { status: "error", exitCode: 1, stderr: "TypeError: boom", workspaceSync: synced };
 
 function memoryWorkspace() {
   const log: string[] = [];
+  const files = new Map<string, string>();
   const ws: AgentWorkspace = {
     context: async () => { log.push("context"); return "ctx"; },
     startTask: async () => { log.push("start"); },
     updateTask: async (_id, status) => { log.push(`task:${status}`); },
     remember: async (key) => { log.push(`remember:${key}`); },
+    writeFile: async (path, content) => { files.set(path, content); log.push(`write:${path}`); },
   };
-  return { ws, log };
+  return { ws, log, files };
 }
 
 test("evidence: success + verified complete sync passes", () => {
@@ -131,6 +133,7 @@ test("loop: conversation without runs is 'answered'; workspace adapter errors ne
   const broken: AgentWorkspace = {
     context: async () => { throw new Error("db down"); }, startTask: async () => { throw new Error("x"); },
     updateTask: async () => { throw new Error("x"); }, remember: async () => { throw new Error("x"); },
+    writeFile: async () => { throw new Error("x"); },
   };
   let output = "";
   const summary = await runAgentLoop({
@@ -141,8 +144,8 @@ test("loop: conversation without runs is 'answered'; workspace adapter errors ne
   assert.ok(output.endsWith("สวัสดีค่ะ"));
 });
 
-test("loop: workspace adapter receives context, task lifecycle and memory", async () => {
-  const { ws, log } = memoryWorkspace();
+test("loop: verified project runs persist a reusable skill in Agent Workspace", async () => {
+  const { ws, log, files } = memoryWorkspace();
   let context = "";
   await runAgentLoop({
     messages: [{ role: "user", content: "go" }], signal: new AbortController().signal, tools: true, workspace: ws, requireWorkspaceSync: true,
@@ -150,7 +153,43 @@ test("loop: workspace adapter receives context, task lifecycle and memory", asyn
     execute: async () => ok, onText: () => {},
   });
   assert.match(context, /ctx/);
-  assert.deepEqual(log.filter(l => !l.startsWith("remember:latest")), ["context", "start", "remember:run-1", "task:done"]);
+  const skillPath = [...files.keys()][0];
+  assert.ok(skillPath);
+  assert.match(skillPath, /^skills\/verified\/.*\/SKILL\.md$/);
+  const skill = files.get(skillPath)!;
+  assert.match(skill, /Previously verified command/);
+  assert.match(skill, /echo hi/);
+  assert.match(skill, /Neon sync: verified=true, complete=true/);
+  assert.match(skill, /Manifest: manifest-test/);
+  assert.match(skill, /project\/index\.html/);
+  assert.deepEqual(log.filter(l => !l.startsWith("remember:latest")), [
+    "context", "start", "remember:run-1", `write:${skillPath}`, `remember:verified skill ${skillPath}`, "task:done",
+  ]);
+});
+
+test("loop: unverified sync never becomes a reusable skill", async () => {
+  const { ws, files } = memoryWorkspace();
+  let turn = 0;
+  const summary = await runAgentLoop({
+    messages: [{ role: "user", content: "สร้างหน้าเว็บ" }],
+    signal: new AbortController().signal,
+    tools: true,
+    requireWorkspaceSync: true,
+    maxRuns: 1,
+    workspace: ws,
+    model: async (_messages, emit) => {
+      turn++;
+      emit(turn === 1 ? block : "ยังตรวจสอบไม่ผ่านค่ะ");
+    },
+    execute: async () => ({
+      status: "success",
+      exitCode: 0,
+      workspaceSync: { verified: false, complete: true, mismatched: ["project/index.html"] },
+    }),
+    onText: () => {},
+  });
+  assert.equal(summary.status, "unverified");
+  assert.equal(files.size, 0);
 });
 
 test("loop: maxRuns is clamped to 8", async () => {

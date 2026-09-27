@@ -262,6 +262,36 @@ export const CommandResultSchema = z.looseObject({
   stdout: z.string().optional(),
   stderr: z.string().optional(),
   exitCode: z.number().nullable().optional(),
+  /** Neon read-back proof for the Sandbox project snapshot. */
+  workspaceSync: z.looseObject({
+    verified: z.boolean(),
+    complete: z.boolean(),
+    added: z.number().optional(),
+    modified: z.number().optional(),
+    deleted: z.number().optional(),
+    addedFiles: z.array(z.string()).optional(),
+    modifiedFiles: z.array(z.string()).optional(),
+    deletedFiles: z.array(z.string()).optional(),
+    renamed: z.array(z.object({ from: z.string(), to: z.string() })).optional(),
+    missing: z.array(z.string()).optional(),
+    mismatched: z.array(z.string()).optional(),
+    unexpected: z.array(z.string()).optional(),
+    skipped: z.array(z.string()).optional(),
+    expectedCount: z.number().optional(),
+    manifestHash: z.string().optional(),
+    readBackHash: z.string().optional(),
+    error: z.string().optional(),
+    note: z.string().optional(),
+    saved: z.number().optional(),
+    total: z.number().optional(),
+  }).optional(),
+  /** Content-free metadata for files included in the project snapshot. */
+  workspaceFiles: z.array(z.looseObject({
+    path: z.string(),
+    content: z.string().optional(),
+    size: z.number().optional(),
+    sha256: z.string().optional(),
+  })).optional(),
   /** Full HTML document to show in a sandboxed iframe. */
   html: z.string().optional(),
   /** Public URL of a live dev-server preview proxied by the runner. */

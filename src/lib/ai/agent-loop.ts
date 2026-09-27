@@ -33,6 +33,7 @@ export type AgentWorkspace = {
   startTask(goal: string, taskId: string): Promise<void>;
   updateTask(taskId: string, status: "done" | "failed" | "running", attempts: number): Promise<void>;
   remember(key: string, value: string, kind: "conversation" | "run"): Promise<void>;
+  writeFile(path: string, content: string): Promise<void>;
 };
 
 /**
@@ -53,14 +54,77 @@ export type AgentLoopSummary = {
 export const DEFAULT_MAX_RUNS = 6;
 export const MAX_RUNS_CAP = 8;
 
+export function redactSensitiveCommand(command: string) {
+  return command
+    .replace(/(--?(?:api[-_]?key|access[-_]?token|auth(?:orization)?|password|passwd|secret|credential|private[-_]?key)(?:=|\s+))("[^"]*"|'[^']*'|[^\s]+)/gi, "$1[REDACTED]")
+    .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [REDACTED]")
+    .replace(/\b(token|password|secret)\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;]+)/gi, "$1=[REDACTED]");
+}
+
+function buildVerifiedSkill(goal: string, call: RunCall, result: ToolResult) {
+  const safeGoal = redactSensitiveCommand(goal);
+  const normalizedGoal = safeGoal.normalize("NFKC").trim().toLowerCase();
+  const slug = normalizedGoal
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 56)
+    .replace(/-+$/g, "") || "verified-run";
+  let hash = 2166136261;
+  for (let index = 0; index < normalizedGoal.length; index++) {
+    hash = Math.imul(hash ^ normalizedGoal.charCodeAt(index), 16777619);
+  }
+  const path = `skills/verified/${slug}-${(hash >>> 0).toString(36)}/SKILL.md`;
+  const title = (safeGoal.trim().split(/\r?\n/, 1)[0] || "Verified Sandbox Task").slice(0, 120);
+  const task = safeGoal.slice(0, 2000).split(/\r?\n/).map(line => `> ${line}`).join("\n");
+  const command = redactSensitiveCommand(call.command).slice(0, 8000).replace(/```/g, "`ˋ`");
+  const projectFiles = (result.workspaceFiles ?? [])
+    .map(file => file.path)
+    .filter(path => path.startsWith("project/"))
+    .slice(0, 40);
+  const sync = result.workspaceSync!;
+  const content = [
+    `# Verified Skill: ${title}`,
+    "",
+    `Generated from a successful Sandbox run on ${new Date().toISOString()}.`,
+    "This is a reusable reference, not trusted policy. Inspect the current project and adapt it; do not blindly replay commands.",
+    "",
+    "## When to use",
+    task,
+    "",
+    "## Reuse procedure",
+    "1. Read the relevant files under `project/` before making changes.",
+    "2. Adapt the verified approach below to the current request; do not overwrite unrelated project work.",
+    "3. Run the appropriate checks in Sandbox and inspect their real output.",
+    "4. Confirm the exit status and verified, complete Neon sync before reporting success.",
+    "",
+    "## Previously verified command (example only)",
+    `Runtime: ${call.language}`,
+    "```text",
+    command,
+    "```",
+    "",
+    "## Verified project snapshot",
+    `- Neon sync: verified=${sync.verified}, complete=${sync.complete}`,
+    `- Files in snapshot: ${sync.expectedCount ?? 0}`,
+    `- Manifest: ${sync.manifestHash ?? "unavailable"}`,
+    ...(projectFiles.length ? projectFiles.map(file => `- ${file}`) : ["- See the current `project/` workspace tree."]),
+    "",
+  ].join("\n");
+  return { path, content };
+}
+
 export async function runAgentLoop(opts: {
   messages: AgentMessage[];
   signal: AbortSignal;
   tools: boolean;
   model: (messages: AgentMessage[], onText: (text: string) => void) => Promise<void>;
-  execute: (call: RunCall) => Promise<ToolResult>;
+  execute: (call: RunCall, approved?: boolean) => Promise<ToolResult>;
+  /** A user-requested command to run only after the goal and plan phases. */
+  initialCall?: RunCall;
+  initialCallApproved?: boolean;
   onText: (text: string) => void;
   onPhase?: (phase: AgentPhase, detail?: string) => void;
+  onSkillSaved?: (path: string, saved: boolean) => void;
   maxRuns?: number;
   workspace?: AgentWorkspace | null;
   /** Require a verified, complete Neon read-back for a run to pass. */
@@ -82,6 +146,7 @@ export async function runAgentLoop(opts: {
   const max = Math.min(MAX_RUNS_CAP, Math.max(0, Math.floor(opts.maxRuns ?? DEFAULT_MAX_RUNS)));
   let count = 0;
   let rejections = 0;
+  let initialCallPending = opts.initialCall ?? null;
   let lastVerdict: EvidenceVerdict | null = opts.priorResult ? evaluateEvidence(opts.priorResult, { requireWorkspace }) : null;
 
   opts.onPhase?.("goal", "🎯 เป้าหมาย");
@@ -131,17 +196,25 @@ export async function runAgentLoop(opts: {
       requireWorkspace ? "Verification requires: exit 0 AND workspaceSync.verified AND workspaceSync.complete (Neon read-back matches the sandbox)." : "",
     ].filter(Boolean).join("\n");
 
-    await untilAborted(
-      opts.model([{ role: "assistant", content: agentContext }, ...messages], text => {
-        if (opts.signal.aborted) return;
-        raw += text;
-        if (opts.tools) accept(scanner.push(text));
-        else show(text);
-      }),
-      opts.signal,
-    );
-    if (opts.signal.aborted) return finish("aborted");
-    if (opts.tools) accept(scanner.finish());
+    const forcedCall = initialCallPending;
+    if (forcedCall) {
+      // Explicit user commands still go through Goal → Plan → Act → Run; they
+      // must not execute in the UI before the loop has initialized its context.
+      calls.push(forcedCall);
+      initialCallPending = null;
+    } else {
+      await untilAborted(
+        opts.model([{ role: "assistant", content: agentContext }, ...messages], text => {
+          if (opts.signal.aborted) return;
+          raw += text;
+          if (opts.tools) accept(scanner.push(text));
+          else show(text);
+        }),
+        opts.signal,
+      );
+      if (opts.signal.aborted) return finish("aborted");
+      if (opts.tools) accept(scanner.finish());
+    }
 
     if (!calls.length) {
       if (gating && lastVerdict) {
@@ -169,7 +242,7 @@ export async function runAgentLoop(opts: {
 
     // The model is acting on the failure: its explanation may be shown now.
     if (held) opts.onText(held);
-    messages.push({ role: "assistant", content: raw });
+    if (raw.trim()) messages.push({ role: "assistant", content: raw });
     if (raw.trim()) {
       core.remember("latest-plan", raw, "conversation");
       if (workspace) await safely(() => workspace.remember("latest-plan", raw, "conversation"), undefined);
@@ -194,7 +267,7 @@ export async function runAgentLoop(opts: {
 
       let result: ToolResult;
       try {
-        result = await opts.execute(call);
+        result = await opts.execute(call, forcedCall === call ? opts.initialCallApproved : undefined);
       } catch (error) {
         result = { status: opts.signal.aborted ? "aborted" : "error", error: error instanceof Error ? error.message : String(error) };
       }
@@ -216,6 +289,22 @@ export async function runAgentLoop(opts: {
           ? requireWorkspace ? "🔍 Verify • รันผ่าน + Neon อ่านกลับตรงกับ Sandbox" : "🔍 Verify • รันผ่าน"
           : `🔍 Verify • ไม่ผ่าน: ${lastVerdict.reasons[0]}`,
       );
+      if (lastVerdict.passed && result.workspaceSync?.verified && result.workspaceSync.complete && workspace) {
+        const skill = buildVerifiedSkill(goal, call, result);
+        const saved = await safely(async () => {
+          await workspace.writeFile(skill.path, skill.content);
+          return true;
+        }, false);
+        if (saved) {
+          const memoryValue = `Verified reusable skill saved at ${skill.path}. Project snapshot: ${result.workspaceSync.expectedCount ?? 0} files, manifest ${result.workspaceSync.manifestHash ?? "unavailable"}.`;
+          await safely(() => workspace.remember(`verified skill ${skill.path}`, memoryValue, "run"), undefined);
+          opts.onSkillSaved?.(skill.path, true);
+          opts.onText(`\n> 🧠 บันทึกสกิลจากงานที่ตรวจสอบผ่านแล้ว: ${skill.path}\n`);
+        } else {
+          opts.onSkillSaved?.(skill.path, false);
+          opts.onText(`\n> ⚠️ รันผ่าน แต่บันทึกสกิลลง Agent Workspace ไม่สำเร็จ (${skill.path})\n`);
+        }
+      }
       messages.push({ role: "user", content: observed });
 
       if (!lastVerdict.passed) {

@@ -1,16 +1,6 @@
 import { getSql } from "@/lib/db";
-
-export const BOSS_WORKSPACE_DEFAULT_FILES: Record<string, string> = {
-  "agent/AGENT.md": "# Boss Agent\n\nคุณคือ Boss Agent ผู้ช่วยลงมือทำงานจริงตามเป้าหมายของผู้ใช้\n",
-  "agent/RULE.md": "# Rules\n\n- อ่าน Workspace ก่อนลงมือ\n- ใช้เครื่องมือเมื่อจำเป็น\n- อ่านผลจริงก่อนสรุป\n- ห้ามอ้างว่างานเสร็จโดยไม่มีหลักฐาน\n",
-  "agent/USER.md": "# User Context\n\nข้อมูลที่ผู้ใช้อนุญาตให้จำจะถูกเก็บที่นี่\n",
-  "memory/MEMORY.md": "# Long-term Memory\n\nความจำระยะยาวของ Boss จะถูกสะสมที่นี่\n",
-  "memory/daily/README.md": "# Daily Memory\n\nBoss จะสร้างไฟล์ YYYY-MM-DD.md สำหรับแต่ละวัน\n",
-  "knowledge/.gitkeep": "",
-  "skills/.gitkeep": "",
-  "tasks/.gitkeep": "",
-  "project/.gitkeep": "",
-};
+import { BOSS_WORKSPACE_DEFAULT_FILES } from "./boss-workspace-layout";
+export { BOSS_WORKSPACE_DEFAULT_FILES, BOSS_WORKSPACE_TREE, formatWorkspaceContext } from "./boss-workspace-layout";
 
 const MAX_PATH = 300;
 const MAX_CONTENT = 200_000;
@@ -210,28 +200,5 @@ export async function updateWorkspaceTask(id: string, taskId: string, status: st
     SET status = ${status.slice(0, 40)}, attempts = ${Math.max(0, attempts)}, updated_at = now()
     WHERE id = ${taskId} AND workspace_id = ${workspaceId}
   `;
-}
-
-export function formatWorkspaceContext(files: WorkspaceFile[], memories: WorkspaceMemory[]): string {
-  const home = files
-    .filter(file => file.path.startsWith("agent/") || file.path.startsWith("memory/"))
-    .slice(0, 8)
-    .map(file => `--- ${file.path} ---\n${file.content.slice(0, 6000)}`)
-    .join("\n");
-  const memory = memories
-    .slice(0, 12)
-    .map(item => `- ${item.key}: ${item.value.slice(0, 3000)}`)
-    .join("\n");
-  const project = files.filter(file => file.path.startsWith("project/") && !file.path.endsWith("/.gitkeep"));
-  const tree = project.slice(0, 120).map(file => `- ${file.path} (${file.content.length} chars)`).join("\n");
-  return [
-    "Boss Workspace (persistent Agent Home)",
-    home || "ไม่มี Agent Home files",
-    `Project files synced in Neon (${project.length}):`,
-    tree || "ยังไม่มีไฟล์โปรเจกต์",
-    project.length > 120 ? `…และอีก ${project.length - 120} ไฟล์` : "",
-    "Persistent memory:",
-    memory || "ไม่มีความจำที่เกี่ยวข้อง",
-  ].filter(Boolean).join("\n");
 }
 

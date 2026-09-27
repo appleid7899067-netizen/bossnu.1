@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, Check, Copy, FileText, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowRightLeft, Check, CircleCheck, CircleX, Copy, FileDiff, FilePlus2, FileText, LoaderCircle, Pencil, RefreshCw, Sparkles, Terminal, Trash2 } from "lucide-react";
 import { formatBytes } from "@/lib/attachments";
 import { Markdown } from "@/components/markdown";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatActivity, ChatMessage } from "@/lib/types";
 import { LuminaMark } from "@/components/lumina-mark";
 
 export type SandboxRunView = {
@@ -22,8 +22,6 @@ export function ChatThread({
   onEditMessage,
   onRegenerate,
   busy = false,
-  workStatus,
-  workSteps = [],
   sandboxRun,
 }: {
   messages: ChatMessage[];
@@ -34,8 +32,6 @@ export function ChatThread({
   /** Re-ask the last user message. */
   onRegenerate?: () => void;
   busy?: boolean;
-  workStatus?: string;
-  workSteps?: string[];
   sandboxRun?: SandboxRunView | null;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -63,10 +59,6 @@ export function ChatThread({
           <div className="flex min-h-[45vh] items-center justify-center text-center">
             <p className="text-sm text-muted">เริ่มคุยกับสลี่ได้เลยค่ะ</p>
           </div>
-        ) : null}
-
-        {streamingId && workStatus ? (
-          <WorkStatus status={workStatus} steps={workSteps} sandboxRun={sandboxRun} />
         ) : null}
 
         {messages.map((m, index) => (
@@ -202,6 +194,7 @@ function MessageBubble({
     <div className="lumina-rise group flex gap-3 sm:gap-4">
       <LuminaMark className="mt-0.5 size-7 shrink-0 text-primary" />
       <div className="min-w-0 max-w-[1080px] flex-1 break-words text-[14px] leading-[1.65] [overflow-wrap:anywhere] sm:text-[13px] sm:leading-[1.55]">
+        {message.activities?.length ? <ActivityFeed activities={message.activities} live={live} /> : null}
         {message.thinking ? <ThinkingBlock text={message.thinking} live={live && !message.content} /> : null}
         {empty ? (
           <p className="lumina-shimmer text-sm font-medium">กำลังคิด…</p>
@@ -239,6 +232,85 @@ function MessageBubble({
         ) : null}
       </div>
     </div>
+  );
+}
+
+
+const PHASE_TITLES: Record<string, string> = {
+  goal: "Goal • เป้าหมาย",
+  plan: "Plan • วางแผน",
+  act: "Act • ลงมือทำ",
+  run: "Run • รัน Sandbox",
+  observe: "Observe • อ่านผล",
+  verify: "Verify • ตรวจสอบ",
+  fix: "Fix • แก้แล้วลองใหม่",
+  answer: "Answer • ตอบในแชต",
+};
+
+function ActivityFeed({ activities, live }: { activities: ChatActivity[]; live: boolean }) {
+  return (
+    <section aria-label="บันทึกกิจกรรมของ Agent" className="mb-3 overflow-hidden rounded-xl border border-border/70 bg-elevated/45 text-[11px]">
+      <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
+        <span className="flex items-center gap-2 font-semibold text-fg"><Sparkles className="size-3.5 text-primary" /> Agent activity</span>
+        <span className="text-[10px] text-subtle">{live ? "กำลังทำงาน · บันทึกในแชตนี้" : `${activities.length} events`}</span>
+      </div>
+      <ol className="divide-y divide-border/40">
+        {activities.map((activity) => (
+          <li key={activity.id} className="px-3 py-2.5">
+            {activity.kind === "phase" ? (
+              <div className="flex items-start gap-2.5">
+                <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+                  {activity.phase === "run" ? <Terminal className="size-3" /> : activity.phase === "verify" ? <CircleCheck className="size-3" /> : <Sparkles className="size-3" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-fg">{PHASE_TITLES[activity.phase] ?? activity.phase}</span>
+                  <span className="block break-words text-[10px] leading-relaxed text-muted">{activity.label.replace(/^[^•]+•\s*/, "")}</span>
+                </span>
+                <time className="shrink-0 text-[9px] text-subtle">{new Date(activity.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+              </div>
+            ) : activity.kind === "command" ? (
+              <div className="flex items-start gap-2.5">
+                <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-300">
+                  {activity.status === "running" ? <LoaderCircle className="size-3 animate-spin" /> : activity.status === "success" ? <CircleCheck className="size-3 text-success" /> : <CircleX className="size-3 text-danger" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className="font-semibold text-fg">Ran command</span>
+                    <span className="rounded bg-bg/70 px-1.5 py-0.5 font-mono text-[9px] text-primary">{activity.runtime}</span>
+                    <span className={activity.status === "success" ? "text-success" : activity.status === "running" ? "text-primary" : "text-danger"}>{activity.status === "success" ? "สำเร็จ" : activity.status === "running" ? "กำลังรัน" : activity.status === "blocked" ? "รออนุญาต" : activity.status}</span>
+                    {activity.durationMs !== undefined ? <span className="text-[9px] text-subtle">{(activity.durationMs / 1000).toFixed(1)}s</span> : null}
+                    {activity.exitCode !== undefined ? <span className="text-[9px] text-subtle">exit {activity.exitCode ?? "—"}</span> : null}
+                  </div>
+                  <pre className="mt-1.5 max-h-24 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-bg/80 px-2.5 py-2 font-mono text-[10px] leading-relaxed text-fg">$ {activity.command}</pre>
+                  {activity.output ? <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-bg/80 px-2.5 py-2 font-mono text-[10px] leading-relaxed text-muted">{activity.output}{activity.status === "running" ? <span className="animate-pulse"> ▌</span> : null}</pre> : null}
+                  {activity.sync ? <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[9px] text-muted"><span>Neon Sync {activity.sync.verified && activity.sync.complete ? "✓ verified" : "⚠ not verified"}</span><span>· {activity.sync.expectedCount ?? 0} files</span><span>· +{activity.sync.added ?? 0} ~{activity.sync.modified ?? 0} -{activity.sync.deleted ?? 0}</span>{activity.sync.error ? <span className="break-all text-danger">· {activity.sync.error}</span> : null}</div> : null}
+                  {activity.previewUrl ? <a href={activity.previewUrl} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex rounded-md bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary hover:bg-primary/15">เปิด Sandbox Preview ↗</a> : null}
+                </div>
+              </div>
+            ) : activity.kind === "files" ? (
+              <div className="flex items-start gap-2.5">
+                <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-300"><FileDiff className="size-3" /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-fg">Edited files <span className="font-normal text-muted">+{activity.files.filter(file => file.action === "added").length} ~{activity.files.filter(file => file.action === "modified").length} -{activity.files.filter(file => file.action === "deleted").length}</span></div>
+                  <ul className="mt-1 space-y-1">
+                    {activity.files.map((file, index) => <li key={`${file.path}-${index}`} className="flex min-w-0 items-center gap-1.5 font-mono text-[10px]">
+                      {file.action === "added" ? <FilePlus2 className="size-3 shrink-0 text-success" /> : file.action === "deleted" ? <Trash2 className="size-3 shrink-0 text-danger" /> : file.action === "renamed" ? <ArrowRightLeft className="size-3 shrink-0 text-primary" /> : <FileDiff className="size-3 shrink-0 text-amber-600 dark:text-amber-300" />}
+                      <span className="min-w-0 break-all text-fg">{file.action === "renamed" ? `${file.from} → ${file.path}` : file.path}</span>
+                      <span className="shrink-0 text-[9px] text-subtle">{file.action}</span>
+                    </li>)}
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2.5">
+                <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-md bg-success/10 text-success"><CircleCheck className="size-3" /></span>
+                <span className="min-w-0 flex-1"><span className="block font-semibold text-fg">Reusable skill {activity.status === "saved" ? "saved" : "not saved"}</span><code className="block break-all text-[10px] text-muted">{activity.path}</code></span>
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -281,82 +353,6 @@ function CopyLine({ text }: { text: string }) {
       {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
       {copied ? "คัดลอกแล้ว" : "คัดลอก"}
     </button>
-  );
-}
-
-function WorkStatus({
-  status,
-  steps,
-  sandboxRun,
-}: {
-  status: string;
-  steps: string[];
-  sandboxRun?: SandboxRunView | null;
-}) {
-  const [expanded, setExpanded] = useState(true);
-  return (
-    <div className="lumina-rise flex gap-3 sm:gap-4">
-      <div className="work-live mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs text-primary">✦</div>
-      <div className="min-w-0 w-full max-w-[1100px] rounded-2xl bg-clay/70 p-3">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="size-1.5 animate-pulse rounded-full bg-primary" />
-            <span className="truncate text-xs font-semibold text-fg">{status}<span className="work-dots" aria-hidden="true"><i /><i /><i /></span></span>
-          </div>
-          <button type="button" onClick={() => setExpanded((value) => !value)} className="shrink-0 rounded-lg px-2 py-1 text-[11px] text-muted transition hover:bg-hover hover:text-fg">{expanded ? "ซ่อนสรุป" : "Summary"}</button>
-        </div>
-        {expanded ? <div className="mb-3 rounded-xl border border-border/60 bg-bg/20 p-3"><p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted">สรุปการทำงาน</p><div className="relative flex flex-col gap-2 pl-5">{steps.map((step, index) => <div key={`${step}-${index}`} className="relative text-xs text-muted"><span className="absolute -left-5 top-1.5 size-2 rounded-full bg-primary shadow-[0_0_8px_var(--color-primary)]" />{index < steps.length - 1 ? <span className="absolute -left-[13px] top-3 h-[calc(100%+8px)] w-px bg-border" /> : null}<span className="font-mono">{step}</span></div>)}</div></div> : null}
-          {sandboxRun ? <span className="rounded-md bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">{sandboxRun.label}</span> : null}
-
-        {sandboxRun ? (
-          <div className="overflow-hidden rounded-xl border border-border/70 bg-elevated/60">
-            <div className="grid grid-cols-[92px_minmax(0,1fr)] text-[11px]">
-              <div className="border-b border-border/60 px-3 py-2 text-muted">หมวด</div>
-              <div className="border-b border-border/60 px-3 py-2 font-medium text-fg">Sandbox Runner</div>
-              <div className="border-b border-border/60 px-3 py-2 text-muted">Runtime</div>
-              <div className="border-b border-border/60 px-3 py-2 font-mono text-primary">{sandboxRun.runtime}</div>
-              <div className="border-b border-border/60 px-3 py-2 text-muted">คำสั่ง</div>
-              <div className="border-b border-border/60 break-all px-3 py-2 font-mono text-[10px] text-fg">
-                {sandboxRun.command || "auto"}
-              </div>
-              <div className="border-b border-border/60 px-3 py-2 text-muted">สถานะ</div>
-              <div className="border-b border-border/60 px-3 py-2 font-semibold text-fg">{sandboxRun.status}</div>
-              {sandboxRun.output ? (
-                <>
-                  <div className="px-3 py-2 text-muted">ผลลัพธ์</div>
-                  <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-[10px] leading-relaxed text-muted">
-                    {sandboxRun.output}{sandboxRun.status === "running" ? <span className="animate-pulse"> ▌</span> : null}
-                  </pre>
-                </>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-
-        {sandboxRun?.previewUrl ? (
-          <div className="mt-2 flex items-center justify-between rounded-lg bg-primary/8 px-3 py-2 text-[11px]">
-            <span>🌐 Live Preview พร้อมแล้ว</span>
-            <a
-              className="font-semibold text-primary hover:underline"
-              href={sandboxRun.previewUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              เปิด Preview ↗
-            </a>
-          </div>
-        ) : null}
-
-        <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
-          {steps.map((step, index) => (
-            <div key={step + index} className="flex items-center gap-2 text-[11px] text-muted">
-              <span className="grid size-4 place-items-center rounded-full bg-elevated text-[9px] text-primary">✓</span>
-              <span>{step}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }
 

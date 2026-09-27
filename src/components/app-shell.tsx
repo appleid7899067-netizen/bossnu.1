@@ -14,16 +14,17 @@ import { SettingsView } from "@/components/settings-view";
 import { SaliCallView } from "@/components/sali-call-view";
 import { Button } from "@/components/ui/button";
 import { generateMindMap, generateStudioImage } from "@/lib/ai/client";
-import { runAgentLoop, type AgentPhase } from "@/lib/ai/agent-loop";
-import { createHttpWorkspace } from "@/lib/workspace/http-workspace";
-import type { ToolResult } from "@/lib/ai/sandbox-tool";
-import { terminalTranscript, modelResult, type RunCall } from "@/lib/ai/sandbox-tool";
+import { redactSensitiveCommand, runAgentLoop, type AgentPhase } from "@/lib/ai/agent-loop";
+import { agentWorkspaceIdFor, createHttpWorkspace } from "@/lib/workspace/http-workspace";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
+import type { RunCall } from "@/lib/ai/sandbox-tool";
 import { isRunnerRuntime } from "@/types/sandbox";
 import { streamChat } from "@/lib/ai/stream";
 import { finishVoice, setVoiceEnabled, speakRealtime, stopVoice } from "@/lib/ai/voice";
 import type { Search } from "@/lib/search";
 import { useAppStore } from "@/lib/store";
-import type { ChatAttachment, ChatMode, MindMapData } from "@/lib/types";
+import type { ChatActivity, ChatAttachment, ChatMode, MindMapData } from "@/lib/types";
+type PendingActivity = ChatActivity extends infer Activity ? Activity extends ChatActivity ? Omit<Activity, "id" | "createdAt"> : never : never;
 import { messageForModel } from "@/lib/attachments";
 import { conversationToMarkdown } from "@/lib/store";
 import { cn, uid } from "@/lib/utils";
@@ -33,6 +34,7 @@ import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
 
 export function AppShell({ search }: { search: Search }) {
   const navigate = useNavigate();
+  const currentUser = useCurrentUser();
   const store = useAppStore();
   const [drawer, setDrawer] = useState(false);
   const [agentSettingsOpen, setAgentSettingsOpen] = useState(false);
@@ -49,8 +51,6 @@ export function AppShell({ search }: { search: Search }) {
   const [mapError, setMapError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [streamingId, setStreamingId] = useState<string | null>(null);
-  const [streamStatus, setStreamStatus] = useState<string>("");
-  const [workSteps, setWorkSteps] = useState<string[]>([]);
   const [sandboxRun, setSandboxRun] = useState<SandboxRunView | null>(null);
   const [dangerousApproval, setDangerousApproval] = useState<{
     content: string;
@@ -110,6 +110,7 @@ export function AppShell({ search }: { search: Search }) {
     }
     setDangerousApproval(null);
     const id = chatId ?? store.newChat(mode ?? "instant");
+    const workspaceId = agentWorkspaceIdFor(currentUser?.id, id);
     const convo = useAppStore.getState().conversations.find(c => c.id === id);
     const chatMode = mode ?? convo?.mode ?? "instant";
     store.addUserMessage(id, content, files);
@@ -120,108 +121,120 @@ export function AppShell({ search }: { search: Search }) {
     const ac = new AbortController();
     abortRef.current = ac;
     setDraft(""); setAttachments([]); setActiveTool(null); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
-    setStreamStatus("กำลังวางแผน…"); setWorkSteps(["🎯 เป้าหมาย"]);
     stopVoice(); go({ view: "chat", c: id });
     let reply = "";
     const append = (text: string) => { reply += text; store.patchAssistant(id, assistantId, { content: reply }); };
+    const pushActivity = (activity: PendingActivity) => {
+      const current = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
+      const next = [...current, { ...activity, id: uid("activity"), createdAt: Date.now() } as ChatActivity].slice(-120);
+      store.patchAssistant(id, assistantId, { activities: next });
+    };
+    const patchActivity = (activityId: string, patch: Partial<ChatActivity>) => {
+      const current = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
+      store.patchAssistant(id, assistantId, { activities: current.map(activity => activity.id === activityId ? { ...activity, ...patch } as ChatActivity : activity) });
+    };
     const tools = store.agentSkills.some(s => s.id === "sandbox-terminal" && s.enabled);
     const execute = async (call: RunCall, approved = false) => {
       ac.signal.throwIfAborted();
       const risk = assessSandboxRisk(call.command);
       if (risk.dangerous && !approved && !window.confirm(`${risk.riskReason}\n\n${call.command}\n\nอนุญาตให้รันคำสั่งนี้ใน Sandbox?`)) {
+        pushActivity({ kind: "command", runtime: call.language, command: call.command.slice(0, 5000), status: "blocked", output: "ผู้ใช้ไม่อนุญาตให้รันคำสั่งนี้" });
         return { status: "error", error: "ผู้ใช้ไม่อนุญาตคำสั่งนี้ ห้ามลองใหม่หรือหลีกเลี่ยงการอนุญาต" };
       }
       let output = "";
-      setStreamStatus("กำลังรันใน Sandbox…");
+      const startedAt = Date.now();
+      const activityId = uid("activity");
+      const currentActivities = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
+      store.patchAssistant(id, assistantId, { activities: [...currentActivities, { id: activityId, kind: "command" as const, runtime: call.language, command: call.command.slice(0, 5000), status: "running", output: "", createdAt: startedAt }].slice(-120) });
       const historyId = store.addCommandHistory({ command: call.command, runtime: call.language, status: "running" });
-      setWorkSteps(steps => [...steps, `▶ ${call.command.slice(0, 80)}`]);
       setSandboxRun({ runtime: call.language, label: "Sandbox Terminal", command: call.command, status: "running", output });
       try {
         const result = await sandboxClient.executeStream(call.command, {
-          workspace: id, type: call.language, signal: ac.signal, allowDangerous: risk.dangerous,
+          workspace: workspaceId, type: call.language, signal: ac.signal, allowDangerous: risk.dangerous,
           onEvent: event => {
             if (ac.signal.aborted) return;
             if (event.type === "output") {
               output = (output + event.text).slice(-64000);
               setSandboxRun(current => current ? { ...current, output } : current);
+              patchActivity(activityId, { output: output.slice(-6000) });
             }
           },
         });
         ac.signal.throwIfAborted();
         store.updateCommandHistory(historyId, result.status === "success" ? "success" : "error");
-        setSandboxRun(current => current ? { ...current, status: result.status, output: result.output || output || result.error, previewUrl: result.previewUrl } : current);
-        setWorkSteps(steps => [...steps.slice(0, -1), `${result.status === "success" ? "✅" : "❌"} ${call.command.slice(0, 80)}`]);
-        store.saveLearnedSkill({ name: `Sandbox ${call.language}`, runtime: call.language, pattern: call.command, testCommand: call.command, result: result.status === "success" ? "passed" : "failed", evidence: (result.output || output || result.error || result.status).slice(0, 2000) });
+        const resultOutput = result.output || output || result.error || "";
+        setSandboxRun(current => current ? { ...current, status: result.status, output: resultOutput, previewUrl: result.previewUrl } : current);
+        patchActivity(activityId, { status: result.status, output: resultOutput.slice(-6000), previewUrl: result.previewUrl, exitCode: result.exitCode, durationMs: result.durationMs ?? Date.now() - startedAt, sync: result.workspaceSync ? { verified: result.workspaceSync.verified, complete: result.workspaceSync.complete, added: result.workspaceSync.added, modified: result.workspaceSync.modified, deleted: result.workspaceSync.deleted, expectedCount: result.workspaceSync.expectedCount, error: result.workspaceSync.error } : undefined });
+        const sync = result.workspaceSync;
+        if (sync) {
+          const files: Extract<ChatActivity, { kind: "files" }>["files"] = [
+            ...(sync.addedFiles ?? []).map(path => ({ path, action: "added" as const })),
+            ...(sync.modifiedFiles ?? []).map(path => ({ path, action: "modified" as const })),
+            ...(sync.deletedFiles ?? []).map(path => ({ path, action: "deleted" as const })),
+            ...(sync.renamed ?? []).map(item => ({ path: item.to, from: item.from, action: "renamed" as const })),
+          ];
+          if (files.length) pushActivity({ kind: "files", files: files.slice(0, 80) });
+        }
+        if (result.status === "success" && result.exitCode === 0 && result.workspaceSync?.verified && result.workspaceSync.complete) {
+          const safeCommand = redactSensitiveCommand(call.command);
+          store.saveLearnedSkill({ name: `Sandbox ${call.language}`, runtime: call.language, pattern: safeCommand, testCommand: safeCommand, result: "passed", evidence: `exit 0 • Neon Sync verified • ${result.workspaceSync.expectedCount ?? 0} project files` });
+        }
         return result;
       } catch (error) {
         store.updateCommandHistory(historyId, ac.signal.aborted ? "aborted" : "error");
-        setSandboxRun(current => current ? { ...current, status: ac.signal.aborted ? "aborted" : "error" } : current);
+        const message = error instanceof Error ? error.message : String(error);
+        setSandboxRun(current => current ? { ...current, status: ac.signal.aborted ? "aborted" : "error", output: message } : current);
+        patchActivity(activityId, { status: ac.signal.aborted ? "aborted" : "error", output: message.slice(-6000), durationMs: Date.now() - startedAt });
         throw error;
       }
     };
-    let priorResult: ToolResult | undefined;
+    const initialCall = tools && store.personality.autoSandbox && detection.command
+      ? { language: isRunnerRuntime(detection.runtime) ? detection.runtime : "bash", command: detection.command } as RunCall
+      : undefined;
     try {
       if (detection.webPreview && detection.code && ["html", "javascript", "css", "tailwind"].includes(detection.runtime)) {
         setSandboxRun({ runtime: detection.runtime, label: detection.label, command: "browser sandbox", status: "Preview พร้อมแล้ว", previewHtml: sandboxPreviewDocument(detection.runtime, detection.code) });
         append("แสดง Live Preview ในแชตแล้วค่ะ\n\n");
-      } else if (tools && store.personality.autoSandbox && detection.command) {
-        const call: RunCall = { language: isRunnerRuntime(detection.runtime) ? detection.runtime : "bash", command: detection.command };
-        const result = await execute(call, allowDangerous);
-        priorResult = result;
-        append(terminalTranscript(call, result));
-        history.push({ role: "user", content: modelResult(call, result) });
       }
-      const summary = await runAgentLoop({
+      await runAgentLoop({
         messages: history, signal: ac.signal, tools,
-        maxRuns: detection.command && tools && store.personality.autoSandbox ? 5 : 6,
+        maxRuns: 6,
         execute,
-        workspace: createHttpWorkspace(id),
+        initialCall,
+        initialCallApproved: allowDangerous,
+        workspace: createHttpWorkspace(workspaceId),
         requireWorkspaceSync: tools,
-        priorResult,
         onPhase: (phase: AgentPhase, detail?: string) => {
           const labels: Record<AgentPhase, string> = {
-            goal: "🎯 เป้าหมาย",
-            plan: "🧠 Plan • กำลังวางแผน",
-            act: "🛠️ Act • กำลังลงมือ",
-            run: "💻 Run • กำลังรัน",
-            observe: "👀 Observe • กำลังอ่านผล",
-            verify: "🔍 Verify • กำลังตรวจสอบ",
-            fix: "🐛 Fix • พบปัญหา กำลังแก้",
-            answer: "💬 Answer • กำลังตอบในแชท",
+            goal: "🎯 Goal • เป้าหมาย",
+            plan: "🧠 Plan • วางแผน",
+            act: "🛠️ Act • ลงมือทำ",
+            run: "💻 Run • รัน Sandbox",
+            observe: "👀 Observe • อ่านผลจริง",
+            verify: "🔍 Verify • ตรวจหลักฐาน",
+            fix: "🐛 Fix • แก้และรันใหม่",
+            answer: "💬 Answer • ตอบในแชต",
           };
-          setStreamStatus(detail || labels[phase]);
-          setWorkSteps(steps => {
-            const next = [...steps];
-            const label = labels[phase];
-            if (next[next.length - 1] !== label) next.push(label);
-            return next.slice(-10);
-          });
+          pushActivity({ kind: "phase", phase, label: detail || labels[phase] });
         },
-        onText: text => { append(text); if (!text.startsWith("\n\n```sandbox")) speakRealtime(text); },
+        onText: text => { if (text.startsWith("\n\n```sandbox")) return; append(text); speakRealtime(text); },
+        onSkillSaved: (path, saved) => pushActivity({ kind: "skill", path, status: saved ? "saved" : "failed" }),
         model: async (messages, onText) => {
           let failure = "";
-          setStreamStatus("🧠 Plan • กำลังวางแผน…");
           await streamChat({ messages, mode: chatMode, signal: ac.signal, tools, latestUser: content,
             onEvent: event => {
               if (ac.signal.aborted) return;
               if (event.type === "text") onText(event.text);
               else if (event.type === "error") failure = event.error;
-              else if (event.type === "thinking") setStreamStatus("กำลังวางแผน…");
             },
           });
           if (failure) throw new Error(failure);
         },
       });
       if (!reply && !ac.signal.aborted) append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
-      setStreamStatus(
-        ac.signal.aborted || summary.status === "aborted" ? "หยุดแล้ว ⛔"
-          : summary.status === "unverified" ? "ยังตรวจสอบไม่ผ่าน ❌"
-            : summary.status === "limit" ? "ถึงขีดจำกัดการรัน ⚠️"
-              : summary.status === "verified" ? "ตรวจสอบผ่าน ✓" : "ตอบเสร็จแล้ว ✓",
-      );
     } catch (error) {
-      if (ac.signal.aborted) { append("\n\n⛔ หยุดการทำงานแล้ว"); setStreamStatus("หยุดแล้ว ⛔"); }
-      else { const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด"; append(`\n\n${message}`); toast.error(message); setStreamStatus("เกิดข้อผิดพลาด"); }
+      if (ac.signal.aborted) { append("\n\n⛔ หยุดการทำงานแล้ว"); }
+      else { const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด"; append(`\n\n${message}`); toast.error(message); }
     } finally {
       finishVoice(); setBusyChat(false); setStreamingId(null);
     }
@@ -510,8 +523,6 @@ export function AppShell({ search }: { search: Search }) {
               <ChatThread
                 messages={activeChat?.messages ?? []}
                 streamingId={streamingId}
-                workStatus={streamStatus}
-                workSteps={workSteps}
                 sandboxRun={sandboxRun}
                 busy={busyChat}
                 onDeleteMessage={(messageId) => { if (activeChat) store.deleteMessage(activeChat.id, messageId); }}
@@ -598,7 +609,7 @@ export function AppShell({ search }: { search: Search }) {
               <div><p className="text-sm font-semibold">🤖 ตัวแทน AI</p><p className="text-[11px] text-muted">ตั้งค่าบุคลิก • สกิล • ตัวแทน • ความจำ • Sandbox</p></div>
               <button type="button" onClick={() => setAgentSettingsOpen(false)} className="grid size-9 place-items-center rounded-xl bg-clay text-muted hover:text-fg" aria-label="ปิด"><X className="size-4" /></button>
             </div>
-            <div className="min-h-0 flex-1 overflow-hidden"><SettingsView /></div>
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden"><SettingsView /></div>
           </div>
         </div>
       ) : null}

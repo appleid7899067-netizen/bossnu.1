@@ -1,7 +1,12 @@
 export type ChatMode = "instant" | "think";
 export type AppView = "chat" | "maps" | "studio" | "builder" | "settings";
 export type ChatAttachment = { name: string; size: number; content: string; };
-export type ChatMessage = { id: string; role: "user" | "assistant"; content: string; thinking?: string; attachments?: ChatAttachment[]; createdAt: number; };
+export type ChatActivity =
+  | { id: string; kind: "phase"; phase: string; label: string; createdAt: number }
+  | { id: string; kind: "command"; runtime: string; command: string; status: string; output?: string; previewUrl?: string | null; exitCode?: number | null; durationMs?: number; sync?: { verified: boolean; complete: boolean; added?: number; modified?: number; deleted?: number; expectedCount?: number; error?: string }; createdAt: number }
+  | { id: string; kind: "files"; files: { path: string; action: "added" | "modified" | "deleted" | "renamed"; from?: string }[]; createdAt: number }
+  | { id: string; kind: "skill"; path: string; status: "saved" | "failed"; createdAt: number };
+export type ChatMessage = { id: string; role: "user" | "assistant"; content: string; thinking?: string; attachments?: ChatAttachment[]; activities?: ChatActivity[]; createdAt: number; };
 export type Conversation = { id: string; title: string; mode: ChatMode; messages: ChatMessage[]; updatedAt: number; pinned?: boolean; };
 export type MapChild = { id: string; label: string; note: string; };
 export type MapBranch = { id: string; label: string; tone: "sage" | "ink" | "clay" | "sky" | "sand"; children: MapChild[]; };
