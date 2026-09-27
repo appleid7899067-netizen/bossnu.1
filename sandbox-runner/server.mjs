@@ -285,6 +285,7 @@ async function execute(body, signal) {
   if (command.length > 32000) throw new Error("command_too_large");
 
   const dir = await acquireWorkspace(body.workspace);
+  await seedWorkspace(dir, body.workspaceFiles);
   let keep = false;
   try {
     if ((language === "node" || language === "javascript") && /^npm\s+run\s+dev\b/i.test(command)) {
@@ -294,16 +295,22 @@ async function execute(body, signal) {
       keep = true;
       await new Promise(r => setTimeout(r, 2200));
       const port = detectPort(session);
+      const snapshot = await collectWorkspaceSnapshot(dir);
       return {
         status: session.exited ? "error" : "running",
         stdout: session.stdout(), stderr: session.stderr(),
         sessionId: session.id, port, previewPath: "/preview/" + session.id + "/",
+        workspaceFiles: snapshot.files,
+        workspaceSyncComplete: snapshot.complete,
       };
     }
     const r = await spawnProcess("bash", ["-c", command], dir, TIMEOUT_MS, signal);
+    const snapshot = await collectWorkspaceSnapshot(dir);
     return {
       status: r.timedOut ? "timeout" : r.exitCode === 0 ? "success" : "error",
       stdout: r.stdout, stderr: r.stderr, exitCode: r.exitCode, signal: r.signal,
+      workspaceFiles: snapshot.files,
+      workspaceSyncComplete: snapshot.complete,
     };
   } finally {
     await releaseWorkspace(dir, body.workspace, keep);
