@@ -238,6 +238,7 @@ export const CommandRequestSchema = z
     /** Runtime hint; `auto` detects from the command text. */
     type: z.enum(COMMAND_TYPES).optional(),
     /** Explicit user approval required for commands classified as dangerous. */
+    workspace: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/).optional(),
     allowDangerous: z.boolean().optional(),
   })
   .refine((value) => Boolean(value.cmd || value.skill), {

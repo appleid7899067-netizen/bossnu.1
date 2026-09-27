@@ -63,6 +63,7 @@ async function consumeSandboxStream(body: ReadableStream<Uint8Array>, onEvent?: 
 
 export type ExecuteOptions = {
   /** Attach a Grok skill to the run (its content is returned with the result). */
+  workspace?: string;
   skill?: string;
   /** Runtime hint; omit for auto-detection. */
   type?: CommandType;
@@ -78,7 +79,7 @@ export class SandboxClient {
 
   constructor(options: SandboxClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? SANDBOX_API_PATH).replace(/\/+$/, "");
-    this.timeoutMs = options.timeoutMs ?? 90_000;
+    this.timeoutMs = options.timeoutMs ?? 150_000;
     this.fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));
   }
 
@@ -112,13 +113,14 @@ export class SandboxClient {
     const combined = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
     let response: Response;
     try {
-      response = await this.fetchImpl("/api/sandbox.stream", {
+      response = await this.fetchImpl(`${this.baseUrl}.stream`, {
         method: "POST",
         headers: { "content-type": "application/json", accept: "text/event-stream" },
-        body: JSON.stringify(stripUndefined({ cmd: command, skill: options.skill, type: options.type, allowDangerous: options.allowDangerous })),
+        body: JSON.stringify(stripUndefined({ cmd: command, workspace: options.workspace, skill: options.skill, type: options.type, allowDangerous: options.allowDangerous })),
         signal: combined,
       });
     } catch (error) {
+      if (options.signal?.aborted) throw error;
       const message = error instanceof Error ? error.message : String(error);
       return errorResult(/timeout|abort/i.test(message) ? "Sandbox ไม่ตอบกลับภายในเวลาที่กำหนด" : "เชื่อมต่อ Sandbox Streaming API ไม่ได้");
     }
@@ -136,7 +138,7 @@ export class SandboxClient {
     if (command.length > SANDBOX_LIMITS.commandChars) {
       return errorResult(`คำสั่งยาวเกิน ${SANDBOX_LIMITS.commandChars.toLocaleString()} ตัวอักษร`);
     }
-    return this.post({ cmd: command, skill: options.skill, type: options.type, allowDangerous: options.allowDangerous }, options.signal);
+    return this.post({ cmd: command, workspace: options.workspace, skill: options.skill, type: options.type, allowDangerous: options.allowDangerous }, options.signal);
   }
 
   executeNode(cmd: string, options: Omit<ExecuteOptions, "type"> = {}) {
@@ -213,6 +215,7 @@ export const sandboxClient = new SandboxClient();
 export type SandboxHistoryEntry = {
   id: string;
   cmd?: string;
+  workspace?: string;
   skill?: string;
   type?: CommandType;
   result: CommandResult;

@@ -21,7 +21,7 @@ function runnerUrl() {
 function corsHeaders(): Record<string,string> {
   return {
     "access-control-allow-origin": process.env.SANDBOX_ALLOW_ORIGIN?.trim() || "*",
-    "access-control-allow-methods": "POST,OPTIONS",
+    "access-control-allow-methods": "GET,POST,OPTIONS",
     "access-control-allow-headers": "content-type",
     "cache-control": "no-cache, no-transform",
   };
@@ -39,13 +39,14 @@ function resolveRuntime(cmd: string, type?: CommandType) {
 }
 
 async function handle(request: Request): Promise<Response> {
-  const raw = await request.text();
+  const query = new URL(request.url).searchParams;
+  const raw = request.method === "GET" ? JSON.stringify({ cmd: query.get("cmd") || undefined, type: query.get("type") || undefined, workspace: query.get("workspace") || undefined }) : await request.text();
   if (raw.length > MAX_BODY_BYTES) return Response.json({ error: "คำขอใหญ่เกินไป" }, { status: 413, headers: corsHeaders() });
   let body: unknown;
   try { body = raw ? JSON.parse(raw) : {}; } catch { return Response.json({ error: "Body ต้องเป็น JSON" }, { status: 400, headers: corsHeaders() }); }
   const parsed = CommandRequestSchema.safeParse(body);
   if (!parsed.success || !parsed.data.cmd) return Response.json({ error: parsed.success ? "ต้องส่ง cmd" : parsed.error.issues[0]?.message }, { status: 400, headers: corsHeaders() });
-  const { cmd, type, allowDangerous } = parsed.data;
+  const { cmd, type, allowDangerous, workspace } = parsed.data;
   const risk = assessSandboxRisk(cmd);
   if (risk.dangerous && !allowDangerous) {
     return Response.json(
@@ -55,23 +56,44 @@ async function handle(request: Request): Promise<Response> {
   }
   const runtime = resolveRuntime(cmd, type);
   const encoder = new TextEncoder();
+  const abort = new AbortController();
+  let closed = false;
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (v: unknown) => event(controller, encoder, v);
+      const send = (v: unknown) => { if (!closed) event(controller, encoder, v); };
+      const close = () => { if (!closed) { closed = true; controller.close(); } };
       const started = Date.now();
       try {
         send({ type: "status", status: "queued", message: "รับคำสั่ง Sandbox" });
         const response = await fetch(runnerUrl() + "/execute/stream", {
           method: "POST",
           headers: { "content-type": "application/json", accept: "text/event-stream" },
-          body: JSON.stringify({ language: runtime, command: cmd }),
-          signal: AbortSignal.timeout(Number(process.env.SANDBOX_RUNNER_TIMEOUT_MS) || 120000),
+          body: JSON.stringify({ language: runtime, command: cmd, workspace }),
+          signal: AbortSignal.any([request.signal, abort.signal, AbortSignal.timeout(Number(process.env.SANDBOX_RUNNER_TIMEOUT_MS) || 140000)]),
         });
+        // Only retry when the streaming endpoint is absent: never rerun a command
+        // after a transient 5xx or a partially consumed stream.
+        if (response.status === 404 || response.status === 405) {
+          const legacy = await fetch(runnerUrl() + "/execute", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ language: runtime, command: cmd, workspace }),
+            signal: AbortSignal.any([request.signal, abort.signal, AbortSignal.timeout(140000)]),
+          });
+          const result = await legacy.json();
+          if (!legacy.ok) throw new Error(result.error || `Runner HTTP ${legacy.status}`);
+          const warning = "Legacy runner: live output and persistent workspace may be unavailable. Redeploy runner v4.";
+          send({ type: "status", status: "running", message: warning });
+          if (result.stdout) send({ type: "output", stream: "stdout", text: result.stdout });
+          if (result.stderr) send({ type: "output", stream: "stderr", text: result.stderr });
+          send({ type: "complete", result: { ...result, success: result.status === "success", type: runtime, runtime, command: cmd,
+            output: [result.stdout, result.stderr, warning].filter(Boolean).join("\n"), durationMs: Date.now() - started } });
+          close(); return;
+        }
         if (!response.ok || !response.body) {
           const data = await response.json().catch(() => null);
           send({ type: "error", error: data?.error || `Sandbox Runner HTTP ${response.status}` });
           send({ type: "complete", result: { success:false, status:"error", type:runtime, runtime, command:cmd, error:data?.error || `Runner HTTP ${response.status}`, durationMs:Date.now()-started } });
-          controller.close(); return;
+          close(); return;
         }
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -94,14 +116,15 @@ async function handle(request: Request): Promise<Response> {
           if (done) break;
         }
         if (!completed) send({ type:"complete", result:{ success:false,status:"error",type:runtime,runtime,command:cmd,error:"Runner stream ended without a complete event",durationMs:Date.now()-started } });
-        controller.close();
+        close();
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         send({ type:"error", error:message });
         send({ type:"complete", result:{ success:false,status:/timeout|abort/i.test(message)?"timeout":"error",type:runtime,runtime,command:cmd,error:message,durationMs:Date.now()-started } });
-        controller.close();
+        close();
       }
     },
+    cancel() { closed = true; abort.abort(); },
   });
   return sseResponse(stream);
 }
@@ -110,6 +133,7 @@ export const Route = createFileRoute("/api/sandbox.stream")({
   server: {
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: corsHeaders() }),
+      GET: async ({ request }) => handle(request),
       POST: async ({ request }) => {
         try { return await handle(request); }
         catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Sandbox stream failed" }, { status: 500, headers: corsHeaders() }); }

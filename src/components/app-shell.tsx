@@ -14,13 +14,16 @@ import { SettingsView } from "@/components/settings-view";
 import { SaliCallView } from "@/components/sali-call-view";
 import { Button } from "@/components/ui/button";
 import { generateMindMap, generateStudioImage } from "@/lib/ai/client";
+import { runAgentLoop } from "@/lib/ai/agent-loop";
+import { terminalTranscript, modelResult, type RunCall } from "@/lib/ai/sandbox-tool";
+import { isRunnerRuntime } from "@/types/sandbox";
 import { streamChat } from "@/lib/ai/stream";
 import { finishVoice, setVoiceEnabled, speakRealtime, stopVoice } from "@/lib/ai/voice";
 import type { Search } from "@/lib/search";
 import { useAppStore } from "@/lib/store";
 import type { BuilderProject, ChatMode, MindMapData } from "@/lib/types";
 import { cn, uid } from "@/lib/utils";
-import { detectSandboxInput } from "@/lib/sandbox/detect";
+import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
 import { sandboxClient } from "@/lib/sandbox-client";
 import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
 
@@ -92,171 +95,101 @@ export function AppShell({ search }: { search: Search }) {
   async function send(text: string, chatId?: string, mode?: ChatMode, allowDangerous = false) {
     const content = text.trim();
     if (!content || busyChat) return;
-    const sandboxDetection = detectSandboxInput(content);
-    if (sandboxDetection.command && sandboxDetection.dangerous && !allowDangerous) {
-      setDangerousApproval({
-        content,
-        chatId,
-        mode,
-        reason: sandboxDetection.riskReason ?? "คำสั่งนี้อาจกระทบไฟล์ ระบบ หรือ process",
-      });
+    const detection = detectSandboxInput(content);
+    if (detection.command && detection.dangerous && !allowDangerous) {
+      setDangerousApproval({ content, chatId, mode, reason: detection.riskReason ?? "คำสั่งนี้อาจกระทบไฟล์" });
       return;
     }
     setDangerousApproval(null);
     const id = chatId ?? store.newChat(mode ?? "instant");
-    const convo = useAppStore.getState().conversations.find((c) => c.id === id);
+    const convo = useAppStore.getState().conversations.find(c => c.id === id);
     const chatMode = mode ?? convo?.mode ?? "instant";
     store.addUserMessage(id, content);
     const assistantId = store.startAssistant(id);
-    setDraft("");
-    setBusyChat(true);
-    setStreamingId(assistantId);
-    setSandboxRun(null);
-    setStreamStatus("กำลังวิเคราะห์คำขอ…");
-    setWorkSteps([
-      "วิเคราะห์คำขอ",
-      sandboxDetection.runtime !== "unknown" ? "ตรวจพบ " + sandboxDetection.label : "ตรวจสอบวิธีทำงาน",
-      sandboxDetection.webPreview ? "เตรียม Live Preview อัตโนมัติ" : "เตรียมขั้นตอนทำงาน",
-    ]);
-    stopVoice();
-    go({ view: "chat", c: id });
-
-    let sandboxNote = "";
-    if (sandboxDetection.webPreview && sandboxDetection.code && ["html", "javascript", "css", "tailwind"].includes(sandboxDetection.runtime)) {
-      setSandboxRun({
-        runtime: sandboxDetection.runtime,
-        label: sandboxDetection.label,
-        command: "browser sandbox",
-        status: "Preview พร้อมแล้ว",
-        previewHtml: sandboxPreviewDocument(sandboxDetection.runtime, sandboxDetection.code),
-      });
-      setWorkSteps((steps) => [...steps, "ตรวจพบโค้ดเว็บ", "แสดง Live Preview ในแชท"]);
-      setStreamStatus("สร้าง Live Preview แล้ว…");
-      sandboxNote = "แสดงตัวอย่างโค้ดใน Live Preview ที่แนบไว้ในแชทแล้วค่ะ";
-    } else if (store.personality.autoSandbox && sandboxDetection.command) {
-      setStreamStatus("กำลังรันในแซนด์บ็อกจริง…");
-      setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: "กำลังรัน…" });
-      setWorkSteps((steps) => [...steps, "กำลังรันในแซนด์บ็อกจริง"]);
-      try {
-        let streamedOutput = "";
-        const result = await sandboxClient.executeStream(sandboxDetection.command, {
-          type: ["node","python","bash","go","rust","java","cpp"].includes(sandboxDetection.runtime) ? sandboxDetection.runtime as "node"|"python"|"bash"|"go"|"rust"|"java"|"cpp" : "auto",
-          allowDangerous,
-          onEvent: (event) => {
-            if (event.type === "status") {
-              setStreamStatus(event.message || (event.status === "running" ? "กำลังรันในแซนด์บ็อกจริง…" : "กำลังเตรียม Sandbox…"));
-              setWorkSteps((steps) => event.message && !steps.includes(event.message) ? [...steps, event.message] : steps);
-            } else if (event.type === "output") {
-              streamedOutput += event.text;
-              setSandboxRun((current) => current ? { ...current, status: "กำลังทำงาน", output: streamedOutput } : current);
-            } else if (event.type === "error") {
-              setStreamStatus("Sandbox พบข้อผิดพลาด");
-            }
-          },
-        });
-        const output = [result?.stdout, result?.stderr].filter(Boolean).join("\\n").trim() || streamedOutput.trim();
-        setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: result?.status === "running" ? "กำลังทำงาน" : result?.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด", output, previewUrl: result?.previewUrl ?? null });
-        if (result) {
-          const passed = result.status === "success";
-          store.saveLearnedSkill({
-            name: `Sandbox ${sandboxDetection.label} • ${passed ? "ผ่าน" : "ล้มเหลว"}`,
-            runtime: sandboxDetection.runtime,
-            pattern: sandboxDetection.command,
-            testCommand: sandboxDetection.command,
-            result: passed ? "passed" : "failed",
-            evidence: output.slice(0, 2000) || result.error || `status=${result.status}`,
-          });
-          setWorkSteps((steps) => steps.includes(passed ? "บันทึกทักษะที่ทดสอบผ่าน" : "บันทึกบทเรียนจากการทดสอบ") ? steps : [...steps, passed ? "บันทึกทักษะที่ทดสอบผ่าน" : "บันทึกบทเรียนจากการทดสอบ"]);
-        }
-        sandboxNote = output ? "\\n\\n**ผลการรัน Sandbox**\\n\\n\`\`\`text\\n" + output + "\\n\`\`\`" : "";
-        const preview = result?.previewUrl ?? null;
-        if (preview) sandboxNote += "\\n\\n:::sandbox-preview " + preview + "\\n";
-        setWorkSteps((steps) => [...steps, ...(result?.steps ?? []), result?.status === "running" ? "เว็บกำลังทำงานและเปิด Preview" : result?.status === "success" ? "Sandbox รันสำเร็จ" : "Sandbox แจ้งข้อผิดพลาด"]);
-        setStreamStatus(result?.status === "running" ? "เปิด Live Preview แล้ว…" : "ตรวจผล Sandbox แล้ว…");
-      } catch (error) {
-        const errorText = error instanceof Error ? error.message : "รัน Sandbox ไม่สำเร็จ";
-        store.saveLearnedSkill({
-          name: `Sandbox ${sandboxDetection.label} • ล้มเหลว`,
-          runtime: sandboxDetection.runtime,
-          pattern: sandboxDetection.command,
-          testCommand: sandboxDetection.command,
-          result: "failed",
-          evidence: errorText.slice(0, 2000),
-        });
-        setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: "ผิดพลาด", output: errorText });
-        sandboxNote = "\\n\\n**Sandbox:** " + errorText;
-        setWorkSteps((steps) => [...steps, "Sandbox พบข้อผิดพลาด", "บันทึกบทเรียนจากการทดสอบ"]);
-      }
-    }
-
-    const history = (
-      useAppStore.getState().conversations.find((c) => c.id === id)?.messages ?? []
-    )
-      .filter((m) => m.id !== assistantId && m.content)
-      .map((m) => ({ role: m.role, content: m.content }));
-
+    const history = (useAppStore.getState().conversations.find(c => c.id === id)?.messages ?? [])
+      .filter(m => m.id !== assistantId && m.content).map(m => ({ role: m.role, content: m.content }));
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-
-    let thinking = "";
-    let reply = sandboxNote;
+    setDraft(""); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
+    setStreamStatus("กำลังวิเคราะห์คำขอ…"); setWorkSteps(["วิเคราะห์คำขอ"]);
+    stopVoice(); go({ view: "chat", c: id });
+    let reply = "";
+    const append = (text: string) => { reply += text; store.patchAssistant(id, assistantId, { content: reply }); };
+    const tools = store.agentSkills.some(s => s.id === "sandbox-terminal" && s.enabled);
+    const execute = async (call: RunCall, approved = false) => {
+      ac.signal.throwIfAborted();
+      const risk = assessSandboxRisk(call.command);
+      if (risk.dangerous && !approved && !window.confirm(`${risk.riskReason}\n\n${call.command}\n\nอนุญาตให้รันคำสั่งนี้ใน Sandbox?`)) {
+        return { status: "error", error: "ผู้ใช้ไม่อนุญาตคำสั่งนี้ ห้ามลองใหม่หรือหลีกเลี่ยงการอนุญาต" };
+      }
+      let output = "";
+      setStreamStatus("กำลังรันใน Sandbox…");
+      setWorkSteps(steps => [...steps, `▶ ${call.command.slice(0, 80)}`]);
+      setSandboxRun({ runtime: call.language, label: "Sandbox Terminal", command: call.command, status: "running", output });
+      try {
+        const result = await sandboxClient.executeStream(call.command, {
+          workspace: id, type: call.language, signal: ac.signal, allowDangerous: risk.dangerous,
+          onEvent: event => {
+            if (ac.signal.aborted) return;
+            if (event.type === "output") {
+              output = (output + event.text).slice(-64000);
+              setSandboxRun(current => current ? { ...current, output } : current);
+            }
+          },
+        });
+        ac.signal.throwIfAborted();
+        setSandboxRun(current => current ? { ...current, status: result.status, output: result.output || output || result.error, previewUrl: result.previewUrl } : current);
+        setWorkSteps(steps => [...steps.slice(0, -1), `${result.status === "success" ? "✅" : "❌"} ${call.command.slice(0, 80)}`]);
+        store.saveLearnedSkill({ name: `Sandbox ${call.language}`, runtime: call.language, pattern: call.command, testCommand: call.command, result: result.status === "success" ? "passed" : "failed", evidence: (result.output || output || result.error || result.status).slice(0, 2000) });
+        return result;
+      } catch (error) {
+        setSandboxRun(current => current ? { ...current, status: ac.signal.aborted ? "aborted" : "error" } : current);
+        throw error;
+      }
+    };
     try {
-      await streamChat({
-        messages: history,
-        mode: chatMode,
-        signal: ac.signal,
-        onEvent: (ev) => {
-          if (ev.type === "start") {
-            setStreamStatus("กำลังทำความเข้าใจคำขอ…");
-            setWorkSteps((steps) => steps.includes("ทำความเข้าใจคำขอ") ? steps : [...steps, "ทำความเข้าใจคำขอ"]);
-          } else if (ev.type === "block_start") {
-            const label = ev.blockType === "tool" ? "กำลังทำงานกับเครื่องมือ…" : ev.blockType === "thinking" ? "กำลังวางแผนคำตอบ…" : "กำลังสร้างคำตอบ…";
-            const step = ev.blockType === "tool" ? "เลือกและทำงานกับเครื่องมือ" : ev.blockType === "thinking" ? "วางแผนคำตอบ" : "สร้างคำตอบ";
-            setStreamStatus(label);
-            setWorkSteps((steps) => steps.includes(step) ? steps : [...steps, step]);
-          } else if (ev.type === "thinking") {
-            thinking += ev.text;
-            // เก็บ reasoning ไว้ในข้อความ แต่ UI แสดงเฉพาะสถานะงานแบบสรุป
-          } else if (ev.type === "text") {
-            setStreamStatus("กำลังตอบ…");
-            reply += ev.text;
-            speakRealtime(ev.text);
-            store.patchAssistant(id, assistantId, { content: reply });
-          } else if (ev.type === "done") {
-            finishVoice();
-            setWorkSteps((steps) => steps.includes("สร้างคำตอบ") ? steps : [...steps, "สร้างคำตอบ"]);
-            setStreamStatus("ตอบเสร็จแล้ว ✓");
-            window.setTimeout(() => setStreamStatus(""), 900);
-          } else if (ev.type === "error") {
-            setStreamStatus("เกิดข้อผิดพลาด");
-            toast.error(ev.error);
-          }
+      if (detection.webPreview && detection.code && ["html", "javascript", "css", "tailwind"].includes(detection.runtime)) {
+        setSandboxRun({ runtime: detection.runtime, label: detection.label, command: "browser sandbox", status: "Preview พร้อมแล้ว", previewHtml: sandboxPreviewDocument(detection.runtime, detection.code) });
+        append("แสดง Live Preview ในแชตแล้วค่ะ\n\n");
+      } else if (tools && store.personality.autoSandbox && detection.command) {
+        const call: RunCall = { language: isRunnerRuntime(detection.runtime) ? detection.runtime : "bash", command: detection.command };
+        const result = await execute(call, allowDangerous);
+        append(terminalTranscript(call, result));
+        history.push({ role: "user", content: modelResult(call, result) });
+      }
+      await runAgentLoop({
+        messages: history, signal: ac.signal, tools,
+        maxRuns: detection.command && tools && store.personality.autoSandbox ? 5 : 6,
+        execute,
+        onText: text => { append(text); if (!text.startsWith("\n\n```sandbox")) speakRealtime(text); },
+        model: async (messages, onText) => {
+          let failure = "";
+          setStreamStatus("กำลังสร้างคำตอบ…");
+          await streamChat({ messages, mode: chatMode, signal: ac.signal, tools, latestUser: content,
+            onEvent: event => {
+              if (ac.signal.aborted) return;
+              if (event.type === "text") onText(event.text);
+              else if (event.type === "error") failure = event.error;
+              else if (event.type === "thinking") setStreamStatus("กำลังวางแผน…");
+            },
+          });
+          if (failure) throw new Error(failure);
         },
       });
-      if (!reply && !ac.signal.aborted) {
-        store.patchAssistant(id, assistantId, {
-          content: "I could not finish that reply. Try sending it again.",
-        });
-      }
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        store.removeEmptyAssistant(id, assistantId);
-        toast.error("Something went wrong. Please try again.");
-      } else if (!reply) {
-        store.removeEmptyAssistant(id, assistantId);
-      }
+      if (!reply && !ac.signal.aborted) append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
+      setStreamStatus(ac.signal.aborted ? "หยุดแล้ว ⛔" : "ตอบเสร็จแล้ว ✓");
+    } catch (error) {
+      if (ac.signal.aborted) { append("\n\n⛔ หยุดการทำงานแล้ว"); setStreamStatus("หยุดแล้ว ⛔"); }
+      else { const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด"; append(`\n\n${message}`); toast.error(message); setStreamStatus("เกิดข้อผิดพลาด"); }
     } finally {
-      setBusyChat(false);
-      setStreamingId(null);
+      finishVoice(); setBusyChat(false); setStreamingId(null);
     }
   }
 
   function stopChat() {
     abortRef.current?.abort();
     stopVoice();
-    setBusyChat(false);
-    setStreamingId(null);
   }
 
   async function makeMap() {

@@ -1,3 +1,5 @@
+import { sandboxClient } from "@/lib/sandbox-client";
+import { assessSandboxRisk } from "@/lib/sandbox/detect";
 import { useEffect, useMemo, useState } from "react";
 import { Bot, Brain, FolderOpen, Play, Plus, Sparkles, Trash2, UserRound, WandSparkles } from "lucide-react";
 import type { PersonalitySettings } from "@/lib/types";
@@ -41,6 +43,7 @@ export function SettingsView() {
   const [newMemory, setNewMemory] = useState("");
   const [newAgent, setNewAgent] = useState("");
   const [saved, setSaved] = useState(false);
+  const [sandboxWorkspace] = useState(() => "playground_" + crypto.randomUUID());
   const [sandboxLanguage, setSandboxLanguage] = useState("python");
   const [sandboxCode, setSandboxCode] = useState(SANDBOX_DEFAULTS.python);
   const [sandboxInput, setSandboxInput] = useState("");
@@ -85,26 +88,19 @@ export function SettingsView() {
         return;
       }
 
-      const runnerUrl = String(import.meta.env.VITE_SANDBOX_RUNNER_URL || "").replace(/\/$/, "");
-      if (sandboxLanguage === "bash" && !runnerUrl) {
-        throw new Error("ยังไม่ได้ตั้ง VITE_SANDBOX_RUNNER_URL สำหรับ Bash isolated runner");
-      }
-
-      const endpoint = sandboxLanguage === "bash"
-        ? runnerUrl + "/execute"
-        : "https://runlet.codealong.live/execute";
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          language: sandboxLanguage,
-          code: sandboxCode,
-          stdin: sandboxInput,
-        }),
+      const quote = (text: string) => "'" + text.replaceAll("'", "'\"'\"'") + "'";
+      const file = SANDBOX_LANGUAGES.find(lang => lang.id === sandboxLanguage)?.file || "main.sh";
+      const launch: Record<string, string> = { python: "python3 main.py", javascript: "node main.js", bash: "bash main.sh", cpp: "g++ main.cpp -o main && ./main", java: "javac Main.java && java Main" };
+      const command = `printf %s ${quote(sandboxCode)} > ${file}
+printf %s ${quote(sandboxInput)} > stdin.txt
+(${launch[sandboxLanguage]}) < stdin.txt`;
+      const risk = assessSandboxRisk(sandboxCode);
+      if (risk.dangerous && !window.confirm(`${risk.riskReason}\n\nอนุญาตให้รันโค้ดนี้?`)) { setSandboxOutput("ยกเลิกแล้ว"); return; }
+      let output = "";
+      const data = await sandboxClient.executeStream(command, { type: "bash", workspace: sandboxWorkspace, allowDangerous: risk.dangerous,
+        onEvent: event => { if (event.type === "output") { output = (output + event.text).slice(-64000); setSandboxOutput(output); } },
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.detail || data?.message || "Sandbox request failed");
+      if (data.error) throw new Error(data.error);
       setSandboxOutput([
         data.stdout || "",
         data.stderr ? "[stderr]\n" + data.stderr : "",

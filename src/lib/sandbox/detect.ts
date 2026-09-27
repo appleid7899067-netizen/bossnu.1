@@ -80,7 +80,7 @@ export function detectSandboxInput(input: string): SandboxDetection {
     return { runtime: "css", label: "CSS", code: value, confidence: "high", webPreview: true, dangerous: false };
   }
   if (htmlDocument(value)) {
-    return { runtime: "html", label: "HTML / Web", code: value, confidence: "high", webPreview: true };
+    return { runtime: "html", label: "HTML / Web", code: value, confidence: "high", webPreview: true, dangerous: false };
   }
   if (/^(?:const|let|var|function|class)\s+/m.test(value) || /(?:document|window)\.[A-Za-z_$]/.test(value)) {
     return { runtime: "javascript", label: "JavaScript", code: value, confidence: "medium", webPreview: true, dangerous: false };

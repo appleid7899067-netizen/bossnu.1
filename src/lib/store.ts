@@ -5,6 +5,7 @@ import { titleFromPrompt, uid } from "@/lib/utils";
 
 const MAX_CHATS=40, MAX_MAPS=16, MAX_IMAGES=12, MAX_MESSAGES=48;
 const defaultSkills=[
+{id:"sandbox-terminal",name:"Sandbox Terminal",description:"รัน npm, npx, git, python3 จริงใน workspace ของแชต",enabled:true},
 {id:"research",name:"Research",description:"ค้นคว้าและสรุปข้อมูล",enabled:true},
 {id:"web-search",name:"Web Search",description:"ค้นข้อมูลล่าสุดและแหล่งอ้างอิง",enabled:true},
 {id:"coding",name:"Coding",description:"เขียนและแก้โค้ด",enabled:true},
@@ -48,6 +49,6 @@ saveLearnedSkill:skill=>set(s=>{
   return {learnedSkills:[{...skill,id:uid("skill"),createdAt:Date.now(),uses:1,lastTestedAt:Date.now()},...s.learnedSkills].slice(0,200)};
 }),
 useLearnedSkill:id=>set(s=>({learnedSkills:s.learnedSkills.map(x=>x.id===id?{...x,uses:x.uses+1}:x)})),
-}),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({conversations:s.conversations,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory,learnedSkills:s.learnedSkills}),merge:(persisted,current)=>{const p=(persisted??{}) as Partial<AppState>;return {...current,...p,personality:{...current.personality,...(p.personality??{})}};}}));
+}),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({conversations:s.conversations,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory,learnedSkills:s.learnedSkills}),merge:(persisted,current)=>{const p=(persisted??{}) as Partial<AppState>;return {...current,...p,agentSkills:[...(p.agentSkills??current.agentSkills),...defaultSkills.filter(d=>!(p.agentSkills??current.agentSkills).some(s=>s.id===d.id))],personality:{...current.personality,...(p.personality??{})}};}}));
 
 export function getConversation(id:string|null){if(!id)return undefined;return useAppStore.getState().conversations.find(c=>c.id===id);}

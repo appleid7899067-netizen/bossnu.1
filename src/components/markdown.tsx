@@ -60,12 +60,12 @@ function inline(text: string, keyPrefix: string): ReactNode[] {
 
 function splitFences(src: string) {
   const parts: { type: "code" | "md"; value: string; lang?: string }[] = [];
-  const re = /```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```/g;
+  const re = /```([^\n`]*)\n([\s\S]*?)```/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src))) {
     if (m.index > last) parts.push({ type: "md", value: src.slice(last, m.index) });
-    parts.push({ type: "code", lang: m[1], value: m[2].replace(/\n$/, "") });
+    parts.push({ type: "code", lang: m[1].trim().split(/\s+/)[0], value: m[2].replace(/\n$/, "") });
     last = m.index + m[0].length;
   }
   if (last < src.length) parts.push({ type: "md", value: src.slice(last) });
@@ -255,12 +255,15 @@ export function Markdown({
         part.type === "code" ? (
           <div key={i} className="contents">
             {i === firstWebIndex && webParts.length > 0 ? <WebPreview html={html} css={css} tailwind={tailwind} live={live} /> : null}
-            <CodeBlock
+            {part.lang === "sandbox" ? <div className="overflow-hidden rounded-xl border border-border bg-[#171717] text-[#e5e7eb]">
+              <div className="border-b border-white/10 px-4 py-2 text-xs font-semibold">⌘ Sandbox Terminal</div>
+              <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs">{part.value}</pre>
+            </div> : <CodeBlock
               code={part.value}
               lang={part.lang}
               live={live}
               showPreview={webParts.length === 1}
-            />
+            />}
           </div>
         ) : /^\s*:::sandbox-preview\s+https?:\/\/\S+\s*$/m.test(part.value.trim()) ? (
           <SandboxPreview key={i} url={part.value.trim().match(/^:::sandbox-preview\s+(https?:\/\/\S+)\s*$/)?.[1] || ""} />

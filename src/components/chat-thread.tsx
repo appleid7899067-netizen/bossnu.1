@@ -223,7 +223,7 @@ function WorkStatus({
                 <>
                   <div className="px-3 py-2 text-muted">ผลลัพธ์</div>
                   <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-[10px] leading-relaxed text-muted">
-                    {sandboxRun.output}
+                    {sandboxRun.output}{sandboxRun.status === "running" ? <span className="animate-pulse"> ▌</span> : null}
                   </pre>
                 </>
               ) : null}

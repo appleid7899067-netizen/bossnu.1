@@ -1,5 +1,5 @@
 import http from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, stat, readdir, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -7,10 +7,57 @@ import { spawn } from "node:child_process";
 const PORT = Number(process.env.PORT || 8787);
 const MAX_BODY = 128 * 1024;
 const MAX_OUTPUT = 64 * 1024;
-const TIMEOUT_MS = 15000;
+const TIMEOUT_MS = Math.min(300000, Math.max(1000, Number(process.env.COMMAND_TIMEOUT_MS) || 120000));
 const DEV_TIMEOUT_MS = 120000;
 const WORKSPACE_REPO = process.env.WORKSPACE_REPO || "";
 const sessions = new Map();
+
+// Workspaces persist on this runner's disk only; they are not security boundaries.
+const workspaceRoot = process.env.WORKSPACE_ROOT || join(tmpdir(), "bossnu-workspaces");
+const busyWorkspaces = new Set();
+const workspaceTTL = Number(process.env.WORKSPACE_TTL_MS) || 86400000;
+function executionEnv(cwd) {
+  return { PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin", HOME: cwd, LANG: "C.UTF-8", HOST: "0.0.0.0",
+    CI: "1", npm_config_yes: "true", npm_config_audit: "false", npm_config_fund: "false",
+    npm_config_update_notifier: "false", npm_config_progress: "false", npm_config_loglevel: "error" };
+}
+async function acquireWorkspace(id) {
+  if (id === undefined) {
+    const dir = await mkdtemp(join(tmpdir(), "bossnu-work-"));
+    await cloneWorkspace(dir);
+    return dir;
+  }
+  if (typeof id !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(id)) throw new Error("invalid_workspace");
+  if (busyWorkspaces.has(id)) throw new Error("workspace_busy");
+  busyWorkspaces.add(id);
+  const dir = join(workspaceRoot, id);
+  try {
+    await mkdir(workspaceRoot, { recursive: true });
+    try { await stat(dir); } catch {
+      await mkdir(dir);
+      try { await cloneWorkspace(dir); } catch (error) { await rm(dir, { recursive: true, force: true }); throw error; }
+    }
+    await utimes(dir, new Date(), new Date());
+    return dir;
+  } catch (error) { busyWorkspaces.delete(id); throw error; }
+}
+async function releaseWorkspace(dir, id, keep) {
+  try {
+    if (id !== undefined) await utimes(dir, new Date(), new Date());
+    else if (!keep) await rm(dir, { recursive: true, force: true });
+  } finally { busyWorkspaces.delete(id); }
+}
+setInterval(async () => {
+  for (const id of await readdir(workspaceRoot).catch(() => [])) {
+    if (busyWorkspaces.has(id) || [...sessions.values()].some(s => s.cwd === join(workspaceRoot, id) && !s.exited)) continue;
+    const dir = join(workspaceRoot, id);
+    const info = await stat(dir).catch(() => null);
+    if (info && !busyWorkspaces.has(id) && Date.now() - info.mtimeMs > workspaceTTL) {
+      busyWorkspaces.add(id);
+      try { await rm(dir, { recursive: true, force: true }); } finally { busyWorkspaces.delete(id); }
+    }
+  }
+}, 60000).unref();
 
 function send(res, status, body) {
   res.writeHead(status, {
@@ -31,14 +78,18 @@ async function readBody(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 function append(target, chunk) { return (target + chunk.toString("utf8")).slice(-MAX_OUTPUT); }
-function spawnProcess(command, args, cwd, timeoutMs) {
+function spawnProcess(command, args, cwd, timeoutMs, signal) {
   return new Promise((resolve) => {
     const child = spawn(command, args, {
       cwd,
-      env: { PATH: "/usr/local/bin:/usr/bin:/bin", HOME: cwd, LANG: "C.UTF-8", HOST: "0.0.0.0" },
+      env: executionEnv(cwd),
       detached: true, stdio: ["pipe", "pipe", "pipe"],
     });
+    child.stdin.end();
+    const cancel = () => { try { process.kill(-child.pid, "SIGKILL"); } catch {} };
     let stdout = "", stderr = "", timedOut = false;
+    signal?.addEventListener("abort", cancel, { once: true });
+    if (signal?.aborted) cancel();
     const timer = setTimeout(() => {
       timedOut = true;
       try { process.kill(-child.pid, "SIGKILL"); } catch {}
@@ -46,9 +97,11 @@ function spawnProcess(command, args, cwd, timeoutMs) {
     child.stdout.on("data", c => { stdout = append(stdout, c); });
     child.stderr.on("data", c => { stderr = append(stderr, c); });
     child.on("error", e => { stderr = append(stderr, e); });
-    child.on("close", (code, signal) => {
+    child.on("close", (code, exitSignal) => {
       clearTimeout(timer);
-      resolve({ stdout, stderr, exitCode: code, signal, timedOut });
+      signal?.removeEventListener("abort", cancel);
+      cancel();
+      resolve({ stdout, stderr, exitCode: code, signal: exitSignal, timedOut });
     });
   });
 }
@@ -59,16 +112,21 @@ async function cloneWorkspace(dir) {
 }
 function startPersistent(command, args, cwd) {
   const child = spawn(command, args, {
-    cwd, env: { PATH: "/usr/local/bin:/usr/bin:/bin", HOME: cwd, LANG: "C.UTF-8", HOST: "0.0.0.0" },
+    cwd, env: executionEnv(cwd),
     detached: true, stdio: ["pipe", "pipe", "pipe"],
   });
+  child.stdin.end();
   let stdout = "", stderr = "";
+  child.on("error", e => { stderr = append(stderr, e); });
+  const lifetime = setTimeout(() => { try { process.kill(-child.pid, "SIGKILL"); } catch {} }, 30 * 60 * 1000);
+  lifetime.unref();
   child.stdout.on("data", c => { stdout = append(stdout, c); });
   child.stderr.on("data", c => { stderr = append(stderr, c); });
   const sessionId = "sb_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
   const session = { id: sessionId, child, cwd, stdout: () => stdout, stderr: () => stderr, createdAt: Date.now(), exited: false };
   sessions.set(sessionId, session);
   child.on("exit", () => {
+    clearTimeout(lifetime);
     session.exited = true;
     setTimeout(() => sessions.delete(sessionId), 10 * 60 * 1000);
   });
@@ -81,7 +139,7 @@ async function prepareNode(dir) {
 }
 function detectPort(session) {
   const text = session.stdout() + " " + session.stderr();
-  const m = text.match(/(?:localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0)[:\\s]+(\\d{2,5})/i) || text.match(/port\\s+(\\d{2,5})/i);
+  const m = text.match(/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)[:\s]+(\d{2,5})/i) || text.match(/port\s+(\d{2,5})/i);
   return Number(m && m[1] || 5173);
 }
 function sseHeaders(res) {
@@ -95,20 +153,21 @@ function sseHeaders(res) {
   });
 }
 function sse(res, event) {
+  if (res.destroyed) return;
   res.write("data: " + JSON.stringify(event) + "\n\n");
 }
 async function executeStream(body, res) {
   const language = String(body.language || "").toLowerCase();
   const command = typeof body.command === "string" ? body.command.trim() : "";
   if (!command) throw new Error("command_required");
+  if (command.length > 32000) throw new Error("command_too_large");
   if (!["node","bash","python","go","rust","java","cpp"].includes(language)) throw new Error("unsupported_runtime");
-  const dir = await mkdtemp(join(tmpdir(), "bossnu-work-"));
+  const dir = await acquireWorkspace(body.workspace);
   let keep = false;
   const started = Date.now();
   try {
     sseHeaders(res);
     sse(res, { type: "status", status: "queued", message: "รับคำสั่ง Sandbox" });
-    await cloneWorkspace(dir);
     sse(res, { type: "status", status: "running", message: "กำลังรันจริงใน Sandbox Runner" });
     if (language === "node" && /^npm\s+run\s+dev\b/i.test(command)) {
       await prepareNode(dir);
@@ -136,35 +195,46 @@ async function executeStream(body, res) {
       sse(res, { type: "complete", result });
       return res.end();
     }
-    const child = spawn("bash", ["-lc", command], {
-      cwd: dir, env: { PATH: "/usr/local/bin:/usr/bin:/bin", HOME: dir, LANG: "C.UTF-8", HOST: "0.0.0.0" },
+    const child = spawn("bash", ["-c", command], {
+      cwd: dir, env: executionEnv(dir),
       detached: true, stdio: ["pipe", "pipe", "pipe"],
     });
+    child.stdin.end();
+    const cancel = () => { try { process.kill(-child.pid, "SIGKILL"); } catch {} };
     let stdout = "", stderr = "", timedOut = false;
+    res.on("close", cancel);
+    if (res.destroyed) cancel();
     const timer = setTimeout(() => { timedOut = true; try { process.kill(-child.pid, "SIGKILL"); } catch {} }, TIMEOUT_MS);
-    child.stdout.on("data", c => { const t=c.toString("utf8"); stdout=append(stdout,c); sse(res,{type:"output",stream:"stdout",text:t}); });
-    child.stderr.on("data", c => { const t=c.toString("utf8"); stderr=append(stderr,c); sse(res,{type:"output",stream:"stderr",text:t}); });
+    let sentBytes = 0;
+    const output = (stream, chunk) => {
+      const remaining = MAX_OUTPUT - sentBytes;
+      if (remaining <= 0) return;
+      const limited = chunk.subarray(0, remaining); sentBytes += limited.length;
+      sse(res, { type: "output", stream, text: limited.toString("utf8") });
+    };
+    child.stdout.on("data", c => { const t=c.toString("utf8"); stdout=append(stdout,c); output("stdout", c); });
+    child.stderr.on("data", c => { const t=c.toString("utf8"); stderr=append(stderr,c); output("stderr", c); });
     await new Promise(resolve => {
-      child.on("error", e => { stderr=append(stderr,e); resolve(); });
-      child.on("close", code => { clearTimeout(timer); const status=timedOut?"timeout":code===0?"success":"error"; sse(res,{type:"complete",result:{success:status==="success",status,type:language,runtime:language,command,stdout,stderr,output:[stdout,stderr].filter(Boolean).join("\n").trim(),exitCode:code,durationMs:Date.now()-started}}); resolve(); });
+      child.on("error", e => { stderr=append(stderr,e); });
+      child.on("close", code => { clearTimeout(timer); res.off("close", cancel); cancel(); const status=timedOut?"timeout":code===0?"success":"error"; sse(res,{type:"complete",result:{success:status==="success",status,type:language,runtime:language,command,stdout,stderr,output:[stdout,stderr].filter(Boolean).join("\n").trim(),exitCode:code,durationMs:Date.now()-started}}); resolve(); });
     });
     return res.end();
   } finally {
-    if (!keep) await rm(dir, { recursive: true, force: true });
+    await releaseWorkspace(dir, body.workspace, keep);
   }
 }
 
-async function execute(body) {
+async function execute(body, signal) {
   const language = String(body.language || "").toLowerCase();
   const command = typeof body.command === "string" ? body.command.trim() : "";
   if (!command) throw new Error("command_required");
+  if (command.length > 32000) throw new Error("command_too_large");
   if (!["node","bash","python","go","rust","java","cpp"].includes(language)) throw new Error("unsupported_runtime");
 
-  const dir = await mkdtemp(join(tmpdir(), "bossnu-work-"));
+  const dir = await acquireWorkspace(body.workspace);
   let keep = false;
   try {
-    await cloneWorkspace(dir);
-    if (language === "node" && /^npm\\s+run\\s+dev\\b/i.test(command)) {
+    if (language === "node" && /^npm\s+run\s+dev\b/i.test(command)) {
       await prepareNode(dir);
       const session = startPersistent("npm", ["run", "dev", "--", "--host", "0.0.0.0"], dir);
       keep = true;
@@ -176,13 +246,13 @@ async function execute(body) {
         sessionId: session.id, port, previewPath: "/preview/" + session.id + "/",
       };
     }
-    const r = await spawnProcess("bash", ["-lc", command], dir, TIMEOUT_MS);
+    const r = await spawnProcess("bash", ["-c", command], dir, TIMEOUT_MS, signal);
     return {
       status: r.timedOut ? "timeout" : r.exitCode === 0 ? "success" : "error",
       stdout: r.stdout, stderr: r.stderr, exitCode: r.exitCode, signal: r.signal,
     };
   } finally {
-    if (!keep) await rm(dir, { recursive: true, force: true });
+    await releaseWorkspace(dir, body.workspace, keep);
   }
 }
 async function proxyPreview(req, res, sessionId, rest) {
@@ -205,7 +275,7 @@ async function proxyPreview(req, res, sessionId, rest) {
 }
 const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") return send(res, 204, {});
-  if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, runner: "multi-runtime", version: 2, sessions: sessions.size });
+  if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, runner: "multi-runtime", version: 4, sessions: sessions.size });
   if (req.method === "GET" && req.url && req.url.startsWith("/preview/")) {
     const parts = req.url.split("/").filter(Boolean);
     return proxyPreview(req, res, parts[1], parts.slice(2).join("/"));
@@ -218,10 +288,13 @@ const server = http.createServer(async (req, res) => {
   try {
     const body = await readBody(req);
     const started = Date.now();
-    const result = await execute(body);
+    const ac = new AbortController();
+    const cancel = () => ac.abort();
+    res.on("close", cancel);
+    const result = await execute(body, ac.signal).finally(() => res.off("close", cancel));
     return send(res, 200, Object.assign({}, result, { durationMs: Date.now() - started }));
   } catch (error) {
     return send(res, 400, { error: error instanceof Error ? error.message : "bad_request" });
   }
 });
-server.listen(PORT, "0.0.0.0", () => console.log("bossnu multi-runtime sandbox listening on :" + PORT));
+server.listen(PORT, "0.0.0.0", () => console.log("bossnu multi-runtime sandbox listening on :" + server.address().port));
