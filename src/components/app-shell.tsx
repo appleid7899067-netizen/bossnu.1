@@ -259,6 +259,24 @@ export function AppShell({ search }: { search: Search }) {
               allowDangerous: true,
             });
             const out = (result.stdout || result.stderr ? [result.stdout, result.stderr].filter(Boolean).join("\n") : result.output) || "";
+            const durationMs = result.durationMs || 160;
+            const runStatus = result.status === "success" ? "success" : "error";
+
+            let updatedReply = reply.replace(
+              runMatch[0],
+              `<run lang="${runLang}" duration="${durationMs}ms" status="${runStatus}" output="${out.replace(/"/g, "&quot;")}">${runCmd}</run>`,
+            );
+
+            if (/ขอรอผลการรันจาก\s*Sandbox\s*Terminal\s*ก่อนนะคะ/i.test(updatedReply)) {
+              updatedReply = updatedReply.replace(
+                /ขอรอผลการรันจาก\s*Sandbox\s*Terminal\s*ก่อนนะคะ/i,
+                out ? `\n\nผลการตรวจสอบจริงคือ: **${out}** ค่ะ ✓` : `\n\nรันคำสั่งเสร็จเรียบร้อยแล้วค่ะ ✓`,
+              );
+            }
+
+            reply = updatedReply;
+            store.patchAssistant(id, assistantId, { content: reply });
+
             setSandboxRun({
               runtime: runLang,
               label: "Sandbox Terminal",

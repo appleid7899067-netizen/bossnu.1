@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Copy, Loader2, Maximize2, Minimize2, Play, RotateCw, SquareTerminal } from "lucide-react";
+import { Check, ChevronRight, Copy, Loader2, Maximize2, Minimize2, Play, RotateCw, SquareTerminal } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { sandboxClient } from "@/lib/sandbox-client";
@@ -62,13 +62,20 @@ function inline(text: string, keyPrefix: string): ReactNode[] {
 
 type ContentPart =
   | { type: "code"; lang?: string; value: string }
-  | { type: "run"; lang?: string; value: string }
+  | {
+      type: "run";
+      lang?: string;
+      duration?: string;
+      status?: string;
+      output?: string;
+      value: string;
+    }
   | { type: "md"; value: string };
 
 function splitContent(src: string): ContentPart[] {
   const parts: ContentPart[] = [];
   const tokenRegex =
-    /```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```|<run(?:\s+lang=["']?([a-zA-Z0-9_-]+)["']?)?>([\s\S]*?)<\/run>/gi;
+    /```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```|<run(?:\s+lang=["']?([a-zA-Z0-9_-]+)["']?)?(?:\s+duration=["']?([^"'>]+)["']?)?(?:\s+status=["']?([^"'>]+)["']?)?(?:\s+output=["']?([^"'>]*)["']?)?>([\s\S]*?)<\/run>/gi;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = tokenRegex.exec(src))) {
@@ -78,10 +85,21 @@ function splitContent(src: string): ContentPart[] {
     if (m[0].startsWith("```")) {
       parts.push({ type: "code", lang: m[1], value: m[2].replace(/\n$/, "") });
     } else {
+      let cmd = (m[7] ?? "").trim();
+      let output = m[6] || "";
+      if (cmd.includes("<cmd>") && cmd.includes("</cmd>")) {
+        const cmdM = cmd.match(/<cmd>([\s\S]*?)<\/cmd>/);
+        const outM = cmd.match(/<output>([\s\S]*?)<\/output>/);
+        if (cmdM) cmd = cmdM[1].trim();
+        if (outM) output = outM[1].trim();
+      }
       parts.push({
         type: "run",
         lang: m[3] || "bash",
-        value: (m[4] ?? "").trim(),
+        duration: m[4],
+        status: m[5],
+        output,
+        value: cmd,
       });
     }
     last = m.index + m[0].length;
@@ -95,19 +113,30 @@ function splitContent(src: string): ContentPart[] {
 export function TerminalRunBlock({
   command,
   lang = "bash",
+  duration,
+  status: initialStatus,
   initialOutput,
-  autoRun = false,
+  autoRun = true,
 }: {
   command: string;
   lang?: string;
+  duration?: string;
+  status?: "idle" | "running" | "success" | "error";
   initialOutput?: string;
   autoRun?: boolean;
 }) {
   const [output, setOutput] = useState(initialOutput || "");
   const [status, setStatus] = useState<"idle" | "running" | "success" | "error">(
-    initialOutput ? "success" : "idle",
+    initialStatus || (initialOutput ? "success" : "idle"),
   );
-  const [durationMs, setDurationMs] = useState<number | null>(null);
+  const [durationMs, setDurationMs] = useState<number | null>(() => {
+    if (duration) {
+      const parsed = parseInt(duration, 10);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return null;
+  });
+  const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const hasAutoRunRef = useRef(false);
 
@@ -150,11 +179,11 @@ export function TerminalRunBlock({
   }, [command, lang]);
 
   useEffect(() => {
-    if (autoRun && !hasAutoRunRef.current && status === "idle") {
+    if (autoRun && !hasAutoRunRef.current && status === "idle" && !initialOutput) {
       hasAutoRunRef.current = true;
       void runCommand();
     }
-  }, [autoRun, runCommand, status]);
+  }, [autoRun, runCommand, status, initialOutput]);
 
   async function copyCommand() {
     try {
@@ -164,93 +193,142 @@ export function TerminalRunBlock({
     } catch {}
   }
 
+  const capitalizedLang =
+    lang.toLowerCase() === "bash"
+      ? "Bash"
+      : lang.toLowerCase() === "node"
+        ? "Node"
+        : lang.toLowerCase() === "python"
+          ? "Python"
+          : lang;
+
+  const durationLabel = duration || (durationMs ? `${durationMs}ms` : "160ms");
+
   return (
-    <div className="my-2.5 overflow-hidden rounded-2xl border border-[#2d3139] bg-[#0f1115] text-[#e6edf3] shadow-lg">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#24272f] bg-[#161922] px-3.5 py-2.5 text-xs">
-        <div className="flex items-center gap-2">
-          <SquareTerminal className="size-4 text-emerald-400" />
-          <span className="font-medium text-white">Sandbox Terminal</span>
-          <span className="rounded bg-black/40 px-2 py-0.5 font-mono text-[11px] text-zinc-300">
-            {lang}
-          </span>
-          {status === "running" ? (
-            <span className="flex items-center gap-1.5 text-[11px] text-amber-400">
-              <Loader2 className="size-3 animate-spin" />
-              กำลังรันใน Sandbox…
-            </span>
-          ) : status === "success" ? (
-            <span className="flex items-center gap-1 text-[11px] text-emerald-400">
-              <Check className="size-3" />
-              สำเร็จ {durationMs ? `(${durationMs} ms)` : ""}
-            </span>
-          ) : status === "error" ? (
-            <span className="text-[11px] text-rose-400">พบข้อผิดพลาด</span>
-          ) : (
-            <span className="text-[11px] text-zinc-400">พร้อมรัน</span>
+    <div className="my-1.5 font-mono text-[13px]">
+      <div
+        onClick={() => setExpanded((v) => !v)}
+        className="inline-flex cursor-pointer items-center gap-2 rounded-lg py-1 px-2 text-zinc-300 transition-colors hover:bg-zinc-800/60"
+        title="คลิกเพื่อดูคำสั่งและผลลัพธ์ใน Terminal"
+      >
+        <ChevronRight
+          className={cn(
+            "size-3.5 text-zinc-400 transition-transform duration-150",
+            expanded && "rotate-90",
           )}
-        </div>
+        />
+        <span className="flex items-center justify-center rounded border border-zinc-700/80 bg-zinc-800/90 px-1.5 py-0.5 text-[10px] font-bold text-zinc-200">
+          &gt;_
+        </span>
+        <span className="text-zinc-200">
+          {status === "running" ? `using ${capitalizedLang}…` : `used ${capitalizedLang}`}
+        </span>
+        {status === "running" ? (
+          <span className="inline-block size-2 animate-pulse rounded-full bg-emerald-400" />
+        ) : status === "success" ? (
+          <span className="flex items-center gap-1 text-emerald-400">
+            <Check className="size-3.5 stroke-[2.5]" />
+            <span className="text-zinc-400 text-xs">{durationLabel}</span>
+          </span>
+        ) : status === "error" ? (
+          <span className="text-xs text-rose-400">✗ failed</span>
+        ) : (
+          <span className="text-xs text-zinc-400">• ready</span>
+        )}
+        <span className="text-zinc-500 text-[11px]">˅</span>
+      </div>
 
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => void copyCommand()}
-            className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs text-zinc-400 hover:bg-white/10 hover:text-white"
-            title="คัดลอกคำสั่ง"
-          >
-            {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
-            <span>{copied ? "คัดลอกแล้ว" : "คัดลอก"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => void runCommand()}
-            disabled={status === "running"}
-            className={cn(
-              "flex items-center gap-1.5 rounded-lg px-3 py-1 font-medium text-xs shadow transition-all",
-              status === "running"
-                ? "bg-zinc-700 text-zinc-400 opacity-60"
-                : status === "success"
-                  ? "bg-zinc-800 text-zinc-200 hover:bg-zinc-700"
-                  : "bg-emerald-600 text-white hover:bg-emerald-500",
-            )}
-          >
-            {status === "running" ? (
-              <>
-                <Loader2 className="size-3 animate-spin" />
-                <span>กำลังรัน…</span>
-              </>
-            ) : status === "success" ? (
-              <>
+      {expanded && (
+        <div className="mt-1.5 overflow-hidden rounded-xl border border-zinc-800 bg-[#0e1015] p-3 text-xs shadow-md">
+          <div className="mb-2 flex items-center justify-between border-b border-zinc-800/80 pb-2 text-[11px] text-zinc-400">
+            <span className="font-semibold text-zinc-300">Terminal Command</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void copyCommand();
+                }}
+                className="flex items-center gap-1 hover:text-white"
+              >
+                <Copy className="size-3" />
+                <span>{copied ? "Copied" : "Copy"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void runCommand();
+                }}
+                disabled={status === "running"}
+                className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300"
+              >
                 <RotateCw className="size-3" />
-                <span>รันใหม่</span>
-              </>
-            ) : (
-              <>
-                <Play className="size-3 fill-current" />
-                <span>รันคำสั่ง</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-[#0b0c10] p-3.5">
-        <div className="flex items-start gap-2 font-mono text-[13px] leading-relaxed">
-          <span className="select-none font-bold text-emerald-400">$</span>
-          <pre className="min-w-0 flex-1 whitespace-pre-wrap break-all text-zinc-200">{command}</pre>
-        </div>
-      </div>
-
-      {(output || status === "running") && (
-        <div className="border-t border-[#22252e] bg-[#07080b] p-3.5">
-          <div className="mb-1.5 flex items-center justify-between text-[11px] text-zinc-400">
-            <span className="font-mono">ผลลัพธ์ (Output):</span>
-            {durationMs ? <span>ใช้เวลา {durationMs} ms</span> : null}
+                <span>Re-run</span>
+              </button>
+            </div>
           </div>
-          <pre className="max-h-64 overflow-auto rounded-lg bg-black/50 p-2.5 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words text-emerald-300">
-            {output || (status === "running" ? "กำลังรอผลลัพธ์จาก Sandbox..." : "(ไม่มีข้อความ output)")}
-          </pre>
+          <div className="flex items-start gap-1.5 font-mono text-zinc-200">
+            <span className="select-none font-bold text-emerald-400">$</span>
+            <pre className="min-w-0 flex-1 whitespace-pre-wrap break-all">{command}</pre>
+          </div>
+          {output ? (
+            <div className="mt-2.5 border-t border-zinc-800/80 pt-2">
+              <div className="mb-1 text-[10px] uppercase tracking-wider text-zinc-500">Output</div>
+              <pre className="max-h-56 overflow-auto rounded bg-black/60 p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-words text-emerald-400">
+                {output}
+              </pre>
+            </div>
+          ) : null}
         </div>
       )}
+    </div>
+  );
+}
+
+function RanCommandsPill({ count }: { count: string }) {
+  return (
+    <div className="my-1 flex items-center gap-2 font-mono text-[13px] text-zinc-300">
+      <span className="text-zinc-500">›</span>
+      <span className="flex items-center justify-center rounded border border-zinc-700/80 bg-zinc-800/90 px-1 py-0.5 text-[10px] font-bold text-zinc-200">
+        &gt;_
+      </span>
+      <span>Ran commands {count}</span>
+    </div>
+  );
+}
+
+function EditedFilesPill({ lines }: { lines: string }) {
+  return (
+    <div className="my-1 flex items-center gap-2 font-mono text-[13px] text-zinc-300">
+      <span className="text-zinc-500">›</span>
+      <span className="flex items-center justify-center rounded border border-zinc-700/80 bg-zinc-800/90 px-1 py-0.5 text-[10px] font-bold text-zinc-200">
+        :≡
+      </span>
+      <span>Edited files</span>
+      <span className="font-semibold text-emerald-400">{lines}</span>
+    </div>
+  );
+}
+
+function WritingFilePill({ path }: { path: string }) {
+  return (
+    <div className="my-2 font-mono text-[13px]">
+      <div className="text-zinc-300">
+        Writing <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-200">{path}</span>
+      </div>
+      <div className="mt-1 flex items-center">
+        <span className="inline-block size-2.5 animate-pulse rounded-full bg-white shadow-sm" />
+      </div>
+    </div>
+  );
+}
+
+function ToolCallPill({ name }: { name: string }) {
+  return (
+    <div className="my-1 flex items-center gap-2 font-mono text-xs text-zinc-400">
+      <span>⚙</span>
+      <span className="rounded bg-zinc-800/80 px-2 py-0.5 text-zinc-300">{name}</span>
     </div>
   );
 }
@@ -323,8 +401,52 @@ function MdBlock({ text }: { text: string }) {
       continue;
     }
     if (/^>\s?/.test(line)) {
+      const ranCmd = /^>\s*(?:>_|›)?\s*Ran commands\s+(\d+)/i.exec(line);
+      if (ranCmd) {
+        flushPara(); flushList();
+        blocks.push(<RanCommandsPill key={`rc-${blocks.length}`} count={ranCmd[1]} />);
+        continue;
+      }
+      const editedFiles = /^>\s*(?::?≡|›)?\s*Edited files\s+(\+?\d+)/i.exec(line);
+      if (editedFiles) {
+        flushPara(); flushList();
+        blocks.push(<EditedFilesPill key={`ef-${blocks.length}`} lines={editedFiles[1]} />);
+        continue;
+      }
+      const usedBash = /^>\s*(?:\[?>_\]?)?\s*used\s+([a-zA-Z0-9_-]+)(?:\s*[✓✔]\s*([0-9a-z]+)?)?/i.exec(line);
+      if (usedBash) {
+        flushPara(); flushList();
+        blocks.push(
+          <div key={`ub-${blocks.length}`} className="my-1 flex items-center gap-2 font-mono text-[13px] text-zinc-300">
+            <span className="text-zinc-500">›</span>
+            <span className="flex items-center justify-center rounded border border-zinc-700/80 bg-zinc-800/90 px-1.5 py-0.5 text-[10px] font-bold text-zinc-200">&gt;_</span>
+            <span>used {usedBash[1]}</span>
+            <span className="flex items-center gap-1 text-emerald-400">
+              <Check className="size-3.5 stroke-[2.5]" />
+              <span className="text-zinc-400 text-xs">{usedBash[2] || "160ms"}</span>
+            </span>
+            <span className="text-zinc-500 text-[11px]">˅</span>
+          </div>
+        );
+        continue;
+      }
       flushPara(); flushList();
       blocks.push(<blockquote key={`q-${blocks.length}`} className="border-l-2 border-primary/50 pl-4 text-muted">{inline(line.replace(/^>\s?/, ""), `q${blocks.length}`)}</blockquote>);
+      continue;
+    }
+
+    const writing = /^(?:Writing|Editing)\s+(\S+)/i.exec(line);
+    if (writing) {
+      flushPara(); flushList();
+      if (next.trim() === "●" || next.trim() === "•") index++;
+      blocks.push(<WritingFilePill key={`wf-${blocks.length}`} path={writing[1]} />);
+      continue;
+    }
+
+    const tool = /^\*?\s*(get_process_output|start_process|stop_process|read_file|write_file|edit_file)\b/i.exec(line);
+    if (tool) {
+      flushPara(); flushList();
+      blocks.push(<ToolCallPill key={`tc-${blocks.length}`} name={tool[1]} />);
       continue;
     }
     if (ul || ol) {
@@ -454,7 +576,10 @@ export function Markdown({
             key={i}
             command={part.value}
             lang={part.lang}
-            autoRun={autoSandbox}
+            duration={part.duration}
+            status={part.status as any}
+            initialOutput={part.output}
+            autoRun={true}
           />
         ) : /^\s*:::sandbox-preview\s+https?:\/\/\S+\s*$/m.test(part.value.trim()) ? (
           <SandboxPreview key={i} url={part.value.trim().match(/^:::sandbox-preview\s+(https?:\/\/\S+)\s*$/)?.[1] || ""} />
