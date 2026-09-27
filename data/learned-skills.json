@@ -1,5 +1,20 @@
 [
   {
+    "id": "skill_1790500678552_vsixm",
+    "name": "Shell • คำสั่งระบบ pwd",
+    "runtime": "bash",
+    "pattern": "pwd && git branch --show-current",
+    "testCommand": "pwd && git branch --show-current",
+    "result": "passed",
+    "evidence": "/home/user/bossnu.1\narena/01a0e1be-bossnu-1",
+    "output": "/home/user/bossnu.1\narena/01a0e1be-bossnu-1",
+    "exitCode": 0,
+    "durationMs": 66,
+    "createdAt": 1790500678552,
+    "lastTestedAt": 1790500678552,
+    "uses": 1
+  },
+  {
     "id": "skill_1790497180401_h3lr1",
     "name": "Shell • คำสั่งระบบ echo",
     "runtime": "bash",
