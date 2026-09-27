@@ -1,4 +1,6 @@
 import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
+import { classifyIntent } from "@/lib/ai/intent";
+import { diagnoseFailure } from "@/lib/ai/sandbox-tool";
 import { isRunnerRuntime } from "@/types/sandbox";
 import { StreamCollector } from "@/lib/sandbox-streaming-client";
 import {
@@ -146,8 +148,9 @@ export function SaliAgent({
     const streaming = isRunnerRuntime(resolved) || resolved === "unknown";
     const risk = streaming ? assessSandboxRisk(command) : { dangerous: false, riskReason: "" };
     if (risk.dangerous && !window.confirm(`${risk.riskReason}\n\n${command}\n\nอนุญาตให้รันคำสั่งนี้?`)) return;
+    const intent = classifyIntent(command);
     runLock.current = true;
-    setLive(streaming ? { output: "", steps: ["รับคำสั่ง…"] } : null);
+    setLive(streaming ? { output: "", steps: [`🧭 เจตนา: ${intent.label}`, "รับคำสั่ง…"] } : null);
     setDraft("");
     push({
       id: uid("m"),
@@ -683,6 +686,14 @@ function ResultCard({
           ? "⏱️ หมดเวลา"
           : "❌ ผิดพลาด";
   const suggestions = result.suggestions ?? [];
+  const hints = result.success
+    ? []
+    : diagnoseFailure({
+        status: String(result.status ?? "error"),
+        exitCode: result.exitCode,
+        error: result.error,
+        output: result.output,
+      }).slice(0, 4);
 
   return (
     <div className="lumina-rise flex gap-3">
@@ -706,6 +717,18 @@ function ResultCard({
               {result.detail ? (
                 <div className="mt-1 font-mono text-[11px] opacity-80">{result.detail}</div>
               ) : null}
+            </div>
+          ) : null}
+
+          {hints.length > 0 ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+              <p className="text-[11px] font-semibold text-amber-800">🩹 แนวทางแก้ (อ่านจาก error จริง)</p>
+              <ul className="mt-1 grid gap-1">
+                {hints.map((hint) => (
+                  <li key={hint} className="text-[11.5px] leading-relaxed text-amber-900">• {hint}</li>
+                ))}
+              </ul>
+              <p className="mt-1.5 text-[10.5px] text-amber-700">ส่ง error นี้ไปคุยในแชต แล้วสลี่จะแก้โค้ดและรันใหม่ให้จนผ่าน</p>
             </div>
           ) : null}
 

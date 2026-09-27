@@ -18,6 +18,7 @@ import { redactSensitiveCommand, runAgentLoop, type AgentPhase } from "@/lib/ai/
 import { agentWorkspaceIdFor, createHttpWorkspace } from "@/lib/workspace/http-workspace";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { sandboxRequestedByUser, type RunCall } from "@/lib/ai/sandbox-tool";
+import { classifyIntent, intentSummary } from "@/lib/ai/intent";
 import { isRunnerRuntime } from "@/types/sandbox";
 import { streamChat } from "@/lib/ai/stream";
 import { finishVoice, setVoiceEnabled, speakRealtime, stopVoice } from "@/lib/ai/voice";
@@ -61,6 +62,7 @@ export function AppShell({ search }: { search: Search }) {
   } | null>(null);
   const [voiceEnabled, setVoiceEnabledState] = useState(true);
   const [callOpen, setCallOpen] = useState(false);
+  const [intentPlan, setIntentPlan] = useState<{ label: string; runCode: boolean } | null>(null);
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -104,6 +106,12 @@ export function AppShell({ search }: { search: Search }) {
     const content = text.trim();
     if ((!content && !files.length) || busyChat) return;
     const detection = detectSandboxInput(content);
+    // Intent first: it decides whether this message may spend Sandbox runs at
+    // all, which runtime fits, and how many repair rounds it gets.
+    const intent = classifyIntent(content, {
+      attachments: files.length,
+      autoSandbox: useAppStore.getState().personality.autoSandbox,
+    });
     if (detection.command && detection.dangerous && !allowDangerous) {
       setDangerousApproval({ content, chatId, mode, attachments: files, reason: detection.riskReason ?? "คำสั่งนี้อาจกระทบไฟล์" });
       return;
@@ -121,6 +129,7 @@ export function AppShell({ search }: { search: Search }) {
     const ac = new AbortController();
     abortRef.current = ac;
     setDraft(""); setAttachments([]); setActiveTool(null); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
+    setIntentPlan(intent);
     stopVoice(); go({ view: "chat", c: id });
     let reply = "";
     const append = (text: string) => { reply += text; store.patchAssistant(id, assistantId, { content: reply }); };
@@ -133,7 +142,8 @@ export function AppShell({ search }: { search: Search }) {
       const current = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
       store.patchAssistant(id, assistantId, { activities: current.map(activity => activity.id === activityId ? { ...activity, ...patch } as ChatActivity : activity) });
     };
-    const tools = true;
+    pushActivity({ kind: "phase", phase: "intent", label: `🧭 Intent • ${intentSummary(intent)}` });
+    const tools = intent.tools || sandboxRequestedByUser(content);
     const execute = async (call: RunCall, approved = false) => {
       ac.signal.throwIfAborted();
       const risk = assessSandboxRisk(call.command);
@@ -185,9 +195,11 @@ export function AppShell({ search }: { search: Search }) {
         throw error;
       }
     };
-    const initialCall = detection.command
-      ? { language: isRunnerRuntime(detection.runtime) ? detection.runtime : "bash", command: detection.command } as RunCall
-      : undefined;
+    const initialCall =
+      intent.initialCall ??
+      (detection.command
+        ? ({ language: isRunnerRuntime(detection.runtime) ? detection.runtime : "bash", command: detection.command } as RunCall)
+        : undefined);
     try {
       if (detection.webPreview && detection.code && ["html", "javascript", "css", "tailwind"].includes(detection.runtime)) {
         setSandboxRun({ runtime: detection.runtime, label: detection.label, command: "browser sandbox", status: "Preview พร้อมแล้ว", previewHtml: sandboxPreviewDocument(detection.runtime, detection.code) });
@@ -195,14 +207,17 @@ export function AppShell({ search }: { search: Search }) {
       }
       await runAgentLoop({
         messages: history, signal: ac.signal, tools,
-        maxRuns: 6,
+        maxRuns: tools ? Math.min(8, Math.max(initialCall ? 2 : 1, intent.maxRuns)) : 0,
+        maxGateRejections: intent.maxGateRejections,
+        intent: { label: intent.label, directive: intent.directive },
         execute,
-        initialCall,
+        initialCall: tools ? initialCall : undefined,
         initialCallApproved: allowDangerous,
         workspace: createHttpWorkspace(workspaceId),
-        requireWorkspaceSync: tools,
+        requireWorkspaceSync: tools && intent.requireWorkspaceSync,
         onPhase: (phase: AgentPhase, detail?: string) => {
           const labels: Record<AgentPhase, string> = {
+            intent: "🧭 Intent • อ่านเจตนาผู้ใช้",
             goal: "🎯 Goal • เป้าหมาย",
             plan: "🧠 Plan • วางแผน",
             act: "🛠️ Act • ลงมือทำ",
@@ -218,7 +233,8 @@ export function AppShell({ search }: { search: Search }) {
         onSkillSaved: (path, saved) => pushActivity({ kind: "skill", path, status: saved ? "saved" : "failed" }),
         model: async (messages, onText) => {
           let failure = "";
-          await streamChat({ messages, mode: chatMode, signal: ac.signal, tools, latestUser: content,
+          await streamChat({ messages, mode: intent.mode === "think" ? "think" : chatMode, signal: ac.signal, tools, latestUser: content,
+            directives: [intent.directive],
             onEvent: event => {
               if (ac.signal.aborted) return;
               if (event.type === "text") onText(event.text);
@@ -233,7 +249,7 @@ export function AppShell({ search }: { search: Search }) {
       if (ac.signal.aborted) { append("\n\n⛔ หยุดการทำงานแล้ว"); }
       else { const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด"; append(`\n\n${message}`); toast.error(message); }
     } finally {
-      finishVoice(); setBusyChat(false); setStreamingId(null);
+      finishVoice(); setBusyChat(false); setStreamingId(null); setIntentPlan(null);
     }
   }
 
@@ -553,6 +569,7 @@ export function AppShell({ search }: { search: Search }) {
                   const hint = prompts[tool];
                   if (hint && !draft.trim()) setDraft(hint);
                 }}
+            onOpenCall={() => setCallOpen(true)}
             voiceEnabled={voiceEnabled}
             onToggleVoice={() => {
               const next = !voiceEnabled;
@@ -578,7 +595,15 @@ export function AppShell({ search }: { search: Search }) {
                 }
               />
               <p className="mt-2 px-1 text-center text-[0.7rem] text-subtle">
-                สลี่พร้อมช่วยค่ะ • แชตเก็บไว้บนอุปกรณ์นี้ • <kbd className="font-sans">/</kbd> พิมพ์ • <kbd className="font-sans">Ctrl K</kbd> ค้นหา • <kbd className="font-sans">Esc</kbd> หยุด
+                {intentPlan ? (
+                  <span className="font-medium text-primary">
+                    🧭 อ่านเจตนาแล้ว: {intentPlan.label} • {intentPlan.runCode ? "รันโค้ดจริงและแก้จนผ่าน" : "ตอบตรงไม่ต้องรัน"}
+                  </span>
+                ) : (
+                  <>
+                    สลี่พร้อมช่วยค่ะ • แชตเก็บไว้บนอุปกรณ์นี้ • <kbd className="font-sans">/</kbd> พิมพ์ • <kbd className="font-sans">Ctrl K</kbd> ค้นหา • <kbd className="font-sans">Esc</kbd> หยุด
+                  </>
+                )}
               </p>
             </div>}
           </>
@@ -588,6 +613,7 @@ export function AppShell({ search }: { search: Search }) {
         <SaliCallView
           history={activeChat?.messages ?? []}
           onClose={() => setCallOpen(false)}
+          onHandoff={(spoken) => void send(spoken, activeChat?.id)}
           onSaveMessage={(role, content) => {
             if (!activeChat?.id) return;
             if (role === "user") store.addUserMessage(activeChat.id, content);

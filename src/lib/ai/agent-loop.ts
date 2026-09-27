@@ -1,4 +1,12 @@
-import { RunScanner, modelResult, terminalTranscript } from "./sandbox-tool.ts";
+import {
+  RunScanner,
+  commandSignature,
+  diagnoseFailure,
+  lintRunCall,
+  modelResult,
+  normalizeRunCall,
+  terminalTranscript,
+} from "./sandbox-tool.ts";
 import type { RunCall, ToolResult } from "./sandbox-tool.ts";
 import { CowAgentCore, buildCowPlan } from "./cow-agent-core.ts";
 import { selectSkills } from "../skills/index.ts";
@@ -21,7 +29,10 @@ function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 export type AgentMessage = { role: "user" | "assistant"; content: string };
-export type AgentPhase = "goal" | "plan" | "act" | "run" | "observe" | "verify" | "fix" | "answer";
+export type AgentPhase = "intent" | "goal" | "plan" | "act" | "run" | "observe" | "verify" | "fix" | "answer";
+
+/** How many times a command may be rejected before a run is spent on it. */
+export const MAX_PRECHECK_FAILURES = 3;
 
 /**
  * Persistent Agent Home used by the loop. Injected (HTTP in the browser, DB on
@@ -126,6 +137,10 @@ export async function runAgentLoop(opts: {
   onPhase?: (phase: AgentPhase, detail?: string) => void;
   onSkillSaved?: (path: string, saved: boolean) => void;
   maxRuns?: number;
+  /** How often the model may answer while evidence is failing (intent-driven). */
+  maxGateRejections?: number;
+  /** Intent read from the user's message; injected into the loop context. */
+  intent?: { label: string; directive?: string } | null;
   workspace?: AgentWorkspace | null;
   /** Require a verified, complete Neon read-back for a run to pass. */
   requireWorkspaceSync?: boolean;
@@ -144,13 +159,21 @@ export async function runAgentLoop(opts: {
   const core = new CowAgentCore(goal);
   const plan = buildCowPlan(goal, selectedSkills.map(skill => skill.name));
   const max = Math.min(MAX_RUNS_CAP, Math.max(0, Math.floor(opts.maxRuns ?? DEFAULT_MAX_RUNS)));
+  const maxRejections = Math.max(1, Math.floor(opts.maxGateRejections ?? MAX_GATE_REJECTIONS));
+  /** command signature → how many times it already failed (repeat detection). */
+  const failCounts = new Map<string, number>();
   let count = 0;
   let rejections = 0;
+  let precheckFailures = 0;
   let initialCallPending = opts.initialCall ?? null;
   let lastVerdict: EvidenceVerdict | null = opts.priorResult ? evaluateEvidence(opts.priorResult, { requireWorkspace }) : null;
 
   opts.onPhase?.("goal", "🎯 เป้าหมาย");
   opts.onText(`\n> 🎯 เป้าหมาย: ${goal.slice(0, 300)}\n`);
+  if (opts.intent) {
+    core.remember("intent", opts.intent.label, "user");
+    opts.onPhase?.("intent", `🧭 Intent • ${opts.intent.label}`);
+  }
   const workspaceContext = workspace ? await safely(() => workspace.context(goal), "Persistent Workspace โหลดไม่สำเร็จ") : "ไม่มี Persistent Workspace";
   if (workspace) await safely(() => workspace.startTask(goal, core.task.id), undefined);
 
@@ -179,7 +202,9 @@ export async function runAgentLoop(opts: {
     const accept = (events: ReturnType<RunScanner["push"]>) => {
       for (const event of events) {
         if (event.type === "text") show(event.text);
-        else calls.push(event.call);
+        // Always scan, so a stray <run> block never leaks into the answer even
+        // when this intent does not allow code execution.
+        else if (opts.tools) calls.push(event.call);
       }
     };
 
@@ -188,6 +213,8 @@ export async function runAgentLoop(opts: {
       workspaceContext,
       "Goal: " + goal.slice(0, 1000),
       "Active skills: " + (selectedSkills.map(skill => skill.name).join(", ") || "General"),
+      opts.intent ? `User intent (routed before this turn): ${opts.intent.label}` : "",
+      opts.intent?.directive ?? "",
       "Plan: " + plan.join(" → "),
       "Relevant memory:",
       core.context(goal),
@@ -207,13 +234,12 @@ export async function runAgentLoop(opts: {
         opts.model([{ role: "assistant", content: agentContext }, ...messages], text => {
           if (opts.signal.aborted) return;
           raw += text;
-          if (opts.tools) accept(scanner.push(text));
-          else show(text);
+          accept(scanner.push(text));
         }),
         opts.signal,
       );
       if (opts.signal.aborted) return finish("aborted");
-      if (opts.tools) accept(scanner.finish());
+      accept(scanner.finish());
     }
 
     if (!calls.length) {
@@ -222,10 +248,10 @@ export async function runAgentLoop(opts: {
         rejections++;
         const runsLeft = max - count;
         core.setPhase("verify");
-        if (rejections < MAX_GATE_REJECTIONS && runsLeft > 0) {
-          opts.onPhase?.("verify", `🚧 Verification Gate • ยังไม่ผ่าน (${rejections}/${MAX_GATE_REJECTIONS}) ให้ Fix → Run → Verify ใหม่`);
+        if (rejections < maxRejections && runsLeft > 0) {
+          opts.onPhase?.("verify", `🚧 Verification Gate • ยังไม่ผ่าน (${rejections}/${maxRejections}) ให้ Fix → Run → Verify ใหม่`);
           messages.push({ role: "assistant", content: raw || "(no answer)" });
-          messages.push({ role: "user", content: gateMessage(lastVerdict.reasons, rejections, runsLeft) });
+          messages.push({ role: "user", content: gateMessage(lastVerdict.reasons, rejections, runsLeft, maxRejections) });
           continue;
         }
         if (held.trim() && !claimsCompletion(held)) opts.onText(held);
@@ -249,8 +275,33 @@ export async function runAgentLoop(opts: {
     }
 
     for (let index = 0; index < calls.length; index++) {
-      const call = calls[index];
+      const requested = calls[index];
       if (opts.signal.aborted) return finish("aborted");
+
+      // ── Pre-run repair ────────────────────────────────────────────────────
+      // Fix the command itself (raw source → heredoc, stray fences/protocol
+      // tags) and refuse to spend a Sandbox run on something that cannot parse.
+      const prepared = normalizeRunCall(requested);
+      const call = prepared.call;
+      const lint = lintRunCall(call);
+      if (prepared.notes.length) opts.onPhase?.("fix", `🩹 Pre-run • ${prepared.notes.join(" • ")}`);
+      if (!lint.ok) {
+        precheckFailures++;
+        rejections++;
+        core.setPhase("fix");
+        opts.onPhase?.("fix", `🐛 Pre-run Check • คำสั่งยังไม่พร้อมรัน (${precheckFailures}/${MAX_PRECHECK_FAILURES})`);
+        opts.onText(`\n> 🩹 ตรวจก่อนรัน (ยังไม่เสียโควตารัน): ${lint.problems.join(" • ")}\n`);
+        messages.push({
+          role: "user",
+          content: `PRE-RUN CHECK FAILED (attempt ${precheckFailures}/${MAX_PRECHECK_FAILURES}) — the command was NOT executed:\n${lint.problems.map(problem => `- ${problem}`).join("\n")}\nFix the command so it is valid shell, then emit a corrected sandbox block.`,
+        });
+        if (precheckFailures >= MAX_PRECHECK_FAILURES) {
+          opts.onText(unverifiedNotice(lint.problems));
+          opts.onPhase?.("answer", "💬 Answer • แก้คำสั่งไม่สำเร็จ");
+          return finish("unverified");
+        }
+        break;
+      }
 
       if (count >= max) {
         opts.onPhase?.("answer", "💬 Answer • ถึงขีดจำกัดการรัน");
@@ -267,7 +318,9 @@ export async function runAgentLoop(opts: {
 
       let result: ToolResult;
       try {
-        result = await opts.execute(call, forcedCall === call ? opts.initialCallApproved : undefined);
+        // Identity is checked against the model's original call: `call` may be a
+        // normalized copy, and the user's approval belongs to their command.
+        result = await opts.execute(call, forcedCall === requested ? opts.initialCallApproved : undefined);
       } catch (error) {
         result = { status: opts.signal.aborted ? "aborted" : "error", error: error instanceof Error ? error.message : String(error) };
       }
@@ -309,11 +362,28 @@ export async function runAgentLoop(opts: {
 
       if (!lastVerdict.passed) {
         core.setPhase("fix");
-        opts.onPhase?.("fix", "🐛 Fix • พบปัญหา กำลังแก้แล้วรันใหม่");
+        const signature = commandSignature(call);
+        const repeats = (failCounts.get(signature) ?? 0) + 1;
+        failCounts.set(signature, repeats);
+        const hints = diagnoseFailure(result);
         const skipped = calls.length - index - 1;
+        const runsLeft = Math.max(0, max - count);
+        opts.onPhase?.("fix", `🐛 Fix • พบปัญหา กำลังแก้แล้วรันใหม่${repeats > 1 ? ` (คำสั่งนี้พลาดครั้งที่ ${repeats})` : ""}`);
+        if (hints.length) opts.onText(`\n> 🩹 แนวทางแก้จาก output จริง: ${hints[0]}\n`);
         messages.push({
           role: "user",
-          content: `VERIFY FAILED:\n${lastVerdict.reasons.map(r => `- ${r}`).join("\n")}${skipped ? `\n${skipped} later sandbox block(s) in your message were NOT run.` : ""}\nFix the cause, run again, and verify before answering.`,
+          content: [
+            `VERIFY FAILED (this exact command has now failed ${repeats} time(s)):`,
+            ...lastVerdict.reasons.map(r => `- ${r}`),
+            ...(hints.length ? ["Diagnosis from the real output:", ...hints.map(hint => `- ${hint}`)] : []),
+            repeats > 1
+              ? "- Do NOT re-run this command unchanged. Change the code or the approach, then verify again."
+              : "",
+            skipped ? `- ${skipped} later sandbox block(s) in your message were NOT run.` : "",
+            runsLeft > 0
+              ? `Fix the root cause, run again (${runsLeft} run(s) left) and verify the real output before answering.`
+              : "No runs are left: explain honestly what still fails and what the user should do next.",
+          ].filter(Boolean).join("\n"),
         });
         break;
       }

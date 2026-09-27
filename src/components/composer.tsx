@@ -9,7 +9,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { ArrowUp, Check, FileText, Mic, Paperclip, Square, Sparkles, Volume2, VolumeX, Wrench, X } from "lucide-react";
+import { ArrowUp, Check, FileText, Mic, Paperclip, Phone, Square, Sparkles, Volume2, VolumeX, Wrench, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ATTACHMENT_ACCEPT, formatBytes, readAttachments } from "@/lib/attachments";
@@ -21,7 +21,7 @@ export type ToolAction = { id: string; label: string };
 
 export function Composer({
   value, onChange, onSubmit, onStop, placeholder, disabled, busy, extra,
-  contextualActions, onContextAction, voiceEnabled, onToggleVoice,
+  contextualActions, onContextAction, voiceEnabled, onToggleVoice, onOpenCall,
   toolActions, activeTool, onToolAction,
   attachments, onAttachments, inputRef, dictation = true,
 }: {
@@ -37,6 +37,8 @@ export function Composer({
   onContextAction?: (action: string) => void;
   voiceEnabled?: boolean;
   onToggleVoice?: () => void;
+  /** Open the realtime voice call (multi-speaker supported). */
+  onOpenCall?: () => void;
   /** Optional tool picker ("which capability should handle this?"). */
   toolActions?: ToolAction[];
   activeTool?: string | null;
@@ -284,6 +286,17 @@ export function Composer({
               className="grid size-10 shrink-0 place-items-center rounded-xl text-muted transition-colors hover:bg-hover hover:text-fg"
             >
               {voiceEnabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
+            </button>
+          ) : null}
+          {onOpenCall ? (
+            <button
+              type="button"
+              aria-label="โทรคุยเสียงแบบเรียลไทม์"
+              title="โทรคุยเสียงแบบเรียลไทม์ (เปิดโหมดหลายคนได้)"
+              onClick={onOpenCall}
+              className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-colors hover:bg-primary/20"
+            >
+              <Phone className="size-4" />
             </button>
           ) : null}
           <div className="ml-auto shrink-0">

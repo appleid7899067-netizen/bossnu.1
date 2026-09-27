@@ -7,7 +7,19 @@ import type { PersonalitySettings } from "@/lib/types";
 import { exportBackup, useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getAvailableVoices, getVoiceSettings, isVoiceSupported, updateVoiceSettings, applyVoiceMode, VOICE_MODES, type VoiceSettings } from "@/lib/ai/voice";
+import { getAvailableVoices, getVoiceSettings, isVoiceSupported, updateVoiceSettings, applyVoiceMode, speakNow, VOICE_MODES, type VoiceSettings } from "@/lib/ai/voice";
+import {
+  MAX_CAST_SIZE,
+  VOICE_PERSONAS,
+  activePersonas,
+  getVoiceCast,
+  setPersonaVoice,
+  subscribeVoiceCast,
+  toSpeakerVoice,
+  toggleCastParticipant,
+  updateVoiceCast,
+  type VoiceCastConfig,
+} from "@/lib/ai/multi-voice";
 
 const SANDBOX_LANGUAGES = [
   { id: "python", label: "Python", file: "main.py" },
@@ -199,6 +211,7 @@ function VoicePanel({ supported, settings, voices, onChange }: { supported: bool
       {!supported ? <div className="rounded-xl bg-clay p-3 text-sm text-muted">เบราว์เซอร์นี้ยังไม่รองรับเสียงพูดแบบ Speech Synthesis</div> : null}
       <Toggle label="เปิดเสียงตอบกลับอัตโนมัติ" value={settings.enabled} onChange={(value) => onChange({ enabled: value })} />
       <div><p className="mb-2 text-sm font-medium">โหมดเสียง</p><div className="grid gap-2 sm:grid-cols-2">{VOICE_MODES.map((mode) => <button key={mode.id} type="button" onClick={() => { applyVoiceMode(mode.id); onChange({ mode: mode.id, rate: mode.rate, pitch: mode.pitch }); }} className={cn("rounded-xl border p-3 text-left transition-all", settings.mode === mode.id ? "border-primary bg-primary/10 text-fg shadow-[0_0_18px_rgba(139,92,246,.18)]" : "border-border bg-clay text-muted hover:text-fg")}><span className="text-sm font-medium">{mode.label}</span><span className="mt-1 block text-xs opacity-75">{mode.description}</span></button>)}</div></div>
+      <MultiVoiceSection />
       <label className="block text-sm"><div className="mb-2 flex justify-between"><span>ความเร็ว</span><span className="text-xs text-muted">{settings.rate.toFixed(2)}×</span></div><input type="range" min="0.7" max="1.3" step="0.01" value={settings.rate} onChange={(e) => onChange({ rate: Number(e.target.value) })} className="w-full"/></label>
       <label className="block text-sm"><div className="mb-2 flex justify-between"><span>โทนเสียง</span><span className="text-xs text-muted">{settings.pitch.toFixed(2)}</span></div><input type="range" min="0.7" max="1.5" step="0.01" value={settings.pitch} onChange={(e) => onChange({ pitch: Number(e.target.value) })} className="w-full"/></label>
       <label className="block text-sm"><div className="mb-2 flex justify-between"><span>ระดับเสียง</span><span className="text-xs text-muted">{Math.round(settings.volume * 100)}%</span></div><input type="range" min="0.2" max="1" step="0.01" value={settings.volume} onChange={(e) => onChange({ volume: Number(e.target.value) })} className="w-full"/></label>
@@ -207,6 +220,69 @@ function VoicePanel({ supported, settings, voices, onChange }: { supported: bool
       <p className="text-xs leading-relaxed text-subtle">ค่าจะบันทึกในเครื่องทันที และมีผลกับเสียงระหว่างการตอบแบบสตรีมด้วย</p>
     </div>
   </Panel>;
+}
+
+function MultiVoiceSection() {
+  const [cast, setCast] = useState<VoiceCastConfig>(() => getVoiceCast());
+  const [testing, setTesting] = useState(false);
+  useEffect(() => subscribeVoiceCast(setCast), []);
+  const personas = activePersonas(cast);
+
+  const testAll = async () => {
+    setTesting(true);
+    try {
+      for (const persona of personas) {
+        await speakNow(`สวัสดีค่ะ ${persona.name} นะคะ รับหน้าที่${persona.role}ค่ะ`, { speaker: toSpeakerVoice(persona) });
+      }
+    } finally { setTesting(false); }
+  };
+
+  return <div className="rounded-2xl border border-border bg-clay p-3">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-sm font-medium">โหมดเสียงหลายคน (Round table)</p>
+        <p className="mt-0.5 text-xs text-muted">ให้หลายตัวละครตอบสลับกันด้วยเสียงคนละแบบ ใช้ในโหมดโทรเรียลไทม์</p>
+      </div>
+      <button type="button" role="switch" aria-checked={cast.enabled} aria-label="เปิดโหมดเสียงหลายคน"
+        onClick={() => setCast(updateVoiceCast({ enabled: !cast.enabled }))}
+        className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors", cast.enabled ? "bg-primary" : "bg-border")}>
+        <span className={cn("absolute top-0.5 size-5 rounded-full bg-bg transition-all", cast.enabled ? "left-[22px]" : "left-0.5")} />
+      </button>
+    </div>
+
+    <div className="mt-3 flex flex-wrap gap-2">
+      {VOICE_PERSONAS.map((persona) => {
+        const picked = cast.participants.includes(persona.id);
+        return <button key={persona.id} type="button" onClick={() => setCast(toggleCastParticipant(persona.id))}
+          className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors",
+            picked ? "border-primary bg-primary/15 text-fg" : "border-border bg-bg text-muted hover:text-fg")}>
+          <span>{persona.emoji}</span><span className="font-medium">{persona.name}</span><span className="opacity-70">{persona.role}</span>
+        </button>;
+      })}
+    </div>
+    <p className="mt-2 text-[11px] text-subtle">เลือกได้สูงสุด {MAX_CAST_SIZE} คน • คนแรกคือผู้พูดหลัก</p>
+
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      {personas.map((persona) => <label key={persona.id} className="block text-xs">
+        <span className="mb-1 flex items-center gap-1.5 text-muted"><span>{persona.emoji}</span>{persona.name}</span>
+        <select value={persona.mode} onChange={(event) => setCast(setPersonaVoice(persona.id, event.target.value as typeof persona.mode))}
+          className="w-full rounded-xl bg-bg px-2.5 py-2 text-fg outline-none">
+          {VOICE_MODES.map((mode) => <option key={mode.id} value={mode.id}>{mode.label}</option>)}
+        </select>
+      </label>)}
+    </div>
+
+    <div className="mt-3 grid gap-2">
+      <Toggle label="สลับคนพูดอัตโนมัติเมื่อไม่มีแท็กชื่อ" value={cast.roundRobin} onChange={(value) => setCast(updateVoiceCast({ roundRobin: value }))} />
+      <Toggle label="พูดแทรกได้ (บอทหยุดพูดทันทีที่ได้ยินเรา)" value={cast.bargeIn} onChange={(value) => setCast(updateVoiceCast({ bargeIn: value }))} />
+      <Toggle label="ต่อไมค์ใหม่อัตโนมัติเมื่อสัญญาณหลุด" value={cast.autoRestart} onChange={(value) => setCast(updateVoiceCast({ autoRestart: value }))} />
+    </div>
+
+    <button type="button" onClick={() => void testAll()} disabled={testing}
+      className="mt-3 w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm font-medium text-fg disabled:opacity-50">
+      {testing ? "กำลังเล่นเสียงทดสอบ…" : `🔊 ทดลองเสียงทั้ง ${personas.length} คน`}
+    </button>
+  </div>;
 }
 
 function DataPanel() {

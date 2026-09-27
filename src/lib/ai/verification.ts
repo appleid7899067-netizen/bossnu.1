@@ -58,9 +58,9 @@ export function claimsCompletion(text: string): boolean {
 export const MAX_GATE_REJECTIONS = 2;
 
 /** Message injected back to the model when it tries to finish without passing evidence. */
-export function gateMessage(reasons: string[], attempt: number, runsLeft: number) {
+export function gateMessage(reasons: string[], attempt: number, runsLeft: number, limit: number = MAX_GATE_REJECTIONS) {
   return [
-    `VERIFICATION GATE (rejection ${attempt}/${MAX_GATE_REJECTIONS}): the last Sandbox run did NOT pass verification.`,
+    `VERIFICATION GATE (rejection ${attempt}/${limit}): the last Sandbox run did NOT pass verification.`,
     ...reasons.map((r) => `- ${r}`),
     "You must not tell the user the work is done/เสร็จแล้ว.",
     runsLeft > 0

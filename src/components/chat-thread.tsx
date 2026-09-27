@@ -237,6 +237,7 @@ function MessageBubble({
 
 
 const PHASE_TITLES: Record<string, string> = {
+  intent: "Intent • อ่านเจตนาผู้ใช้",
   goal: "Goal • เป้าหมาย",
   plan: "Plan • วางแผน",
   act: "Act • ลงมือทำ",

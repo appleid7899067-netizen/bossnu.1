@@ -63,6 +63,8 @@ export async function streamChat(opts: {
   signal?: AbortSignal;
   tools?: boolean;
   latestUser?: string;
+  /** Extra system lines: intent routing, multi-voice cast, repair contract. */
+  directives?: string[];
   onEvent: (event: StreamEvent) => void;
 }) {
   try {
@@ -92,8 +94,10 @@ export async function streamChat(opts: {
       memories ? `ความจำที่บันทึกไว้:\n${memories}` : "ไม่มีความจำที่บันทึกไว้",
       learnedSkills ? `ทักษะจากโค้ดที่เคยทดสอบผ่าน:\n${learnedSkills}` : "ยังไม่มีทักษะโค้ดที่ทดสอบผ่าน",
       "ห้ามอ้างว่าทำสิ่งที่ยังไม่ได้ทำจริง",
+      ...(opts.directives ?? []).filter(Boolean),
       buildSkillContext(latestUser),
-      SANDBOX_TOOL_PROMPT,
+      // Only hand the model the terminal protocol when this intent may run code.
+      opts.tools === false ? "" : SANDBOX_TOOL_PROMPT,
     ].filter(Boolean).join("\n");
 
     const response = await puter.ai.chat(
