@@ -84,6 +84,76 @@ function detectPort(session) {
   const m = text.match(/(?:localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0)[:\\s]+(\\d{2,5})/i) || text.match(/port\\s+(\\d{2,5})/i);
   return Number(m && m[1] || 5173);
 }
+function sseHeaders(res) {
+  res.writeHead(200, {
+    "content-type": "text/event-stream; charset=utf-8",
+    "cache-control": "no-cache, no-transform",
+    connection: "keep-alive",
+    "access-control-allow-origin": process.env.ALLOW_ORIGIN || "*",
+    "access-control-allow-methods": "POST,GET,OPTIONS",
+    "access-control-allow-headers": "content-type",
+  });
+}
+function sse(res, event) {
+  res.write("data: " + JSON.stringify(event) + "\n\n");
+}
+async function executeStream(body, res) {
+  const language = String(body.language || "").toLowerCase();
+  const command = typeof body.command === "string" ? body.command.trim() : "";
+  if (!command) throw new Error("command_required");
+  if (!["node","bash","python","go","rust","java","cpp"].includes(language)) throw new Error("unsupported_runtime");
+  const dir = await mkdtemp(join(tmpdir(), "bossnu-work-"));
+  let keep = false;
+  const started = Date.now();
+  try {
+    sseHeaders(res);
+    sse(res, { type: "status", status: "queued", message: "รับคำสั่ง Sandbox" });
+    await cloneWorkspace(dir);
+    sse(res, { type: "status", status: "running", message: "กำลังรันจริงใน Sandbox Runner" });
+    if (language === "node" && /^npm\s+run\s+dev\b/i.test(command)) {
+      await prepareNode(dir);
+      const session = startPersistent("npm", ["run", "dev", "--", "--host", "0.0.0.0"], dir);
+      keep = true;
+      const sendOutput = () => {
+        const out = session.stdout();
+        const err = session.stderr();
+        if (out) sse(res, { type: "output", stream: "stdout", text: out });
+        if (err) sse(res, { type: "output", stream: "stderr", text: err });
+      };
+      await new Promise(r => setTimeout(r, 2200));
+      sendOutput();
+      const port = detectPort(session);
+      const result = {
+        success: !session.exited,
+        status: session.exited ? "error" : "running",
+        type: session.exited ? "node" : "dev-server",
+        runtime: language, label: "Node.js", command,
+        stdout: session.stdout(), stderr: session.stderr(),
+        output: [session.stdout(), session.stderr()].filter(Boolean).join("\n").trim().slice(-MAX_OUTPUT),
+        sessionId: session.id, port, previewPath: "/preview/" + session.id + "/",
+        durationMs: Date.now() - started,
+      };
+      sse(res, { type: "complete", result });
+      return res.end();
+    }
+    const child = spawn("bash", ["-lc", command], {
+      cwd: dir, env: { PATH: "/usr/local/bin:/usr/bin:/bin", HOME: dir, LANG: "C.UTF-8", HOST: "0.0.0.0" },
+      detached: true, stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stdout = "", stderr = "", timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; try { process.kill(-child.pid, "SIGKILL"); } catch {} }, TIMEOUT_MS);
+    child.stdout.on("data", c => { const t=c.toString("utf8"); stdout=append(stdout,c); sse(res,{type:"output",stream:"stdout",text:t}); });
+    child.stderr.on("data", c => { const t=c.toString("utf8"); stderr=append(stderr,c); sse(res,{type:"output",stream:"stderr",text:t}); });
+    await new Promise(resolve => {
+      child.on("error", e => { stderr=append(stderr,e); resolve(); });
+      child.on("close", code => { clearTimeout(timer); const status=timedOut?"timeout":code===0?"success":"error"; sse(res,{type:"complete",result:{success:status==="success",status,type:language,runtime:language,command,stdout,stderr,output:[stdout,stderr].filter(Boolean).join("\n").trim(),exitCode:code,durationMs:Date.now()-started}}); resolve(); });
+    });
+    return res.end();
+  } finally {
+    if (!keep) await rm(dir, { recursive: true, force: true });
+  }
+}
+
 async function execute(body) {
   const language = String(body.language || "").toLowerCase();
   const command = typeof body.command === "string" ? body.command.trim() : "";
@@ -139,6 +209,10 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && req.url && req.url.startsWith("/preview/")) {
     const parts = req.url.split("/").filter(Boolean);
     return proxyPreview(req, res, parts[1], parts.slice(2).join("/"));
+  }
+  if (req.method === "POST" && req.url === "/execute/stream") {
+    try { return await executeStream(await readBody(req), res); }
+    catch (error) { if (!res.headersSent) send(res, 400, { error: error instanceof Error ? error.message : "bad_request" }); else res.end(); return; }
   }
   if (req.method !== "POST" || req.url !== "/execute") return send(res, 404, { error: "not_found" });
   try {
