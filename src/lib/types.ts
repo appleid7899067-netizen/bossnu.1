@@ -13,4 +13,29 @@ export type PersonalitySettings = { name: string; tone: string; actFirst: boolea
 export type AgentSkill = { id: string; name: string; description: string; enabled: boolean; };
 export type AgentProfile = { id: string; name: string; role: string; instructions: string; skills: string[]; createdAt: number; };
 export type MemoryItem = { id: string; content: string; createdAt: number; };
-export type LearnedSkill = { id: string; name: string; runtime: string; pattern: string; testCommand?: string; result: "passed" | "failed"; evidence: string; createdAt: number; uses: number; lastTestedAt?: number; };
+export type LearnedSkill = {
+  id: string;
+  name: string;
+  runtime: string;
+  pattern: string;
+  testCommand?: string;
+  result: "passed" | "failed";
+  evidence: string;
+  output?: string;
+  exitCode?: number | null;
+  durationMs?: number;
+  createdAt: number;
+  uses: number;
+  lastTestedAt?: number;
+};
+
+export type CommandHistoryItem = {
+  id: string;
+  command: string;
+  runtime: string;
+  status: "success" | "error" | "running";
+  output?: string;
+  exitCode?: number | null;
+  durationMs?: number;
+  timestamp: number;
+};

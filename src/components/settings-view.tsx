@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bot, Brain, FolderOpen, Play, Plus, Sparkles, Trash2, UserRound, WandSparkles } from "lucide-react";
+import { BookOpen, Bot, Brain, Check, FolderOpen, Play, Plus, Sparkles, SquareTerminal, Terminal, Trash2, UserRound, WandSparkles } from "lucide-react";
 import type { PersonalitySettings } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,7 @@ const SANDBOX_DEFAULTS: Record<string, string> = {
 
 export function SettingsView() {
   const store = useAppStore();
-  const [tab, setTab] = useState<"personality"|"skills"|"agents"|"memory"|"profiles"|"sandbox"|"voice">("personality");
+  const [tab, setTab] = useState<"personality"|"skills"|"learned"|"history"|"agents"|"memory"|"profiles"|"sandbox"|"voice">("personality");
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => getVoiceSettings());
   const [voiceList, setVoiceList] = useState<{ name: string; lang: string }[]>([]);
   const [newMemory, setNewMemory] = useState("");
@@ -133,7 +133,7 @@ export function SettingsView() {
       </div>
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3">
         {[
-          ["personality","บุคลิค",Sparkles],["skills","สกิล",WandSparkles],["agents","ตัวแทน",Bot],["memory","ความจำ",Brain],["profiles","แฟ้มโปรไฟล์",FolderOpen],["voice","เสียง",Sparkles],["sandbox","Sandbox",Play],
+          ["personality","บุคลิค",Sparkles],["skills","สกิล",WandSparkles],["learned",`ทักษะที่บันทึก (${store.learnedSkills.length})`,BookOpen],["history",`ประวัติคำสั่ง (${store.commandHistory.length})`,Terminal],["agents","ตัวแทน",Bot],["memory","ความจำ",Brain],["profiles","แฟ้มโปรไฟล์",FolderOpen],["voice","เสียง",Sparkles],["sandbox","Sandbox",Play],
         ].map(([id,label,Icon]) => <button key={id as string} type="button" onClick={() => setTab(id as typeof tab)} className={cn("flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-sm",tab===id?"bg-elevated text-fg":"text-muted hover:bg-hover hover:text-fg")}><Icon className="size-4"/>{label as string}</button>)}
       </div>
 
@@ -145,6 +145,102 @@ export function SettingsView() {
       {tab==="voice" ? <VoicePanel supported={isVoiceSupported()} settings={voiceSettings} voices={voiceList} onChange={changeVoice} /> : null}
 
       {tab==="skills" ? <Panel title={`สกิลที่ใช้งาน • ${enabledCount}/${skills.length}`} icon={WandSparkles}><div className="grid gap-2 md:grid-cols-2">{skills.map(skill=><div key={skill.id} className="flex items-center justify-between rounded-xl bg-clay p-3"><div><p className="text-sm font-medium">{skill.name}</p><p className="text-xs text-muted">{skill.description}</p></div><button type="button" onClick={()=>store.toggleAgentSkill(skill.id)} className={cn("rounded-full px-3 py-1 text-xs",skill.enabled?"bg-fg text-bg":"bg-elevated text-muted")}>{skill.enabled?"เปิด":"ปิด"}</button></div>)}</div></Panel> : null}
+
+      {tab==="learned" ? <Panel title={`ทักษะที่เรียนรู้จากการรันจริง • ${store.learnedSkills.length} รายการ`} icon={BookOpen}>
+        <div className="mb-4 rounded-xl bg-clay p-3.5 text-xs leading-relaxed text-muted">
+          <p className="font-medium text-fg">📁 บันทึกในไฟล์: <code className="rounded bg-bg px-1.5 py-0.5 text-primary">data/learned-skills.json</code> และ <code className="rounded bg-bg px-1.5 py-0.5 text-primary">data/learned-skills.md</code></p>
+          <p className="mt-1">ทุกครั้งที่รันคำสั่งโค้ดใน Sandbox Terminal ระบบจะอัปเดตไฟล์แบบเรียลไทม์ และนำทักษะไปเป็นบริบทให้สลี่ (AI) ทันที</p>
+        </div>
+        {store.learnedSkills.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted">
+            ยังไม่มีทักษะที่บันทึกไว้ ลองรันคำสั่งใน Sandbox Terminal หรือบอกให้สลี่รันโค้ดดูนะคะ
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {store.learnedSkills.map((item) => (
+              <div key={item.id} className="rounded-2xl bg-clay p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-semibold", item.result === "passed" ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400")}>
+                      {item.result === "passed" ? "✓ ผ่าน" : "✗ ล้มเหลว"}
+                    </span>
+                    <span className="font-semibold text-sm">{item.name}</span>
+                    <span className="rounded bg-bg px-2 py-0.5 font-mono text-[11px] text-zinc-400">{item.runtime}</span>
+                  </div>
+                  <div className="text-[11px] text-muted">
+                    ใช้งาน {item.uses} ครั้ง • {new Date(item.lastTestedAt || item.createdAt).toLocaleString("th-TH")}
+                  </div>
+                </div>
+                <pre className="mt-3 overflow-x-auto rounded-xl bg-bg/70 p-3 font-mono text-xs leading-relaxed text-zinc-300">
+                  {item.pattern}
+                </pre>
+                {item.evidence ? (
+                  <div className="mt-2 text-[11px]">
+                    <span className="text-muted">ผลลัพธ์ที่ตรวจพบ: </span>
+                    <span className="font-mono text-emerald-400">{item.evidence.slice(0, 160)}</span>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel> : null}
+
+      {tab==="history" ? <Panel title="ประวัติคำสั่ง (Command History)" icon={Terminal}>
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-clay p-3.5 text-xs text-muted">
+          <div>
+            <p className="font-medium text-fg">บันทึกคำสั่งที่รันใน Repository ทั้งหมด</p>
+            <p className="mt-0.5">รวม {store.commandHistory.length} คำสั่งที่บันทึกไว้</p>
+          </div>
+          {store.commandHistory.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("ต้องการล้างประวัติคำสั่งทั้งหมดหรือไม่?")) {
+                  store.clearCommandHistory();
+                }
+              }}
+              className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs text-rose-400 hover:bg-rose-500/10 transition"
+            >
+              <Trash2 className="size-3.5" />
+              <span>ล้างประวัติ</span>
+            </button>
+          )}
+        </div>
+        {store.commandHistory.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted">
+            ยังไม่มีประวัติคำสั่งที่เคยรันในรีโพ
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {store.commandHistory.map((item) => (
+              <div key={item.id} className="rounded-2xl bg-clay p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-semibold", item.status === "success" ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400")}>
+                      {item.status === "success" ? "✓ สำเร็จ" : "✗ ผิดพลาด"}
+                    </span>
+                    <span className="font-mono text-xs font-bold text-primary">{item.runtime}</span>
+                    {item.durationMs ? <span className="font-mono text-[11px] text-muted">{item.durationMs}ms</span> : null}
+                  </div>
+                  <div className="text-[11px] text-muted">
+                    {new Date(item.timestamp).toLocaleString("th-TH")}
+                  </div>
+                </div>
+                <div className="mt-2 rounded-xl bg-bg/80 p-3 font-mono text-xs text-zinc-200">
+                  <span className="text-emerald-400 select-none">$ </span>
+                  {item.command}
+                </div>
+                {item.output ? (
+                  <pre className="mt-2 max-h-36 overflow-auto rounded-xl bg-bg/50 p-2.5 font-mono text-[11px] leading-relaxed text-zinc-400">
+                    {item.output}
+                  </pre>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel> : null}
 
       {tab==="agents" ? <Panel title="ตัวแทน AI" icon={Bot}><div className="grid gap-3 md:grid-cols-2">{store.agentProfiles.map(agent=><div key={agent.id} className="rounded-2xl bg-clay p-4"><div className="flex items-start justify-between"><div><p className="font-semibold">{agent.name}</p><p className="text-xs text-muted">{agent.role}</p></div><button type="button" onClick={()=>store.deleteAgentProfile(agent.id)} className="text-subtle hover:text-fg"><Trash2 className="size-4"/></button></div><p className="mt-3 text-sm text-muted">{agent.instructions}</p></div>)}</div><div className="mt-4 flex gap-2"><input value={newAgent} onChange={e=>setNewAgent(e.target.value)} placeholder="ชื่อตัวแทนใหม่" className="min-w-0 flex-1 rounded-xl bg-clay px-3 py-2.5 outline-none"/><Button onClick={()=>{if(newAgent.trim()){store.addAgentProfile({id:crypto.randomUUID(),name:newAgent.trim(),role:"Custom Agent",instructions:"ทำงานตามเป้าหมายของผู้ใช้ ตรวจผลก่อนรายงาน",skills:[],createdAt:Date.now()});setNewAgent("")}}}><Plus className="size-4"/>เพิ่ม</Button></div></Panel> : null}
 

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Menu, Phone, X } from "lucide-react";
+import { Menu, Phone, Terminal, X } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { AppBuilderView } from "@/components/app-builder-view";
 import { ChatThread, type SandboxRunView } from "@/components/chat-thread";
+import { CommandHistoryModal } from "@/components/command-history-modal";
 import { Composer } from "@/components/composer";
 import { Discover } from "@/components/discover";
 import { LuminaWordmark } from "@/components/lumina-mark";
@@ -42,6 +43,7 @@ export function AppShell({ search }: { search: Search }) {
   const [streamStatus, setStreamStatus] = useState<string>("");
   const [workSteps, setWorkSteps] = useState<string[]>([]);
   const [sandboxRun, setSandboxRun] = useState<SandboxRunView | null>(null);
+  const [commandHistoryOpen, setCommandHistoryOpen] = useState(false);
   const [dangerousApproval, setDangerousApproval] = useState<{
     content: string;
     chatId?: string;
@@ -64,6 +66,14 @@ export function AppShell({ search }: { search: Search }) {
     });
     void useAppStore.persist.rehydrate();
     if (useAppStore.persist.hasHydrated()) useAppStore.getState().setHydrated();
+
+    // Sync learned skills from data/learned-skills.json on server
+    void sandboxClient.getLearnedSkills().then((serverSkills) => {
+      if (serverSkills?.length) {
+        useAppStore.getState().syncLearnedSkills(serverSkills);
+      }
+    });
+
     return unsub;
   }, []);
 
@@ -201,39 +211,162 @@ export function AppShell({ search }: { search: Search }) {
 
     let thinking = "";
     let reply = sandboxNote;
+    let iteration = 0;
+    const maxIterations = 5;
+    let currentHistory = [...history];
+
     try {
-      await streamChat({
-        messages: history,
-        mode: chatMode,
-        signal: ac.signal,
-        onEvent: (ev) => {
-          if (ev.type === "start") {
-            setStreamStatus("กำลังทำความเข้าใจคำขอ…");
-            setWorkSteps((steps) => steps.includes("ทำความเข้าใจคำขอ") ? steps : [...steps, "ทำความเข้าใจคำขอ"]);
-          } else if (ev.type === "block_start") {
-            const label = ev.blockType === "tool" ? "กำลังทำงานกับเครื่องมือ…" : ev.blockType === "thinking" ? "กำลังวางแผนคำตอบ…" : "กำลังสร้างคำตอบ…";
-            const step = ev.blockType === "tool" ? "เลือกและทำงานกับเครื่องมือ" : ev.blockType === "thinking" ? "วางแผนคำตอบ" : "สร้างคำตอบ";
-            setStreamStatus(label);
-            setWorkSteps((steps) => steps.includes(step) ? steps : [...steps, step]);
-          } else if (ev.type === "thinking") {
-            thinking += ev.text;
-            // เก็บ reasoning ไว้ในข้อความ แต่ UI แสดงเฉพาะสถานะงานแบบสรุป
-          } else if (ev.type === "text") {
-            setStreamStatus("กำลังตอบ…");
-            reply += ev.text;
-            speakRealtime(ev.text);
-            store.patchAssistant(id, assistantId, { content: reply });
-          } else if (ev.type === "done") {
-            finishVoice();
-            setWorkSteps((steps) => steps.includes("สร้างคำตอบ") ? steps : [...steps, "สร้างคำตอบ"]);
-            setStreamStatus("ตอบเสร็จแล้ว ✓");
-            window.setTimeout(() => setStreamStatus(""), 900);
-          } else if (ev.type === "error") {
-            setStreamStatus("เกิดข้อผิดพลาด");
-            toast.error(ev.error);
+      while (iteration < maxIterations && !ac.signal.aborted) {
+        iteration++;
+        let turnReply = "";
+
+        await streamChat({
+          messages: currentHistory,
+          mode: chatMode,
+          signal: ac.signal,
+          onEvent: (ev) => {
+            if (ev.type === "start") {
+              setStreamStatus(
+                iteration === 1
+                  ? "กำลังทำความเข้าใจคำขอ…"
+                  : `กำลังดำเนินการต่อเนื่องในรีโพ (รอบที่ ${iteration})…`,
+              );
+              setWorkSteps((steps) =>
+                steps.includes("ทำความเข้าใจคำขอ") ? steps : [...steps, "ทำความเข้าใจคำขอ"],
+              );
+            } else if (ev.type === "block_start") {
+              const label =
+                ev.blockType === "tool"
+                  ? "กำลังทำงานกับเครื่องมือ…"
+                  : ev.blockType === "thinking"
+                    ? "กำลังวางแผนคำตอบ…"
+                    : "กำลังสร้างคำตอบ…";
+              const step =
+                ev.blockType === "tool"
+                  ? "เลือกและทำงานกับเครื่องมือ"
+                  : ev.blockType === "thinking"
+                    ? "วางแผนคำตอบ"
+                    : "สร้างคำตอบ";
+              setStreamStatus(label);
+              setWorkSteps((steps) => (steps.includes(step) ? steps : [...steps, step]));
+            } else if (ev.type === "thinking") {
+              thinking += ev.text;
+            } else if (ev.type === "text") {
+              setStreamStatus("กำลังตอบ…");
+              turnReply += ev.text;
+              speakRealtime(ev.text);
+              const combinedReply = reply ? `${reply}\n\n${turnReply}` : turnReply;
+              store.patchAssistant(id, assistantId, { content: combinedReply });
+            } else if (ev.type === "done") {
+              finishVoice();
+              setWorkSteps((steps) =>
+                steps.includes("สร้างคำตอบ") ? steps : [...steps, "สร้างคำตอบ"],
+              );
+            } else if (ev.type === "error") {
+              setStreamStatus("เกิดข้อผิดพลาด");
+              toast.error(ev.error);
+            }
+          },
+        });
+
+        if (ac.signal.aborted) break;
+
+        // Execute all <run> blocks in this turn sequentially in the repository
+        const runRegex = /<run(?:\s+lang=["']?([a-zA-Z0-9_-]+)["']?)?>([\s\S]*?)<\/run>/gi;
+        const allRuns = Array.from(turnReply.matchAll(runRegex));
+
+        if (allRuns.length > 0 && store.personality.autoSandbox && !ac.signal.aborted) {
+          let updatedTurnReply = turnReply;
+          let lastOutput = "";
+          for (const runMatch of allRuns) {
+            const runLang = (runMatch[1] || "bash").toLowerCase();
+            const runCmd = runMatch[2].trim();
+            if (!runCmd) continue;
+
+            setStreamStatus(`กำลังรัน ${runLang} ในรีโพ…`);
+            setWorkSteps((steps) => [...steps, `รันในรีโพ: ${runCmd.slice(0, 32)}…`]);
+            try {
+              const result = await sandboxClient.executeStream(runCmd, {
+                type: ["node", "python", "bash", "go", "rust", "java", "cpp"].includes(runLang)
+                  ? (runLang as "node" | "python" | "bash" | "go" | "rust" | "java" | "cpp")
+                  : "auto",
+                allowDangerous: true,
+              });
+              const out =
+                (result.stdout || result.stderr
+                  ? [result.stdout, result.stderr].filter(Boolean).join("\n")
+                  : result.output) || "";
+              lastOutput = out;
+              const durationMs = result.durationMs || 160;
+              const runStatus = result.status === "success" ? "success" : "error";
+
+              updatedTurnReply = updatedTurnReply.replace(
+                runMatch[0],
+                `<run lang="${runLang}" duration="${durationMs}ms" status="${runStatus}" output="${out.replace(/"/g, "&quot;")}">${runCmd}</run>`,
+              );
+
+              const combined = reply ? `${reply}\n\n${updatedTurnReply}` : updatedTurnReply;
+              store.patchAssistant(id, assistantId, { content: combined });
+
+              setSandboxRun({
+                runtime: runLang,
+                label: "Repo Sandbox",
+                command: runCmd,
+                status: result.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด",
+                output: out,
+              });
+              store.saveLearnedSkill({
+                name: `Repo Sandbox • ${result.status === "success" ? "ผ่าน" : "ล้มเหลว"}`,
+                runtime: runLang,
+                pattern: runCmd,
+                testCommand: runCmd,
+                result: result.status === "success" ? "passed" : "failed",
+                evidence: out.slice(0, 2000),
+              });
+              store.addCommandHistory({
+                command: runCmd,
+                runtime: runLang,
+                status: result.status === "success" ? "success" : "error",
+                output: out,
+                exitCode: result.exitCode,
+                durationMs,
+              });
+            } catch (e) {
+              console.error("Auto sandbox execution failed:", e);
+              store.addCommandHistory({
+                command: runCmd,
+                runtime: runLang,
+                status: "error",
+                output: e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการรัน",
+                durationMs: 160,
+              });
+            }
           }
-        },
-      });
+
+          reply = reply ? `${reply}\n\n${updatedTurnReply}` : updatedTurnReply;
+          store.patchAssistant(id, assistantId, { content: reply });
+
+          // Provide execution output back to Sali so she can continue autonomously
+          currentHistory = [
+            ...currentHistory,
+            { role: "assistant", content: updatedTurnReply },
+            {
+              role: "user",
+              content: `[ผลการรันคำสั่งในรีโพ]:\n\`\`\`\n${lastOutput.slice(0, 3000) || "(คำสั่งสำเร็จ ไม่มี output)"}\n\`\`\`\nกรุณาดำเนินการขั้นตอนถัดไปในรีโพอย่างต่อเนื่องจนกระทั่งงานเสร็จสมบูรณ์ หากต้องการรันคำสั่งหรือแก้ไขไฟล์เพิ่มให้ใส่แท็ก <run> ได้ทันที หรือหากงานเสร็จสมบูรณ์แล้วให้สรุปผลการทำงานให้ชัดเจน`,
+            },
+          ];
+
+          setStreamStatus("สลี่กำลังดำเนินการขั้นต่อไปในรีโพ…");
+        } else {
+          // No <run> blocks in this turn -> agent has finished all actions
+          reply = reply ? `${reply}\n\n${turnReply}` : turnReply;
+          store.patchAssistant(id, assistantId, { content: reply });
+          setStreamStatus("ตอบเสร็จแล้ว ✓");
+          window.setTimeout(() => setStreamStatus(""), 1200);
+          break;
+        }
+      }
+
       if (!reply && !ac.signal.aborted) {
         store.patchAssistant(id, assistantId, {
           content: "I could not finish that reply. Try sending it again.",
@@ -392,17 +525,72 @@ export function AppShell({ search }: { search: Search }) {
       ) : null}
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between border-b border-border px-3 md:hidden">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={drawer ? "Close menu" : "Open menu"}
-            onClick={() => setDrawer((v) => !v)}
-          >
-            {drawer ? <X className="size-5" /> : <Menu className="size-5" />}
-          </Button>
-          <LuminaWordmark compact />
-          <Button variant="ghost" size="icon-sm" aria-label="Voice mode" onClick={() => setCallOpen(true)}><Phone className="size-5" /></Button>
+        {/* Top Status & Agent Control Bar */}
+        <header className="flex h-12 shrink-0 items-center justify-between border-b border-border/70 px-3 sm:px-4 bg-surface/80 backdrop-blur-md z-10">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={drawer ? "Close menu" : "Open menu"}
+              onClick={() => setDrawer((v) => !v)}
+              className="md:hidden"
+            >
+              {drawer ? <X className="size-4" /> : <Menu className="size-4" />}
+            </Button>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-xs tracking-tight text-fg truncate max-w-[140px] sm:max-w-[240px]">
+                {activeChat?.title || "สลี่ • Arena Agent Mode"}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                Repo Mode
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Live Working Status Badge */}
+            <div className="flex items-center gap-1.5 rounded-full border border-border/70 bg-elevated/80 px-2.5 py-1 text-xs">
+              <span
+                className={cn(
+                  "size-2 rounded-full",
+                  busyChat || streamingId
+                    ? "animate-pulse bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]"
+                    : "bg-emerald-500/60",
+                )}
+              />
+              <span className="text-[11px] font-medium text-muted max-w-[150px] truncate sm:max-w-[280px]">
+                {busyChat || streamingId
+                  ? streamStatus || "กำลังประมวลผลในรีโพ…"
+                  : "พร้อมทำงานในรีโพ"}
+              </span>
+            </div>
+
+            {/* Command History Button */}
+            <button
+              type="button"
+              onClick={() => setCommandHistoryOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-elevated px-2.5 py-1 text-xs text-muted hover:text-fg hover:border-border transition shadow-sm"
+              title="ดูประวัติคำสั่งทั้งหมดในรีโพ (Command History)"
+            >
+              <Terminal className="size-3.5 text-emerald-400" />
+              <span className="hidden sm:inline text-[11px] font-medium">Command History</span>
+              {store.commandHistory.length > 0 && (
+                <span className="rounded-full bg-zinc-800 px-1.5 py-0.2 text-[10px] font-mono text-zinc-300">
+                  {store.commandHistory.length}
+                </span>
+              )}
+            </button>
+
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Voice mode"
+              onClick={() => setCallOpen(true)}
+              className="text-subtle hover:text-fg"
+            >
+              <Phone className="size-4" />
+            </Button>
+          </div>
         </header>
 
         {view === "maps" ? (
@@ -547,6 +735,11 @@ export function AppShell({ search }: { search: Search }) {
           </div>
         </div>
       ) : null}
+      <CommandHistoryModal
+        open={commandHistoryOpen}
+        onClose={() => setCommandHistoryOpen(false)}
+        onReRun={(cmd) => void send(cmd, activeChat?.id)}
+      />
       <Toaster
         position="bottom-right"
         toastOptions={{

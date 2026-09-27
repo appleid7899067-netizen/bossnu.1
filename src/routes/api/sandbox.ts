@@ -17,6 +17,8 @@
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { detectSandboxInput } from "@/lib/sandbox/detect";
+import { executeLocalCommand } from "@/lib/sandbox/local-runner";
+import { getLearnedSkills, recordLearnedSkill } from "@/lib/sandbox/learned-skills.server";
 import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
 import { listSkills, loadSkill, suggestSkills } from "@/lib/sandbox/skills.server";
 import {
@@ -179,7 +181,7 @@ async function runOnRunner(
   steps.push(`ส่งไปรันที่ Sandbox Runner (${runtime})`);
   const started = Date.now();
 
-  let response: Response;
+  let response: Response | null = null;
   try {
     response = await fetch(`${runner.url}/execute`, {
       method: "POST",
@@ -189,21 +191,23 @@ async function runOnRunner(
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    const timedOut = /timeout|aborted/i.test(detail);
-    steps.push(timedOut ? "Runner ไม่ตอบกลับภายในเวลาที่กำหนด" : "เชื่อมต่อ Runner ไม่ได้");
+    steps.push(`ไม่สามารถเชื่อมต่อ Remote Runner (${detail}) → สลับใช้ Local Sandbox ในเครื่อง`);
+    const local = await executeLocalCommand(command, runner.timeoutMs);
+    steps.push(local.success ? "รันด้วย Local Sandbox สำเร็จ" : "Local Sandbox พบข้อผิดพลาด");
     return {
-      httpStatus: timedOut ? 504 : 502,
+      httpStatus: 200,
       result: {
-        success: false,
-        status: timedOut ? "timeout" : "error",
+        success: local.success,
+        status: local.status,
         type: runtime,
         runtime,
         label,
         command,
-        error: timedOut
-          ? "Sandbox Runner ไม่ตอบกลับภายในเวลาที่กำหนด"
-          : "เชื่อมต่อ Sandbox Runner ไม่ได้ — ตรวจสอบ SANDBOX_RUNNER_URL",
-        detail: detail.slice(0, 300),
+        stdout: local.stdout,
+        stderr: local.stderr,
+        output: local.output,
+        exitCode: local.exitCode ?? undefined,
+        signal: local.signal ?? undefined,
         durationMs: Date.now() - started,
         steps,
       },
@@ -212,6 +216,29 @@ async function runOnRunner(
 
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
+    if (response.status >= 500) {
+      steps.push(`Remote Runner แจ้ง HTTP ${response.status} → สลับใช้ Local Sandbox ในเครื่อง`);
+      const local = await executeLocalCommand(command, runner.timeoutMs);
+      steps.push(local.success ? "รันด้วย Local Sandbox สำเร็จ" : "Local Sandbox พบข้อผิดพลาด");
+      return {
+        httpStatus: 200,
+        result: {
+          success: local.success,
+          status: local.status,
+          type: runtime,
+          runtime,
+          label,
+          command,
+          stdout: local.stdout,
+          stderr: local.stderr,
+          output: local.output,
+          exitCode: local.exitCode ?? undefined,
+          signal: local.signal ?? undefined,
+          durationMs: Date.now() - started,
+          steps,
+        },
+      };
+    }
     steps.push(`Runner ปฏิเสธคำสั่ง (HTTP ${response.status})`);
     return {
       httpStatus: response.status === 400 ? 400 : 502,
@@ -342,6 +369,12 @@ async function handleGet(request: Request): Promise<Response> {
   const skillId = url.searchParams.get("skill")?.trim();
   const reference = url.searchParams.get("reference")?.trim() || undefined;
   const query = url.searchParams.get("q")?.trim();
+  const getLearned = url.searchParams.get("learned");
+
+  if (getLearned === "true" || getLearned === "1") {
+    const learned = await getLearnedSkills();
+    return json({ success: true, count: learned.length, learnedSkills: learned });
+  }
 
   if (skillId) {
     const parsed = CommandRequestSchema.safeParse({ skill: skillId, reference });
@@ -417,24 +450,47 @@ async function handlePost(request: Request): Promise<Response> {
   const action = plan(command, type, steps);
   const suggestions = skill ? [] : suggestSkills(command).map((s) => s.id);
 
+  let responseResult: CommandResult;
+  let responseHttpStatus: number;
+
   if (action.kind === "json") {
     const { result, httpStatus } = validateJson(action.code, steps);
-    return json({ ...result, skill, suggestions }, httpStatus);
-  }
-  if (action.kind === "web") {
-    return json({
+    responseResult = { ...result, skill, suggestions };
+    responseHttpStatus = httpStatus;
+  } else if (action.kind === "web") {
+    responseResult = {
       ...renderWeb(action.runtime, action.label, action.code, steps),
       skill,
       suggestions,
-    });
+    };
+    responseHttpStatus = 200;
+  } else {
+    const { result, httpStatus } = await runOnRunner(
+      action.runtime,
+      action.label,
+      action.command,
+      steps,
+    );
+    responseResult = { ...result, skill, suggestions };
+    responseHttpStatus = httpStatus;
   }
-  const { result, httpStatus } = await runOnRunner(
-    action.runtime,
-    action.label,
-    action.command,
-    steps,
-  );
-  return json({ ...result, skill, suggestions }, httpStatus);
+
+  // Record every execution outcome into data/learned-skills.json & .md in real-time
+  try {
+    const learnedSkill = await recordLearnedSkill({
+      runtime: action.kind === "json" ? "json" : action.runtime,
+      command: action.kind === "runner" ? action.command : action.code,
+      output: responseResult.output || responseResult.stdout || responseResult.stderr,
+      error: responseResult.error,
+      status: responseResult.status,
+      exitCode: responseResult.exitCode,
+      durationMs: responseResult.durationMs,
+    });
+    return json({ ...responseResult, learnedSkill }, responseHttpStatus);
+  } catch (err) {
+    console.error("[sandbox] failed to record learned skill:", err);
+    return json(responseResult, responseHttpStatus);
+  }
 }
 
 export const Route = createFileRoute("/api/sandbox")({

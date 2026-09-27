@@ -1,0 +1,62 @@
+[
+  {
+    "id": "skill_1790500678552_vsixm",
+    "name": "Shell • คำสั่งระบบ pwd",
+    "runtime": "bash",
+    "pattern": "pwd && git branch --show-current",
+    "testCommand": "pwd && git branch --show-current",
+    "result": "passed",
+    "evidence": "/home/user/bossnu.1\narena/01a0e1be-bossnu-1",
+    "output": "/home/user/bossnu.1\narena/01a0e1be-bossnu-1",
+    "exitCode": 0,
+    "durationMs": 66,
+    "createdAt": 1790500678552,
+    "lastTestedAt": 1790500678552,
+    "uses": 1
+  },
+  {
+    "id": "skill_1790497180401_h3lr1",
+    "name": "Shell • คำสั่งระบบ echo",
+    "runtime": "bash",
+    "pattern": "echo Arena Agent Mode Live",
+    "testCommand": "echo Arena Agent Mode Live",
+    "result": "passed",
+    "evidence": "Arena Agent Mode Live",
+    "output": "Arena Agent Mode Live",
+    "exitCode": 0,
+    "durationMs": 53,
+    "createdAt": 1790497180401,
+    "lastTestedAt": 1790497180401,
+    "uses": 1
+  },
+  {
+    "id": "skill_1790496637777_hioex",
+    "name": "PYTHON • python3 -c \"print('Python 3 math check:', …",
+    "runtime": "python",
+    "pattern": "python3 -c \"print('Python 3 math check:', 2 ** 10)\"",
+    "testCommand": "python3 -c \"print('Python 3 math check:', 2 ** 10)\"",
+    "result": "passed",
+    "evidence": "Python 3 math check: 1024",
+    "output": "Python 3 math check: 1024",
+    "exitCode": 0,
+    "durationMs": 153,
+    "createdAt": 1790496637777,
+    "lastTestedAt": 1790496637777,
+    "uses": 1
+  },
+  {
+    "id": "skill_1790496623868_y14gf",
+    "name": "Node.js • จัดการและจัดรูปแบบวันที่ด้วย dayjs",
+    "runtime": "bash",
+    "pattern": "tmpdir=\"$(mktemp -d)\" && cd \"$tmpdir\" && npm init -y >/dev/null 2>&1 && npm install dayjs >/dev/null 2>&1 && node -e \"const dayjs=require('dayjs'); console.log(dayjs().format('YYYY-MM-DD'))\"",
+    "testCommand": "tmpdir=\"$(mktemp -d)\" && cd \"$tmpdir\" && npm init -y >/dev/null 2>&1 && npm install dayjs >/dev/null 2>&1 && node -e \"const dayjs=require('dayjs'); console.log(dayjs().format('YYYY-MM-DD'))\"",
+    "result": "passed",
+    "evidence": "2026-09-27",
+    "output": "2026-09-27",
+    "exitCode": 0,
+    "durationMs": 794,
+    "createdAt": 1790496623868,
+    "lastTestedAt": 1790496645124,
+    "uses": 2
+  }
+]

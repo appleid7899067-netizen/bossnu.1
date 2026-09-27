@@ -1013,6 +1013,7 @@ function datetime(args) {
 }
 var anyString = /^[\s\S]{0,}$/;
 var number$1 = /^-?\d+(?:\.\d+)?$/;
+var boolean$1 = /^(?:true|false)$/i;
 var lowercase = /^[^A-Z]*$/;
 var uppercase = /^[^a-z]*$/;
 //#endregion
@@ -1815,6 +1816,24 @@ var $ZodNumber = /*@__PURE__*/ $constructor("$ZodNumber", (inst, def) => {
 var $ZodNumberFormat = /*@__PURE__*/ $constructor("$ZodNumberFormat", (inst, def) => {
 	$ZodCheckNumberFormat.init(inst, def);
 	$ZodNumber.init(inst, def);
+});
+var $ZodBoolean = /*@__PURE__*/ $constructor("$ZodBoolean", (inst, def) => {
+	$ZodType.init(inst, def);
+	inst._zod.pattern = boolean$1;
+	inst._zod.parse = (payload, _ctx) => {
+		if (def.coerce) try {
+			payload.value = Boolean(payload.value);
+		} catch (_) {}
+		const input = payload.value;
+		if (typeof input === "boolean") return payload;
+		payload.issues.push({
+			expected: "boolean",
+			code: "invalid_type",
+			input,
+			inst
+		});
+		return payload;
+	};
 });
 var $ZodUnknown = /*@__PURE__*/ $constructor("$ZodUnknown", (inst, def) => {
 	$ZodType.init(inst, def);
@@ -3280,6 +3299,13 @@ function _int(Class, params) {
 	});
 }
 // @__NO_SIDE_EFFECTS__
+function _boolean(Class, params) {
+	return new Class({
+		type: "boolean",
+		...normalizeParams(params)
+	});
+}
+// @__NO_SIDE_EFFECTS__
 function _unknown(Class) {
 	return new Class({ type: "unknown" });
 }
@@ -4058,6 +4084,9 @@ var numberProcessor = (schema, ctx, _json, params) => {
 		if (rest.length) json.allOf = [...json.allOf ?? [], ...rest.map((m) => ({ multipleOf: m }))];
 	}
 };
+var booleanProcessor = (_schema, _ctx, json, _params) => {
+	json.type = "boolean";
+};
 var neverProcessor = (_schema, _ctx, json, _params) => {
 	json.not = {};
 };
@@ -4830,6 +4859,14 @@ var ZodNumberFormat = /*@__PURE__*/ $constructor("ZodNumberFormat", (inst, def) 
 function int(params) {
 	return /* @__PURE__ */ _int(ZodNumberFormat, params);
 }
+var ZodBoolean = /*@__PURE__*/ $constructor("ZodBoolean", (inst, def) => {
+	$ZodBoolean.init(inst, def);
+	ZodType.init(inst, def);
+	inst._zod.processJSONSchema = (ctx, json, params) => booleanProcessor(inst, ctx, json, params);
+});
+function boolean(params) {
+	return /* @__PURE__ */ _boolean(ZodBoolean, params);
+}
 var ZodUnknown = /*@__PURE__*/ $constructor("ZodUnknown", (inst, def) => {
 	$ZodUnknown.init(inst, def);
 	ZodType.init(inst, def);
@@ -4926,6 +4963,14 @@ function object(shape, params) {
 	return new ZodObject({
 		type: "object",
 		shape: shape ?? {},
+		...normalizeParams(params)
+	});
+}
+function looseObject(shape, params) {
+	return new ZodObject({
+		type: "object",
+		shape,
+		catchall: unknown(),
 		...normalizeParams(params)
 	});
 }
@@ -5173,4 +5218,4 @@ function superRefine(fn, params) {
 	return /* @__PURE__ */ _superRefine(fn, params);
 }
 //#endregion
-export { union as a, string as i, number as n, object as r, literal as t };
+export { looseObject as a, string as c, literal as i, union as l, array as n, number as o, boolean as r, object as s, _enum as t };
