@@ -148,21 +148,27 @@ export async function runAgentLoop(opts: {
 
       if (opts.signal.aborted) return;
 
-      const hasWorkspaceEvidence = !workspaceId || !calls.length || Array.isArray(result.workspaceFiles);
-      const hasProjectEvidence = !workspaceId || !calls.length || (Array.isArray(result.workspaceFiles) && result.workspaceFiles.some(file => typeof file?.path === "string" && file.path.startsWith("project/")));
+      const hasWorkspaceEvidence = !workspaceId || !calls.length || (
+        Array.isArray(result.workspaceFiles) &&
+        Boolean(result.workspaceSync?.verified)
+      );
+      const hasProjectEvidence = !workspaceId || !calls.length || (
+        Array.isArray(result.workspaceFiles) &&
+        result.workspaceFiles.some(file => typeof file?.path === "string" && file.path.startsWith("project/"))
+      );
       const passed =
         result.status === "success" &&
         (result.exitCode == null || result.exitCode === 0) &&
         !result.error &&
         hasWorkspaceEvidence &&
-        (result.workspaceFiles?.length === 0 || hasProjectEvidence);
+        hasProjectEvidence;
       verified = passed;
       core.setPhase("verify");
       opts.onPhase?.(
         "verify",
         passed
-          ? "🔍 Verify • ผ่านผลรันจริง + มีหลักฐาน Workspace"
-          : "🔍 Verify • ยังไม่มีหลักฐาน Workspace ครบ กำลังตรวจซ้ำ",
+          ? "🔍 Verify • รันผ่าน + Sync + ตรวจไฟล์จริงใน Neon ตรงกัน"
+          : "🔍 Verify • หลักฐานยังไม่ครบ กำลัง Fix แล้ว Run ใหม่",
       );
 
       if (!passed) {
