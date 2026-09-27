@@ -11,6 +11,8 @@
  * `skills`, `busy`, `error`, `lastResult` and `history` state.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { LearnedSkill } from "@/lib/types";
+import { useAppStore } from "@/lib/store";
 import {
   CommandResultSchema,
   SANDBOX_API_PATH,
@@ -36,7 +38,7 @@ export type SandboxClientOptions = {
 export type SandboxStreamEvent =
   | { type: "status"; status: string; message?: string }
   | { type: "output"; stream: "stdout" | "stderr"; text: string }
-  | { type: "complete"; result: CommandResult }
+  | { type: "complete"; result: CommandResult; learnedSkill?: LearnedSkill }
   | { type: "error"; error: string };
 
 async function consumeSandboxStream(body: ReadableStream<Uint8Array>, onEvent?: (event: SandboxStreamEvent) => void): Promise<CommandResult> {
@@ -44,7 +46,15 @@ async function consumeSandboxStream(body: ReadableStream<Uint8Array>, onEvent?: 
   const decoder = new TextDecoder();
   let buffer = "";
   let final: CommandResult | null = null;
-  const emit = (event: SandboxStreamEvent) => { onEvent?.(event); if (event.type === "complete") final = event.result; };
+  const emit = (event: SandboxStreamEvent) => {
+    onEvent?.(event);
+    if (event.type === "complete") {
+      final = event.result;
+      if (typeof window !== "undefined" && event.learnedSkill) {
+        useAppStore.getState().saveLearnedSkill(event.learnedSkill);
+      }
+    }
+  };
   try {
     while (true) {
       const { value, done } = await reader.read();
@@ -186,8 +196,27 @@ export class SandboxClient {
 
     const data: unknown = await response.json().catch(() => null);
     const parsed = CommandResultSchema.safeParse(data);
-    if (parsed.success) return parsed.data;
+    if (parsed.success) {
+      if (typeof window !== "undefined" && (data as any)?.learnedSkill) {
+        useAppStore.getState().saveLearnedSkill((data as any).learnedSkill);
+      }
+      return parsed.data;
+    }
     return errorResult(messageFrom(data) ?? `Sandbox API ตอบกลับ HTTP ${response.status}`);
+  }
+
+  /** Fetch all learned skills stored in data/learned-skills.json on the server. */
+  async getLearnedSkills(): Promise<LearnedSkill[]> {
+    try {
+      const response = await this.fetchImpl(`${this.baseUrl}?learned=true`, {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+      const data = (await response.json().catch(() => null)) as { learnedSkills?: LearnedSkill[] } | null;
+      return Array.isArray(data?.learnedSkills) ? data.learnedSkills : [];
+    } catch {
+      return [];
+    }
   }
 }
 

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "skill_1790496637777_hioex",
+    "name": "PYTHON • python3 -c \"print('Python 3 math check:', …",
+    "runtime": "python",
+    "pattern": "python3 -c \"print('Python 3 math check:', 2 ** 10)\"",
+    "testCommand": "python3 -c \"print('Python 3 math check:', 2 ** 10)\"",
+    "result": "passed",
+    "evidence": "Python 3 math check: 1024",
+    "output": "Python 3 math check: 1024",
+    "exitCode": 0,
+    "durationMs": 153,
+    "createdAt": 1790496637777,
+    "lastTestedAt": 1790496637777,
+    "uses": 1
+  },
+  {
+    "id": "skill_1790496623868_y14gf",
+    "name": "Node.js • จัดการและจัดรูปแบบวันที่ด้วย dayjs",
+    "runtime": "bash",
+    "pattern": "tmpdir=\"$(mktemp -d)\" && cd \"$tmpdir\" && npm init -y >/dev/null 2>&1 && npm install dayjs >/dev/null 2>&1 && node -e \"const dayjs=require('dayjs'); console.log(dayjs().format('YYYY-MM-DD'))\"",
+    "testCommand": "tmpdir=\"$(mktemp -d)\" && cd \"$tmpdir\" && npm init -y >/dev/null 2>&1 && npm install dayjs >/dev/null 2>&1 && node -e \"const dayjs=require('dayjs'); console.log(dayjs().format('YYYY-MM-DD'))\"",
+    "result": "passed",
+    "evidence": "2026-09-27",
+    "output": "2026-09-27",
+    "exitCode": 0,
+    "durationMs": 794,
+    "createdAt": 1790496623868,
+    "lastTestedAt": 1790496645124,
+    "uses": 2
+  }
+]

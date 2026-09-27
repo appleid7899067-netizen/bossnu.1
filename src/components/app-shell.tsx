@@ -64,6 +64,14 @@ export function AppShell({ search }: { search: Search }) {
     });
     void useAppStore.persist.rehydrate();
     if (useAppStore.persist.hasHydrated()) useAppStore.getState().setHydrated();
+
+    // Sync learned skills from data/learned-skills.json on server
+    void sandboxClient.getLearnedSkills().then((serverSkills) => {
+      if (serverSkills?.length) {
+        useAppStore.getState().syncLearnedSkills(serverSkills);
+      }
+    });
+
     return unsub;
   }, []);
 

@@ -18,6 +18,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { detectSandboxInput } from "@/lib/sandbox/detect";
 import { executeLocalCommand } from "@/lib/sandbox/local-runner";
+import { getLearnedSkills, recordLearnedSkill } from "@/lib/sandbox/learned-skills.server";
 import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
 import { listSkills, loadSkill, suggestSkills } from "@/lib/sandbox/skills.server";
 import {
@@ -368,6 +369,12 @@ async function handleGet(request: Request): Promise<Response> {
   const skillId = url.searchParams.get("skill")?.trim();
   const reference = url.searchParams.get("reference")?.trim() || undefined;
   const query = url.searchParams.get("q")?.trim();
+  const getLearned = url.searchParams.get("learned");
+
+  if (getLearned === "true" || getLearned === "1") {
+    const learned = await getLearnedSkills();
+    return json({ success: true, count: learned.length, learnedSkills: learned });
+  }
 
   if (skillId) {
     const parsed = CommandRequestSchema.safeParse({ skill: skillId, reference });
@@ -443,24 +450,47 @@ async function handlePost(request: Request): Promise<Response> {
   const action = plan(command, type, steps);
   const suggestions = skill ? [] : suggestSkills(command).map((s) => s.id);
 
+  let responseResult: CommandResult;
+  let responseHttpStatus: number;
+
   if (action.kind === "json") {
     const { result, httpStatus } = validateJson(action.code, steps);
-    return json({ ...result, skill, suggestions }, httpStatus);
-  }
-  if (action.kind === "web") {
-    return json({
+    responseResult = { ...result, skill, suggestions };
+    responseHttpStatus = httpStatus;
+  } else if (action.kind === "web") {
+    responseResult = {
       ...renderWeb(action.runtime, action.label, action.code, steps),
       skill,
       suggestions,
-    });
+    };
+    responseHttpStatus = 200;
+  } else {
+    const { result, httpStatus } = await runOnRunner(
+      action.runtime,
+      action.label,
+      action.command,
+      steps,
+    );
+    responseResult = { ...result, skill, suggestions };
+    responseHttpStatus = httpStatus;
   }
-  const { result, httpStatus } = await runOnRunner(
-    action.runtime,
-    action.label,
-    action.command,
-    steps,
-  );
-  return json({ ...result, skill, suggestions }, httpStatus);
+
+  // Record every execution outcome into data/learned-skills.json & .md in real-time
+  try {
+    const learnedSkill = await recordLearnedSkill({
+      runtime: action.kind === "json" ? "json" : action.runtime,
+      command: action.kind === "runner" ? action.command : action.code,
+      output: responseResult.output || responseResult.stdout || responseResult.stderr,
+      error: responseResult.error,
+      status: responseResult.status,
+      exitCode: responseResult.exitCode,
+      durationMs: responseResult.durationMs,
+    });
+    return json({ ...responseResult, learnedSkill }, responseHttpStatus);
+  } catch (err) {
+    console.error("[sandbox] failed to record learned skill:", err);
+    return json(responseResult, responseHttpStatus);
+  }
 }
 
 export const Route = createFileRoute("/api/sandbox")({

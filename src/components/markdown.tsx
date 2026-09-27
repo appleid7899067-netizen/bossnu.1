@@ -135,6 +135,14 @@ export function TerminalRunBlock({
       setOutput(finalOut);
       setStatus(res.status === "success" ? "success" : "error");
       if (res.durationMs) setDurationMs(res.durationMs);
+      useAppStore.getState().saveLearnedSkill({
+        name: `Terminal • ${command.replace(/\s+/g, " ").slice(0, 36)}`,
+        runtime: lang,
+        pattern: command,
+        testCommand: command,
+        result: res.status === "success" ? "passed" : "failed",
+        evidence: finalOut.slice(0, 2000) || res.error || `status: ${res.status}`,
+      });
     } catch (err) {
       setStatus("error");
       setOutput(err instanceof Error ? err.message : "รันคำสั่งไม่สำเร็จ");

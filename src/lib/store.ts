@@ -23,7 +23,7 @@ personality:PersonalitySettings; agentSkills:AgentSkill[]; agentProfiles:AgentPr
 setHydrated:()=>void; newChat:(mode?:ChatMode)=>string; setActiveChat:(id:string|null)=>void; setChatMode:(id:string,mode:ChatMode)=>void;
 addUserMessage:(chatId:string,content:string)=>string; startAssistant:(chatId:string)=>string; patchAssistant:(chatId:string,messageId:string,patch:Partial<Pick<ChatMessage,"content"|"thinking">>)=>void; removeEmptyAssistant:(chatId:string,messageId:string)=>void; deleteMessage:(chatId:string,messageId:string)=>void; deleteChat:(id:string)=>void;
 addMap:(map:SavedMap)=>void; setActiveMap:(id:string|null)=>void; deleteMap:(id:string)=>void; addImage:(image:StudioImage)=>void; deleteImage:(id:string)=>void;
-updatePersonality:(patch:Partial<PersonalitySettings>)=>void; toggleAgentSkill:(id:string)=>void; addAgentProfile:(profile:AgentProfile)=>void; deleteAgentProfile:(id:string)=>void; addMemory:(content:string)=>void; deleteMemory:(id:string)=>void; saveLearnedSkill:(skill:Omit<LearnedSkill,"id"|"createdAt"|"uses">)=>void; useLearnedSkill:(id:string)=>void;
+updatePersonality:(patch:Partial<PersonalitySettings>)=>void; toggleAgentSkill:(id:string)=>void; addAgentProfile:(profile:AgentProfile)=>void; deleteAgentProfile:(id:string)=>void; addMemory:(content:string)=>void; deleteMemory:(id:string)=>void; saveLearnedSkill:(skill:Omit<LearnedSkill,"id"|"createdAt"|"uses">)=>void; useLearnedSkill:(id:string)=>void; syncLearnedSkills:(skills:LearnedSkill[])=>void;
 };
 
 export const useAppStore=create<AppState>()(persist((set)=>({
@@ -48,6 +48,18 @@ saveLearnedSkill:skill=>set(s=>{
   return {learnedSkills:[{...skill,id:uid("skill"),createdAt:Date.now(),uses:1,lastTestedAt:Date.now()},...s.learnedSkills].slice(0,200)};
 }),
 useLearnedSkill:id=>set(s=>({learnedSkills:s.learnedSkills.map(x=>x.id===id?{...x,uses:x.uses+1}:x)})),
+syncLearnedSkills:skills=>set(s=>{
+  const map=new Map<string,LearnedSkill>();
+  for(const sk of s.learnedSkills)map.set(`${sk.runtime}:${sk.pattern.trim()}`,sk);
+  for(const sk of skills){
+    const key=`${sk.runtime}:${sk.pattern.trim()}`;
+    const existing=map.get(key);
+    if(!existing || (sk.lastTestedAt??sk.createdAt)>(existing.lastTestedAt??existing.createdAt)){
+      map.set(key,{...existing,...sk});
+    }
+  }
+  return {learnedSkills:Array.from(map.values()).sort((a,b)=>(b.lastTestedAt??b.createdAt)-(a.lastTestedAt??a.createdAt)).slice(0,300)};
+}),
 }),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({conversations:s.conversations,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory,learnedSkills:s.learnedSkills}),merge:(persisted,current)=>{const p=(persisted??{}) as Partial<AppState>;return {...current,...p,personality:{...current.personality,...(p.personality??{})}};}}));
 
 export function getConversation(id:string|null){if(!id)return undefined;return useAppStore.getState().conversations.find(c=>c.id===id);}
