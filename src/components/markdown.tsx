@@ -236,6 +236,12 @@ export function Markdown({
   live?: boolean;
 }) {
   const cleanedText = text.replace(/\*{3,}/g, "").replace(/\/\/nn\//gi, "");
+  // Keep the DOM shape stable while tokens stream in. Promoting an unfinished
+  // table or code fence to a richer element mid-stream can confuse hydration
+  // and DOM reconciliation in mobile browsers.
+  if (live) {
+    return <div className={cn("min-w-0 max-w-full whitespace-pre-wrap break-words text-[1rem] leading-[1.7] [overflow-wrap:anywhere]", className)}>{cleanedText}</div>;
+  }
   const parts = splitFences(cleanedText);
   const webParts = parts.filter((part) => part.type === "code" && isWebLang(part.lang));
   const html = webParts.find((part) => ["html", "htm"].includes((part.lang || "").toLowerCase()))?.value || "";
