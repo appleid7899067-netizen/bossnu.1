@@ -121,7 +121,7 @@ printf %s ${quote(sandboxInput)} > stdin.txt
     setSandboxOutput("พร้อมรัน " + language);
   };
 
-  return <section className="min-h-0 flex-1 overflow-y-auto">
+  return <section className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y [scrollbar-width:thin]">
     <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle">BOSS CONTROL</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">ตั้งค่าตัวแทนและสมอง</h1><p className="mt-1 text-sm text-muted">บุคลิก • สกิล • ตัวแทน • ความจำ • โปรไฟล์ • Sandbox</p></div>
