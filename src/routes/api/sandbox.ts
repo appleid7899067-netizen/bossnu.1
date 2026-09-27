@@ -259,7 +259,18 @@ async function runOnRunner(
 
   const exitCode = typeof data.exitCode === "number" ? data.exitCode : null;
   const returnedFiles = Array.isArray(data.workspaceFiles) ? data.workspaceFiles as Array<{ path: string; content: string }> : [];
-  if (workspace && returnedFiles.length) await saveProjectFiles(workspace, returnedFiles);
+  const workspaceSyncComplete = data.workspaceSyncComplete === true;
+  let workspaceSync;
+  if (workspace) {
+    workspaceSync = await saveProjectFiles(workspace, returnedFiles, { complete: workspaceSyncComplete });
+    steps.push(
+      workspaceSync.verified
+        ? `Workspace Sync ผ่าน • ${workspaceSync.total} ไฟล์ตรงกับ Neon`
+        : workspaceSyncComplete
+          ? `Workspace Sync ยังไม่ผ่าน • missing=${workspaceSync.missing.length}, mismatch=${workspaceSync.mismatched.length}`
+          : "Workspace Sync เป็น snapshot ไม่สมบูรณ์ • ไม่ลบไฟล์เก่า",
+    );
+  }
   const error =
     status === "timeout"
       ? "หมดเวลาการรัน — Runner จำกัดเวลาต่อคำสั่ง"
@@ -286,6 +297,8 @@ async function runOnRunner(
       previewUrl,
       durationMs,
       steps,
+      workspaceFiles: returnedFiles,
+      workspaceSync,
     },
   };
 }
