@@ -73,8 +73,8 @@ function splitFences(src: string) {
 
 function SandboxPreview({ url }: { url: string }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-primary/20 bg-ink-soft shadow-[0_0_28px_rgba(139,92,246,0.14)]">
-      <div className="flex h-7 items-center justify-between border-b border-white/8 px-2.5 text-[10px] text-white/45">
+    <div className="overflow-hidden rounded-lg border border-primary/20 bg-[#f3f4f6] shadow-[0_0_28px_rgba(139,92,246,0.14)]">
+      <div className="flex h-7 items-center justify-between border-b border-[#e5e7eb] px-2.5 text-[10px] text-[#667085]">
         <span>🌐 Sandbox Live Preview</span>
         <a href={url} target="_blank" rel="noreferrer" className="text-primary hover:underline">เปิดเต็มจอ</a>
       </div>
@@ -174,13 +174,13 @@ function WebPreview({ html, css, tailwind, live }: { html: string; css: string; 
     ? doc
     : `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}\\n${tailwind}</style>${hasTailwind ? '<script src="https://cdn.tailwindcss.com"></script>' : ''}</head><body>${doc}</body></html>`;
   return (
-    <div className={cn("overflow-hidden rounded-lg border border-primary/25 bg-ink-soft shadow-[0_0_30px_rgba(139,92,246,0.16)]", live ? "html-live" : "")}>
-      <div className="flex h-8 items-center justify-between border-b border-white/8 px-2.5 text-[10px] font-medium text-white/55">
+    <div className={cn("overflow-hidden rounded-lg border border-primary/25 bg-[#f3f4f6] shadow-[0_0_30px_rgba(139,92,246,0.16)]", live ? "html-live" : "")}>
+      <div className="flex h-8 items-center justify-between border-b border-[#e5e7eb] px-2.5 text-[10px] font-medium text-[#667085]">
         <span>🌐 Sandbox • HTML + CSS + Tailwind</span>
         <span className="text-primary">LIVE</span>
       </div>
       <iframe title="HTML CSS Tailwind Sandbox Preview" sandbox="allow-scripts" srcDoc={source} className="h-[390px] w-full bg-white" />
-      <div className="flex flex-wrap gap-2 border-t border-white/8 px-2.5 py-1.5 text-[10px] text-white/40">
+      <div className="flex flex-wrap gap-2 border-t border-[#e5e7eb] px-2.5 py-1.5 text-[10px] text-[#667085]">
         <span>HTML ✓</span><span>CSS {css.trim() ? "✓" : "—"}</span><span>Tailwind {hasTailwind ? "✓" : "—"}</span>
       </div>
     </div>
@@ -194,25 +194,25 @@ function CodeBlock({ code, lang, live, showPreview = true }: { code: string; lan
   const isWeb = isWebLang(value);
   const [preview, setPreview] = useState(isWeb && value !== "css" && value !== "tailwind" && value !== "tailwindcss");
   return (
-    <div className={cn("overflow-hidden rounded-lg bg-ink-soft", isWeb && live ? "html-live" : "")}>
-      <div className="flex h-7 items-center justify-between border-b border-white/8 px-2.5 text-[10px] font-medium uppercase tracking-wide text-white/45">
+    <div className={cn("overflow-hidden rounded-lg bg-[#f3f4f6]", isWeb && live ? "html-live" : "")}>
+      <div className="flex h-7 items-center justify-between border-b border-[#e5e7eb] px-2.5 text-[10px] font-medium uppercase tracking-wide text-[#667085]">
         <span>{isTooLong ? "txt" : (lang || "code")}</span>
-        {isWeb ? <button type="button" onClick={() => setPreview(v => !v)} className={cn("rounded px-2 py-1 text-[10px] font-semibold transition", preview ? "bg-primary/20 text-primary" : "bg-white/8 text-white/70 hover:bg-white/12 hover:text-white")}>{preview ? "‹ Code" : "▶ รันในแซนด์บ็อก"}</button> : null}
+        {isWeb ? <button type="button" onClick={() => setPreview(v => !v)} className={cn("rounded px-2 py-1 text-[10px] font-semibold transition", preview ? "bg-primary/20 text-primary" : "bg-[#e5e7eb] text-[#475467] hover:bg-[#dfe3e8] hover:text-[#202124]")}>{preview ? "‹ Code" : "▶ รันในแซนด์บ็อก"}</button> : null}
       </div>
       {isTooLong ? (
-        <div className="bg-ink-soft">
-          <div className="flex items-center justify-between border-b border-white/8 px-2.5 py-1.5 text-[10px] text-white/45">
+        <div className="bg-[#f3f4f6]">
+          <div className="flex items-center justify-between border-b border-[#e5e7eb] px-2.5 py-1.5 text-[10px] text-[#667085]">
             <span>TXT • ข้อความยาว</span>
             <span>{code.length.toLocaleString()} ตัวอักษร</span>
           </div>
-          <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words px-3 py-2.5 font-mono text-[11px] leading-[1.45] text-primary-fg"><code>{code}</code></pre>
+          <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words px-3 py-2.5 font-mono text-[11px] leading-[1.45] text-[#202124]"><code>{code}</code></pre>
         </div>
       ) : preview && isWeb && showPreview && value !== "css" && value !== "tailwind" && value !== "tailwindcss" ? (
         <iframe title="HTML preview" sandbox="allow-scripts" srcDoc={code} className="h-[360px] w-full bg-white" />
       ) : (
-        <pre className="overflow-x-auto px-3 py-2.5 font-mono text-[11px] leading-[1.45] text-primary-fg"><code>{code}</code></pre>
+        <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words px-3 py-2.5 font-mono text-[11px] leading-[1.45] text-[#202124]"><code>{code}</code></pre>
       )}
-      {isWeb ? <div className="flex items-center justify-between border-t border-white/8 px-2.5 py-1 text-[10px] text-white/35"><span>{value === "css" ? "CSS • Sandbox Style" : value.startsWith("tailwind") ? "Tailwind CSS • Sandbox" : "HTML • Sandboxed Live Preview"}</span><span>แยกกรอบโค้ดชัดเจน</span></div> : null}
+      {isWeb ? <div className="flex items-center justify-between border-t border-[#e5e7eb] px-2.5 py-1 text-[10px] text-[#667085]"><span>{value === "css" ? "CSS • Sandbox Style" : value.startsWith("tailwind") ? "Tailwind CSS • Sandbox" : "HTML • Sandboxed Live Preview"}</span><span>แยกกรอบโค้ดชัดเจน</span></div> : null}
     </div>
   );
 }
