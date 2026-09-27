@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sali Sandbox Agent — standalone</title>
+<meta name="description" content="Standalone UI ที่คุยกับ /api/sandbox โดยตรง: โหลด Grok Skills รันคำสั่งในแซนด์บ็อก และดู Live Preview" />
+<link rel="icon" href="/favicon.svg" />
+<style>
+  :root {
+    --bg: #ffffff; --elevated: #f5f7fa; --hover: #edf1f6; --fg: #202124; --muted: #6b7280; --subtle: #9aa0a6;
+    --primary: #4d8bff; --primary-fg: #fff; --border: #e7e9ed; --danger: #b91c1c; --danger-bg: #fef2f2;
+    --ok: #047857; --ok-bg: #ecfdf5; --warn: #b45309; --warn-bg: #fffbeb; --live: #0369a1; --live-bg: #f0f9ff;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: "Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: var(--sans); }
+  button { cursor: pointer; font: inherit; }
+  .app { display: grid; grid-template-rows: auto 1fr auto; height: 100dvh; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .logo { width: 36px; height: 36px; border-radius: 12px; background: rgba(77,139,255,.12); display: grid; place-items: center; color: var(--primary); font-size: 18px; }
+  .brand h1 { margin: 0; font-size: 15px; letter-spacing: -.01em; }
+  .brand p { margin: 2px 0 0; font-size: 11px; color: var(--muted); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--ok-bg); color: var(--ok); white-space: nowrap; }
+  .pill.err { background: var(--danger-bg); color: var(--danger); }
+  .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .api { display: flex; align-items: center; gap: 6px; }
+  .api input { width: 220px; max-width: 40vw; height: 32px; border: 1px solid var(--border); border-radius: 10px; padding: 0 10px; font: 12px var(--mono); color: var(--fg); background: var(--elevated); }
+  main { display: grid; grid-template-columns: 290px minmax(0, 1fr); min-height: 0; }
+  aside { border-right: 1px solid var(--border); overflow-y: auto; padding: 14px 12px; }
+  aside h2 { margin: 0 4px 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--subtle); font-weight: 600; }
+  .cat { margin: 0 4px 4px; font-size: 11px; color: var(--muted); font-weight: 600; }
+  .skill { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 12px; color: var(--fg); }
+  .skill:hover { background: var(--hover); }
+  .skill.active { background: rgba(77,139,255,.12); }
+  .skill .e { font-size: 16px; line-height: 1; margin-top: 1px; }
+  .skill .t { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .skill .d { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .skill .n { flex: 0 0 auto; font-size: 10px; color: var(--subtle); background: var(--elevated); border-radius: 6px; padding: 2px 6px; }
+  .thread { overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .thread > * { max-width: 880px; width: 100%; margin: 0 auto; }
+  .empty { text-align: center; padding: 48px 8px 16px; color: var(--muted); }
+  .empty h2 { margin: 12px 0 6px; color: var(--fg); font-size: 24px; letter-spacing: -.02em; }
+  .examples { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; margin-top: 20px; }
+  .example { border: 1px solid var(--border); background: var(--bg); border-radius: var(--radius); padding: 12px 14px; text-align: left; color: var(--fg); }
+  .example:hover { border-color: rgba(77,139,255,.4); background: var(--elevated); }
+  .example b { display: block; font-size: 13px; }
+  .example code { display: block; margin-top: 4px; font: 11px var(--mono); color: var(--muted); white-space: pre-wrap; }
+  .user { display: flex; justify-content: flex-end; }
+  .user pre { margin: 0; max-width: min(90%, 42rem); background: var(--elevated); border-radius: 20px 20px 6px 20px; padding: 10px 14px; font: 12.5px/1.5 var(--mono); white-space: pre-wrap; word-break: break-word; box-shadow: 0 0 0 1px rgba(31,41,55,.07); }
+  .card { display: flex; gap: 12px; animation: rise .35s cubic-bezier(.22,1,.36,1) both; }
+  .card .ava { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; background: rgba(77,139,255,.12); color: var(--primary); display: grid; place-items: center; font-size: 12px; margin-top: 2px; }
+  .box { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--bg); }
+  .box .bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 12px; background: rgba(245,247,250,.8); border-bottom: 1px solid var(--border); }
+  .box .body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .chip { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 7px; font-size: 10.5px; font-weight: 600; background: var(--bg); color: var(--muted); box-shadow: 0 0 0 1px rgba(31,41,55,.07); }
+  .chip.mono { font-family: var(--mono); }
+  .chip.ok { background: var(--ok-bg); color: var(--ok); } .chip.err { background: var(--danger-bg); color: var(--danger); }
+  .chip.warn { background: var(--warn-bg); color: var(--warn); } .chip.live { background: var(--live-bg); color: var(--live); }
+  .chip.primary { background: rgba(77,139,255,.12); color: var(--primary); }
+  .out { background: #0f172a; color: #e2e8f0; border-radius: 12px; padding: 10px 12px; font: 11.5px/1.55 var(--mono); white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow: auto; margin: 0; }
+  .errbox { background: var(--danger-bg); color: var(--danger); border-radius: 12px; padding: 8px 12px; font-size: 12.5px; }
+  .skillbox { border: 1px solid rgba(77,139,255,.25); background: rgba(77,139,255,.05); border-radius: 12px; }
+  .skillbox summary { cursor: pointer; padding: 8px 12px; font-size: 12.5px; font-weight: 600; list-style: none; display: flex; gap: 8px; align-items: center; }
+  .skillbox summary code { font: 10.5px var(--mono); color: var(--muted); font-weight: 400; }
+  .skillbox pre { margin: 0; border-top: 1px solid rgba(77,139,255,.18); background: var(--bg); padding: 12px; max-height: 380px; overflow: auto; font: 12px/1.6 var(--mono); white-space: pre-wrap; word-break: break-word; }
+  .preview { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #fff; }
+  .preview .ph { display: flex; justify-content: space-between; align-items: center; padding: 0 12px; height: 32px; background: var(--elevated); border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted); font-weight: 600; }
+  .preview .ph a { color: var(--primary); text-decoration: none; }
+  .preview iframe { display: block; width: 100%; height: min(50vh, 420px); border: 0; background: #fff; }
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 12px; margin: 0; padding: 0; list-style: none; }
+  .steps li { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); min-width: 0; }
+  .steps li span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .steps .i { flex: 0 0 16px; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; background: var(--ok-bg); color: var(--ok); }
+  .flow { background: var(--elevated); border-radius: var(--radius); padding: 12px; }
+  .flow .now { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+  .flow .spin { width: 12px; height: 12px; border: 2px solid rgba(77,139,255,.25); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
+  .flow ol { margin: 10px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px; }
+  .flow li { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--subtle); }
+  .flow li .i { flex: 0 0 16px; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; background: var(--bg); box-shadow: 0 0 0 1px rgba(31,41,55,.07); }
+  .flow li.done { color: var(--fg); } .flow li.done .i { background: #d1fae5; color: var(--ok); box-shadow: none; }
+  .flow li.now { color: var(--fg); } .flow li.now .i { background: var(--primary); color: #fff; box-shadow: none; }
+  .suggest { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 11px; color: var(--muted); }
+  .suggest button { border: 0; background: rgba(77,139,255,.12); color: var(--primary); border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; }
+  footer { border-top: 1px solid var(--border); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+  .composer { max-width: 880px; margin: 0 auto; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .seg { display: flex; background: var(--elevated); border-radius: 10px; padding: 2px; }
+  .seg button { border: 0; background: transparent; color: var(--muted); height: 28px; padding: 0 10px; border-radius: 8px; font-size: 11px; font-weight: 600; }
+  .seg button.on { background: var(--bg); color: var(--fg); box-shadow: 0 0 0 1px rgba(31,41,55,.07); }
+  .active-skill { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 4px 0 10px; border-radius: 999px; background: rgba(77,139,255,.12); color: var(--primary); font-size: 11px; font-weight: 600; }
+  .active-skill button { border: 0; background: transparent; color: inherit; width: 20px; height: 20px; border-radius: 50%; }
+  .hint { font-size: 11px; color: var(--subtle); }
+  .input { display: flex; align-items: flex-end; gap: 8px; background: var(--elevated); border-radius: 18px; padding: 8px; box-shadow: 0 0 0 1px rgba(31,41,55,.07); }
+  .input:focus-within { box-shadow: 0 0 0 2px var(--primary); }
+  textarea { flex: 1; border: 0; background: transparent; resize: none; min-height: 40px; max-height: 160px; padding: 8px; font: 13px/1.5 var(--mono); color: var(--fg); outline: none; }
+  textarea::placeholder { font-family: var(--sans); color: var(--subtle); }
+  .run { width: 36px; height: 36px; border: 0; border-radius: 10px; background: var(--primary); color: #fff; font-size: 16px; display: grid; place-items: center; }
+  .run:disabled { opacity: .45; cursor: default; }
+  .run.stop { background: var(--bg); color: var(--fg); box-shadow: 0 0 0 1px rgba(31,41,55,.12); }
+  .foot { text-align: center; font-size: 11px; color: var(--subtle); margin: 8px 0 0; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+    aside { border-right: 0; border-bottom: 1px solid var(--border); padding: 10px 12px; display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden; }
+    aside h2, .cat { display: none; }
+    .skill { width: auto; flex: 0 0 auto; padding: 6px 10px; border-radius: 999px; background: var(--elevated); align-items: center; }
+    .skill .d, .skill .n { display: none; }
+    .api input { display: none; }
+    .thread { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="logo">▣</div>
+      <div>
+        <h1>Sali Sandbox Agent <span style="font-weight:500;color:var(--muted)">· standalone</span></h1>
+        <p>คุยกับ <code>/api/sandbox</code> โดยตรง — โหลด Grok Skills • รันคำสั่ง • Live Preview</p>
+      </div>
+    </div>
+    <div class="api">
+      <input id="apiBase" type="text" spellcheck="false" title="API base URL (ค่าเริ่มต้น: origin เดียวกัน)" />
+      <span id="status" class="pill"><span class="dot"></span>กำลังเชื่อมต่อ…</span>
+    </div>
+  </header>
+
+  <main>
+    <aside id="skills"><h2>Grok Skills</h2><div class="cat">กำลังโหลด…</div></aside>
+    <section id="thread" class="thread"></section>
+  </main>
+
+  <footer>
+    <form id="form" class="composer">
+      <div class="opts">
+        <div class="seg" id="types"></div>
+        <span id="activeSkill" class="hint">เลือกสกิลเพื่อแนบบริบทให้การรัน</span>
+      </div>
+      <div class="input">
+        <textarea id="cmd" rows="1" placeholder="พิมพ์คำสั่ง เช่น npm --version, python3 -c ..., หรือวาง HTML"></textarea>
+        <button id="run" class="run" type="submit" aria-label="รันคำสั่ง" disabled>↑</button>
+      </div>
+      <p class="foot">Enter เพื่อรัน • Shift+Enter ขึ้นบรรทัดใหม่ • ทุกคำสั่งรันในแซนด์บ็อกที่แยกจากแอป</p>
+    </form>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (sel) => document.querySelector(sel);
+  const thread = $("#thread"), skillsEl = $("#skills"), statusEl = $("#status"), form = $("#form");
+  const cmdEl = $("#cmd"), runBtn = $("#run"), typesEl = $("#types"), activeSkillEl = $("#activeSkill"), apiInput = $("#apiBase");
+
+  // --- API base: ?api=… > localStorage > same origin ---------------------------------------
+  const params = new URLSearchParams(location.search);
+  const stored = localStorage.getItem("sali.apiBase") || "";
+  let apiBase = (params.get("api") || stored || "").replace(/\/+$/, "");
+  apiInput.value = apiBase;
+  apiInput.placeholder = location.origin + "/api/sandbox";
+  apiInput.addEventListener("change", () => {
+    apiBase = apiInput.value.trim().replace(/\/+$/, "");
+    localStorage.setItem("sali.apiBase", apiBase);
+    loadSkills();
+  });
+  const endpoint = () => (apiBase ? (apiBase.endsWith("/api/sandbox") ? apiBase : apiBase + "/api/sandbox") : "/api/sandbox");
+
+  // --- state ------------------------------------------------------------------------------
+  const TYPES = ["auto", "node", "python", "bash", "html", "json"];
+  const TYPE_LABEL = { auto: "Auto", node: "Node", python: "Python", bash: "Bash", html: "HTML", json: "JSON" };
+  const CATEGORY = { design: "ดีไซน์", games: "เกม", art: "งานภาพ", platform: "แพลตฟอร์ม", data: "ข้อมูล", ai: "AI", other: "อื่น ๆ" };
+  const EXAMPLES = [
+    { label: "npm --version", cmd: "npm --version", type: "node" },
+    { label: "Python: print(2 + 2)", cmd: 'python3 -c "print(2 + 2)"', type: "python" },
+    { label: "Bash: echo + date", cmd: 'echo "hello from sandbox" && date -u', type: "bash" },
+    { label: "HTML preview", cmd: '<h1 style="font-family:system-ui">Hello from Sali 💜</h1>\n<button onclick="this.textContent=\'clicked ✓\'">click me</button>', type: "html" },
+  ];
+  let skills = [], activeSkill = null, typeHint = "auto", busy = false, controller = null;
+
+  // --- helpers ----------------------------------------------------------------------------
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  const scrollDown = () => { thread.scrollTop = thread.scrollHeight; };
+  const setStatus = (text, bad) => { statusEl.className = "pill" + (bad ? " err" : ""); statusEl.innerHTML = '<span class="dot"></span>'; statusEl.append(text); };
+  const chip = (text, cls) => el("span", "chip" + (cls ? " " + cls : ""), text);
+
+  function renderTypes() {
+    typesEl.innerHTML = "";
+    for (const t of TYPES) {
+      const b = el("button", t === typeHint ? "on" : "", TYPE_LABEL[t] || t);
+      b.type = "button"; b.onclick = () => { typeHint = t; renderTypes(); };
+      typesEl.append(b);
+    }
+  }
+  function renderActiveSkill() {
+    activeSkillEl.innerHTML = "";
+    if (!activeSkill) { activeSkillEl.className = "hint"; activeSkillEl.textContent = "เลือกสกิลเพื่อแนบบริบทให้การรัน"; return; }
+    activeSkillEl.className = "active-skill";
+    activeSkillEl.append(activeSkill.name);
+    const x = el("button", "", "×"); x.type = "button"; x.title = "ยกเลิกสกิล"; x.onclick = () => { activeSkill = null; renderActiveSkill(); renderSkills(); };
+    activeSkillEl.append(x);
+  }
+  function renderSkills() {
+    skillsEl.innerHTML = "";
+    skillsEl.append(el("h2", "", "Grok Skills"));
+    const groups = new Map();
+    for (const s of skills) { if (!groups.has(s.category)) groups.set(s.category, []); groups.get(s.category).push(s); }
+    for (const [cat, list] of groups) {
+      skillsEl.append(el("div", "cat", CATEGORY[cat] || cat));
+      for (const s of list) {
+        const b = el("button", "skill" + (activeSkill && activeSkill.id === s.id ? " active" : ""));
+        b.type = "button"; b.title = s.shortDescription || s.description;
+        b.append(el("span", "e", s.emoji));
+        const t = el("span", ""); t.style.minWidth = "0"; t.style.flex = "1";
+        t.append(el("span", "t", s.title), el("span", "d", s.shortDescription || s.description));
+        b.append(t);
+        if (s.references.length) b.append(el("span", "n", "+" + s.references.length));
+        b.onclick = () => openSkill(s);
+        skillsEl.append(b);
+      }
+    }
+  }
+  function renderEmpty() {
+    const wrap = el("div", "empty");
+    wrap.append(el("div", "logo", "▣"));
+    wrap.querySelector(".logo").style.margin = "0 auto";
+    wrap.append(el("h2", "", "สลี่พร้อมรันให้ค่ะ"));
+    wrap.append(el("p", "", "พิมพ์คำสั่ง Node / Python / Bash เพื่อรันในแซนด์บ็อกจริง วาง HTML เพื่อดู Live Preview หรือเลือก Grok Skill เพื่อโหลดคู่มือ"));
+    const ex = el("div", "examples");
+    for (const e of EXAMPLES) {
+      const b = el("button", "example"); b.type = "button";
+      b.append(el("b", "", e.label), el("code", "", e.cmd));
+      b.onclick = () => run(e.cmd, e.type);
+      ex.append(b);
+    }
+    wrap.append(ex);
+    thread.append(wrap);
+  }
+
+  function userBubble(text, extras) {
+    const w = el("div", "user"); const pre = el("pre", "", text); w.append(pre);
+    if (extras && extras.length) { const row = el("div"); row.style.cssText = "display:flex;gap:6px;margin-top:6px;justify-content:flex-end"; for (const c of extras) row.append(c); pre.append(row); }
+    thread.querySelector(".empty")?.remove();
+    thread.append(w); scrollDown();
+  }
+
+  function flowCard(steps) {
+    const card = el("div", "card"); card.append(el("div", "ava", "✦"));
+    const box = el("div", "flow"); const now = el("div", "now"); now.append(el("span", "spin"), el("span", "", steps[0]));
+    const ol = el("ol"); steps.forEach((s, i) => { const li = el("li", i === 0 ? "now" : ""); li.append(el("span", "i", i === 0 ? "•" : String(i + 1)), el("span", "", s)); ol.append(li); });
+    box.append(now, ol); card.append(box); thread.append(card); scrollDown();
+    let idx = 0;
+    const timer = setInterval(() => {
+      if (idx >= steps.length - 2) return;
+      idx++;
+      now.lastChild.textContent = steps[idx];
+      [...ol.children].forEach((li, i) => { li.className = i < idx ? "done" : i === idx ? "now" : ""; li.firstChild.textContent = i < idx ? "✓" : i === idx ? "•" : String(i + 1); });
+    }, 650);
+    return { remove() { clearInterval(timer); card.remove(); } };
+  }
+
+  function resultCard(r) {
+    const card = el("div", "card"); card.append(el("div", "ava", "✦"));
+    const box = el("div", "box"); const bar = el("div", "bar");
+    const label = r.status === "running" ? ["🟢 กำลังทำงาน", "live"] : r.success ? ["✅ สำเร็จ", "ok"] : r.status === "timeout" ? ["⏱️ หมดเวลา", "warn"] : ["❌ ผิดพลาด", "err"];
+    bar.append(chip(label[0], label[1]), chip(r.type || "?", "mono"));
+    if (r.label && r.label !== r.type) bar.append(chip(r.label));
+    if (typeof r.exitCode === "number") bar.append(chip("exit " + r.exitCode, "mono"));
+    if (r.durationMs) bar.append(chip((r.durationMs / 1000).toFixed(2) + "s"));
+    const body = el("div", "body");
+    if (r.error) { const e = el("div", "errbox", r.error); if (r.detail) { const d = el("div", "", r.detail); d.style.cssText = "margin-top:4px;font:11px var(--mono);opacity:.8"; e.append(d); } body.append(e); }
+    if (r.skill) {
+      const det = el("details", "skillbox"); det.open = r.type === "skill";
+      const sum = el("summary"); sum.append("📖 " + r.skill.name + " "); sum.append(el("code", "", r.skill.path)); det.append(sum);
+      det.append(el("pre", "", r.skill.content)); body.append(det);
+    }
+    if (r.output) body.append(el("pre", "out", r.output));
+    if (r.html) {
+      const p = el("div", "preview"); const ph = el("div", "ph"); ph.append(el("span", "", "🌐 Live Preview"), el("span", "", "iframe แยกกรอบ • allow-scripts")); p.append(ph);
+      const f = document.createElement("iframe"); f.setAttribute("sandbox", "allow-scripts"); f.title = "Sandbox HTML preview"; f.srcdoc = r.html; p.append(f); body.append(p);
+    }
+    if (r.previewUrl) {
+      const p = el("div", "preview"); const ph = el("div", "ph"); ph.append(el("span", "", "🌐 Dev server กำลังทำงาน"));
+      const a = el("a", "", "เปิดเต็มจอ ↗"); a.href = r.previewUrl; a.target = "_blank"; a.rel = "noreferrer"; ph.append(a); p.append(ph);
+      const f = document.createElement("iframe"); f.src = r.previewUrl; f.title = "Sandbox live preview"; p.append(f); body.append(p);
+    }
+    if (Array.isArray(r.steps) && r.steps.length) {
+      const ol = el("ol", "steps"); for (const s of r.steps) { const li = el("li"); li.append(el("span", "i", "✓"), el("span", "", s)); ol.append(li); } body.append(ol);
+    }
+    if (Array.isArray(r.suggestions) && r.suggestions.length) {
+      const sg = el("div", "suggest", "สกิลที่เกี่ยวข้อง: ");
+      for (const id of r.suggestions) { const b = el("button", "", id); b.type = "button"; b.onclick = () => { const s = skills.find((x) => x.id === id); if (s) openSkill(s); }; sg.append(b); }
+      body.append(sg);
+    }
+    box.append(bar, body); card.append(box); thread.append(card); scrollDown();
+  }
+
+  // --- API calls --------------------------------------------------------------------------
+  async function api(body, signal) {
+    const res = await fetch(endpoint(), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal });
+    const data = await res.json().catch(() => null);
+    if (data && typeof data === "object" && "success" in data) return data;
+    return { success: false, status: "error", type: "error", error: "Sandbox API ตอบกลับ HTTP " + res.status };
+  }
+
+  async function loadSkills() {
+    setStatus("กำลังเชื่อมต่อ…");
+    try {
+      const res = await fetch(endpoint()); const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "HTTP " + res.status);
+      skills = data.skills; renderSkills();
+      setStatus("API พร้อม • " + data.count + " สกิล • runner: " + data.runner.source);
+    } catch (err) {
+      skills = []; renderSkills();
+      skillsEl.append(el("div", "errbox", "โหลดสกิลไม่ได้: " + err.message));
+      setStatus("API ไม่พร้อม", true);
+    }
+  }
+
+  function setBusy(v) {
+    busy = v; runBtn.className = "run" + (v ? " stop" : ""); runBtn.textContent = v ? "■" : "↑"; runBtn.type = v ? "button" : "submit";
+    runBtn.disabled = v ? false : !cmdEl.value.trim(); runBtn.setAttribute("aria-label", v ? "หยุด" : "รันคำสั่ง");
+  }
+
+  async function openSkill(skill) {
+    if (busy) return;
+    activeSkill = skill; renderActiveSkill(); renderSkills();
+    userBubble("เปิดสกิล " + skill.name, [chip("skill", "mono")]);
+    const flow = flowCard(["รับคำสั่ง", "โหลดสกิล " + skill.name, "แสดงผล"]);
+    setBusy(true); controller = new AbortController();
+    try { resultCard(await api({ skill: skill.id, type: "skill" }, controller.signal)); }
+    catch (err) { resultCard({ success: false, status: "error", type: "error", error: err.name === "AbortError" ? "ยกเลิกแล้ว" : "เชื่อมต่อ Sandbox API ไม่ได้", detail: err.message }); }
+    finally { flow.remove(); setBusy(false); }
+  }
+
+  async function run(cmd, type) {
+    const command = (cmd || "").trim(); if (!command || busy) return;
+    cmdEl.value = ""; autosize();
+    const t = type || typeHint;
+    const extras = []; if (t !== "auto") extras.push(chip(t, "mono")); if (activeSkill) extras.push(chip(activeSkill.name, "primary"));
+    userBubble(command, extras);
+    const flow = flowCard(["รับคำสั่ง", "วิเคราะห์ประเภทคำสั่ง", activeSkill ? "โหลดสกิล " + activeSkill.name : "เตรียม Sandbox", "กำลังรัน…", "แสดงผล"]);
+    setBusy(true); controller = new AbortController();
+    const body = { cmd: command }; if (t !== "auto") body.type = t; if (activeSkill) body.skill = activeSkill.id;
+    try { resultCard(await api(body, controller.signal)); }
+    catch (err) { resultCard({ success: false, status: "error", type: "error", error: err.name === "AbortError" ? "ยกเลิกคำสั่งแล้ว" : "เชื่อมต่อ Sandbox API ไม่ได้", detail: err.message }); }
+    finally { flow.remove(); setBusy(false); }
+  }
+
+  // --- wiring -----------------------------------------------------------------------------
+  function autosize() { cmdEl.style.height = "0px"; cmdEl.style.height = Math.min(cmdEl.scrollHeight, 160) + "px"; }
+  cmdEl.addEventListener("input", () => { autosize(); if (!busy) runBtn.disabled = !cmdEl.value.trim(); });
+  cmdEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); run(cmdEl.value); } });
+  form.addEventListener("submit", (e) => { e.preventDefault(); run(cmdEl.value); });
+  runBtn.addEventListener("click", () => { if (busy && controller) controller.abort(); });
+
+  renderTypes(); renderActiveSkill(); renderEmpty(); autosize(); loadSkills();
+})();
+</script>
+</body>
+</html>

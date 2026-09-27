@@ -1,4 +1,5 @@
-import { Bot, GitBranch, ImageIcon, MessageSquare, Sparkles } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Bot, GitBranch, ImageIcon, MessageSquare, Sparkles, SquareTerminal } from "lucide-react";
 import type { AppView } from "@/lib/types";
 
 const PROMPTS = [
@@ -27,6 +28,7 @@ export function Discover({ onPrompt, onView }: { onPrompt: (text: string) => voi
         <ModePill icon={GitBranch} label="Mind maps" onClick={() => onView("maps")} />
         <ModePill icon={Bot} label="AI Builder" onClick={() => onView("builder")} />
         <ModePill icon={ImageIcon} label="Studio" onClick={() => onView("studio")} />
+        <Link to="/sandbox" className="inline-flex h-9 items-center gap-2 rounded-full border border-[#e8ebef] bg-white px-3.5 text-xs font-medium text-[#66707c] transition hover:bg-[#f6f8fb]"><SquareTerminal className="size-3.5 text-primary" />Sandbox</Link>
       </div>
     </div>
   );

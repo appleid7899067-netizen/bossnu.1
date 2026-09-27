@@ -1,4 +1,5 @@
-import { Bot, GitBranch, ImageIcon, MessageSquare, Plus, Settings, Trash2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Bot, GitBranch, ImageIcon, MessageSquare, Plus, Settings, SquareTerminal, Trash2 } from "lucide-react";
 import { LuminaWordmark } from "@/components/lumina-mark";
 import { Button } from "@/components/ui/button";
 import type { AppView, Conversation, SavedMap } from "@/lib/types";
@@ -22,6 +23,9 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
       <NavItem active={view === "maps"} icon={GitBranch} label="History" onClick={() => onView("maps")} />
       <NavItem active={view === "studio"} icon={ImageIcon} label="Explore" onClick={() => onView("studio")} />
       <NavItem active={view === "builder"} icon={Bot} label="DeepSeek V3" onClick={() => onView("builder")} />
+      <Link to="/sandbox" className="flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-sm font-medium text-muted transition-colors hover:bg-hover hover:text-fg" activeProps={{ className: "bg-elevated text-fg" }}>
+        <SquareTerminal className="size-4 shrink-0" strokeWidth={1.8} />Sandbox
+      </Link>
       <NavItem active={view === "settings"} icon={Settings} label="Settings" onClick={() => onView("settings")} />
     </nav>
     <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-3 pb-4 no-scrollbar">
