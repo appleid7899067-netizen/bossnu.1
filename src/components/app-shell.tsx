@@ -117,8 +117,22 @@ export function AppShell({ search }: { search: Search }) {
       setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: "กำลังรัน…" });
       setWorkSteps((steps) => [...steps, "กำลังรันในแซนด์บ็อกจริง"]);
       try {
-        const result = await sandboxClient.execute(sandboxDetection.command, { type: sandboxDetection.runtime });
-        const output = [result?.stdout, result?.stderr].filter(Boolean).join("\\n").trim();
+        let streamedOutput = "";
+        const result = await sandboxClient.executeStream(sandboxDetection.command, {
+          type: sandboxDetection.runtime,
+          onEvent: (event) => {
+            if (event.type === "status") {
+              setStreamStatus(event.message || (event.status === "running" ? "กำลังรันในแซนด์บ็อกจริง…" : "กำลังเตรียม Sandbox…"));
+              setWorkSteps((steps) => event.message && !steps.includes(event.message) ? [...steps, event.message] : steps);
+            } else if (event.type === "output") {
+              streamedOutput += event.text;
+              setSandboxRun((current) => current ? { ...current, status: "กำลังทำงาน", output: streamedOutput } : current);
+            } else if (event.type === "error") {
+              setStreamStatus("Sandbox พบข้อผิดพลาด");
+            }
+          },
+        });
+        const output = [result?.stdout, result?.stderr].filter(Boolean).join("\\n").trim() || streamedOutput.trim();
         setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: result?.status === "running" ? "กำลังทำงาน" : result?.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด", output, previewUrl: result?.previewUrl ?? null });
         if (result?.status === "success") {
           store.saveLearnedSkill({
