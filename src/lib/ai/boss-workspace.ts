@@ -5,6 +5,11 @@ export const BOSS_WORKSPACE_DEFAULT_FILES: Record<string, string> = {
   "agent/RULE.md": "# Rules\n\n- อ่าน Workspace ก่อนลงมือ\n- ใช้เครื่องมือเมื่อจำเป็น\n- อ่านผลจริงก่อนสรุป\n- ห้ามอ้างว่างานเสร็จโดยไม่มีหลักฐาน\n",
   "agent/USER.md": "# User Context\n\nข้อมูลที่ผู้ใช้อนุญาตให้จำจะถูกเก็บที่นี่\n",
   "memory/MEMORY.md": "# Long-term Memory\n\nความจำระยะยาวของ Boss จะถูกสะสมที่นี่\n",
+  "memory/daily/README.md": "# Daily Memory\n\nBoss จะสร้างไฟล์ YYYY-MM-DD.md สำหรับแต่ละวัน\n",
+  "knowledge/.gitkeep": "",
+  "skills/.gitkeep": "",
+  "tasks/.gitkeep": "",
+  "project/.gitkeep": "",
 };
 
 const MAX_PATH = 300;
