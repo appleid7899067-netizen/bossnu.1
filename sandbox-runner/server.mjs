@@ -234,6 +234,7 @@ async function executeStream(body, res) {
       await new Promise(r => setTimeout(r, 2200));
       sendOutput();
       const port = detectPort(session);
+      const snapshot = await collectWorkspaceSnapshot(dir);
       const result = {
         success: !session.exited,
         status: session.exited ? "error" : "running",
@@ -243,8 +244,8 @@ async function executeStream(body, res) {
         output: [session.stdout(), session.stderr()].filter(Boolean).join("\n").trim().slice(-MAX_OUTPUT),
         sessionId: session.id, port, previewPath: "/preview/" + session.id + "/",
         durationMs: Date.now() - started,
-        workspaceFiles: (await collectWorkspaceSnapshot(dir)).files,
-        workspaceSyncComplete: (await collectWorkspaceSnapshot(dir)).complete,
+        workspaceFiles: snapshot.files,
+        workspaceSyncComplete: snapshot.complete,
       };
       sse(res, { type: "complete", result });
       return res.end();
