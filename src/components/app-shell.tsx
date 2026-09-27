@@ -109,7 +109,7 @@ export function AppShell({ search }: { search: Search }) {
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-    setDraft(""); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
+    setDraft(""); setActiveTool(null); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
     setStreamStatus("กำลังวางแผน…"); setWorkSteps(["🎯 เป้าหมาย"]);
     stopVoice(); go({ view: "chat", c: id });
     let reply = "";
