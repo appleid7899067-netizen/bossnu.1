@@ -119,7 +119,7 @@ export function AppShell({ search }: { search: Search }) {
       try {
         const result = await sandboxClient.execute(sandboxDetection.command, { type: sandboxDetection.runtime });
         const output = [result?.stdout, result?.stderr].filter(Boolean).join("\\n").trim();
-        setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: result?.status === "running" ? "กำลังทำงาน" : result?.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด", output, previewUrl: null });
+        setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: result?.status === "running" ? "กำลังทำงาน" : result?.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด", output, previewUrl: result?.previewUrl ?? null });
         if (result?.status === "success") {
           store.saveLearnedSkill({
             name: `Sandbox ${sandboxDetection.label}`,
@@ -132,9 +132,9 @@ export function AppShell({ search }: { search: Search }) {
           setWorkSteps((steps) => steps.includes("บันทึกทักษะที่ทดสอบผ่าน") ? steps : [...steps, "บันทึกทักษะที่ทดสอบผ่าน"]);
         }
         sandboxNote = output ? "\\n\\n**ผลการรัน Sandbox**\\n\\n\`\`\`text\\n" + output + "\\n\`\`\`" : "";
-        const preview = null;
+        const preview = result?.previewUrl ?? null;
         if (preview) sandboxNote += "\\n\\n:::sandbox-preview " + preview + "\\n";
-        setWorkSteps((steps) => [...steps, result?.status === "running" ? "เว็บกำลังทำงานและเปิด Preview" : result?.status === "success" ? "Sandbox รันสำเร็จ" : "Sandbox แจ้งข้อผิดพลาด"]);
+        setWorkSteps((steps) => [...steps, ...(result?.steps ?? []), result?.status === "running" ? "เว็บกำลังทำงานและเปิด Preview" : result?.status === "success" ? "Sandbox รันสำเร็จ" : "Sandbox แจ้งข้อผิดพลาด"]);
         setStreamStatus(result?.status === "running" ? "เปิด Live Preview แล้ว…" : "ตรวจผล Sandbox แล้ว…");
       } catch (error) {
         const errorText = error instanceof Error ? error.message : "รัน Sandbox ไม่สำเร็จ";
