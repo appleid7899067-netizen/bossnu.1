@@ -96,7 +96,11 @@ export function SaliAgent({
 
   useEffect(() => {
     const el = scroller.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    // Keep streaming output visible without hijacking the user's scroll position
+    // when they have intentionally moved up in the conversation.
+    if (distanceFromBottom < 160) el.scrollTop = el.scrollHeight;
   }, [messages, sandbox.busy, live]);
 
   useEffect(() => {
@@ -300,13 +304,49 @@ export function SaliAgent({
                 ),
               )}
 
-              {sandbox.busy && live ? <div className="overflow-hidden rounded-2xl border border-border bg-elevated" data-testid="sandbox-live-output">
-                <div className="border-b border-border p-3 text-xs" role="status" aria-live="polite">
-                  <span className="font-semibold text-primary">🌊 Sandbox · Live</span>
-                  {live.steps.map((step, i) => <div key={i} className="mt-1 text-muted">{i === live.steps.length - 1 ? "⟳" : "✓"} {step}</div>)}
-                </div>
-                <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs">{live.output || "รอ output จาก runner…"}<span className="animate-pulse"> ▌</span></pre>
-              </div> : sandbox.busy ? <FlowStatus skill={activeSkill} /> : null}
+              {sandbox.busy && live ? (
+                <section
+                  className="overflow-hidden rounded-2xl border border-border bg-elevated"
+                  data-testid="sandbox-live-workspace"
+                  aria-label="Sandbox Workspace"
+                >
+                  <div className="flex items-center gap-2 border-b border-border px-3 py-2" role="status" aria-live="polite">
+                    <SquareTerminal className="size-3.5 text-primary" />
+                    <span className="text-[11px] font-semibold">Workspace</span>
+                    <span className="text-[10px] text-muted">Terminal · Live</span>
+                    <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-primary">
+                      <span className="size-1.5 animate-pulse rounded-full bg-primary" />
+                      กำลังทำงาน
+                    </span>
+                  </div>
+                  <div className="grid gap-px bg-border lg:grid-cols-[minmax(0,1.2fr)_minmax(240px,0.8fr)]">
+                    <div className="min-w-0 bg-[#0f172a]">
+                      <div className="flex h-8 items-center justify-between px-3 text-[10px] text-slate-400">
+                        <span>Terminal</span>
+                        <span>streaming</span>
+                      </div>
+                      <pre className="max-h-[min(45vh,360px)] min-h-28 overflow-auto whitespace-pre-wrap break-words px-3 pb-3 font-mono text-[11.5px] leading-[1.55] text-slate-100 [overflow-wrap:anywhere]">{live.output || "รอ output จาก runner…"}<span className="animate-pulse"> ▌</span></pre>
+                    </div>
+                    <div className="flex min-h-28 flex-col justify-center bg-bg p-4">
+                      <div className="text-[11px] font-semibold">สถานะการทำงาน</div>
+                      <ol className="mt-2 grid gap-1.5">
+                        {live.steps.map((step, i) => (
+                          <li key={i} className="flex items-center gap-2 text-[11px] text-muted">
+                            <span className={cn(
+                              "grid size-4 shrink-0 place-items-center rounded-full text-[9px]",
+                              i === live.steps.length - 1 ? "bg-primary text-primary-fg" : "bg-emerald-100 text-emerald-700",
+                            )}>
+                              {i === live.steps.length - 1 ? "•" : "✓"}
+                            </span>
+                            <span className="truncate">{step}</span>
+                          </li>
+                        ))}
+                      </ol>
+                      <p className="mt-3 text-[10px] text-subtle">Preview จะเปิดทันทีเมื่อ runner ส่ง URL หรือ HTML กลับมา</p>
+                    </div>
+                  </div>
+                </section>
+              ) : sandbox.busy ? <FlowStatus skill={activeSkill} /> : null}
             </div>
           </div>
 
