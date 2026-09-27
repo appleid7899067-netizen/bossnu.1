@@ -1,5 +1,7 @@
 import { RunScanner, modelResult, terminalTranscript } from "./sandbox-tool.ts";
 import type { RunCall, ToolResult } from "./sandbox-tool.ts";
+import { CowAgentCore, buildCowPlan } from "./cow-agent-core.ts";
+import { selectSkills } from "../skills/index.ts";
 
 function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -24,12 +26,18 @@ export async function runAgentLoop(opts: {
   maxRuns?: number;
 }) {
   const messages = [...opts.messages];
+  const goal = [...messages].reverse().find(message => message.role === "user")?.content ?? "";
+  const selectedSkills = selectSkills(goal, 5);
+  const core = new CowAgentCore(goal);
   let count = 0;
+  const plan = buildCowPlan(goal, selectedSkills.map(skill => skill.name));
+  opts.onPhase?.("goal", "🎯 เป้าหมาย");
+  opts.onText(`\n> 🎯 เป้าหมาย: ${goal.slice(0, 300)}\n`);
   const max = Math.min(6, Math.max(0, opts.maxRuns ?? 6));
 
-  opts.onPhase?.("goal", "เป้าหมาย");
   while (!opts.signal.aborted) {
-    opts.onPhase?.("plan", "กำลังวางแผน");
+    core.setPhase("plan");
+    opts.onPhase?.("plan", `🧠 Plan • ${plan[Math.min(count, plan.length - 1)]}`);
 
     const scanner = new RunScanner();
     const calls: RunCall[] = [];
@@ -56,23 +64,28 @@ export async function runAgentLoop(opts: {
     if (opts.tools) accept(scanner.finish());
 
     if (!calls.length) {
-      opts.onPhase?.("answer", "ตอบผลในแชท");
+      core.complete();
+      opts.onPhase?.("answer", "💬 Answer • ตอบผลในแชท");
       return;
     }
 
     messages.push({ role: "assistant", content: raw });
+    if (raw.trim()) core.remember("latest-plan", raw, "conversation");
 
     for (const call of calls) {
       if (opts.signal.aborted) return;
 
       if (count >= max) {
-        opts.onPhase?.("answer", "ถึงขีดจำกัดการรัน");
+        core.fail();
+        opts.onPhase?.("answer", "💬 Answer • ถึงขีดจำกัดการรัน");
         opts.onText(`\nถึงขีดจำกัด ${max} รอบแล้ว กรุณาส่งข้อความเพื่อทำต่อค่ะ\n`);
         return;
       }
 
       count++;
-      opts.onPhase?.("act", "กำลังลงมือทำ");
+      core.attempt();
+      core.setPhase("act");
+      opts.onPhase?.("act", "🛠️ Act • กำลังลงมือ");
       opts.onPhase?.("run", `กำลังรัน ${call.language}`);
 
       let result: ToolResult;
@@ -89,16 +102,20 @@ export async function runAgentLoop(opts: {
         result = { ...result, status: "aborted" };
       }
 
-      opts.onPhase?.("observe", "กำลังอ่านผลจาก Sandbox");
+      core.setPhase("observe");
+      core.remember(`run-${count}`, modelResult(call, result), "run");
+      opts.onPhase?.("observe", "👀 Observe • กำลังอ่านผลจาก Sandbox");
       opts.onText(terminalTranscript(call, result));
 
       if (opts.signal.aborted) return;
 
       const passed = result.status === "success";
-      opts.onPhase?.("verify", passed ? "กำลังตรวจสอบผล" : "ตรวจพบปัญหา");
+      core.setPhase("verify");
+      opts.onPhase?.("verify", passed ? "🔍 Verify • ผ่านการตรวจสอบเบื้องต้น" : "🔍 Verify • ตรวจพบปัญหา");
 
       if (!passed) {
-        opts.onPhase?.("fix", "กำลังแก้ปัญหาแล้วรันใหม่");
+        core.setPhase("fix");
+        opts.onPhase?.("fix", "🐛 Fix • กำลังแก้ปัญหาแล้วรันใหม่");
       }
 
       messages.push({ role: "user", content: modelResult(call, result) });
