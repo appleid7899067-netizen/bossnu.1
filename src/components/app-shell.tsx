@@ -104,6 +104,17 @@ export function AppShell({ search }: { search: Search }) {
       try {
         const result = await executeSandbox(sandboxDetection);
         const output = [result?.stdout, result?.stderr].filter(Boolean).join("\\n").trim();\n        setSandboxRun({ runtime: sandboxDetection.runtime, label: sandboxDetection.label, command: sandboxDetection.command, status: result?.status === "running" ? "กำลังทำงาน" : result?.status === "success" ? "สำเร็จ" : "มีข้อผิดพลาด", output, previewUrl: result ? sandboxPreviewUrl(result) : null });
+        if (result?.status === "success") {
+          store.saveLearnedSkill({
+            name: `Sandbox ${sandboxDetection.label}`,
+            runtime: sandboxDetection.runtime,
+            pattern: sandboxDetection.command,
+            testCommand: sandboxDetection.command,
+            result: "passed",
+            evidence: output.slice(0, 2000) || "exitCode=0",
+          });
+          setWorkSteps((steps) => steps.includes("บันทึกทักษะที่ทดสอบผ่าน") ? steps : [...steps, "บันทึกทักษะที่ทดสอบผ่าน"]);
+        }
         sandboxNote = output ? "\\n\\n**ผลการรัน Sandbox**\\n\\n\`\`\`text\\n" + output + "\\n\`\`\`" : "";
         const preview = result ? sandboxPreviewUrl(result) : null;
         if (preview) sandboxNote += "\\n\\n:::sandbox-preview " + preview + "\\n";
