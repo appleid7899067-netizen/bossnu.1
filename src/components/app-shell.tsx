@@ -119,7 +119,7 @@ export function AppShell({ search }: { search: Search }) {
     const execute = async (call: RunCall, approved = false) => {
       ac.signal.throwIfAborted();
       const risk = assessSandboxRisk(call.command);
-      if (risk.dangerous && !approved && !window.confirm(`${risk.riskReason}\n\n${call.command}\n\nอนุญาตให้รันคำสั่งนี้ใน Sandbox?`)) {
+      if (risk.dangerous && !approved && !window.confirm(`${risk.riskReason}\\n\\n${call.command}\\n\\nอนุญาตให้รันคำสั่งนี้ใน Sandbox?`)) {
         return { status: "error", error: "ผู้ใช้ไม่อนุญาตคำสั่งนี้ ห้ามลองใหม่หรือหลีกเลี่ยงการอนุญาต" };
       }
       let output = "";
@@ -153,7 +153,7 @@ export function AppShell({ search }: { search: Search }) {
     try {
       if (detection.webPreview && detection.code && ["html", "javascript", "css", "tailwind"].includes(detection.runtime)) {
         setSandboxRun({ runtime: detection.runtime, label: detection.label, command: "browser sandbox", status: "Preview พร้อมแล้ว", previewHtml: sandboxPreviewDocument(detection.runtime, detection.code) });
-        append("แสดง Live Preview ในแชตแล้วค่ะ\n\n");
+        append("แสดง Live Preview ในแชตแล้วค่ะ\\n\\n");
       } else if (tools && store.personality.autoSandbox && detection.command) {
         const call: RunCall = { language: isRunnerRuntime(detection.runtime) ? detection.runtime : "bash", command: detection.command };
         const result = await execute(call, allowDangerous);
@@ -183,7 +183,7 @@ export function AppShell({ search }: { search: Search }) {
             return next.slice(-10);
           });
         },
-        onText: text => { append(text); if (!text.startsWith("\n\n```sandbox")) speakRealtime(text); },
+        onText: text => { append(text); if (!text.startsWith("\\n\\n```sandbox")) speakRealtime(text); },
         model: async (messages, onText) => {
           let failure = "";
           setStreamStatus("🧠 Plan • กำลังวางแผน…");
@@ -201,8 +201,8 @@ export function AppShell({ search }: { search: Search }) {
       if (!reply && !ac.signal.aborted) append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
       setStreamStatus(ac.signal.aborted ? "หยุดแล้ว ⛔" : "ตอบเสร็จแล้ว ✓");
     } catch (error) {
-      if (ac.signal.aborted) { append("\n\n⛔ หยุดการทำงานแล้ว"); setStreamStatus("หยุดแล้ว ⛔"); }
-      else { const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด"; append(`\n\n${message}`); toast.error(message); setStreamStatus("เกิดข้อผิดพลาด"); }
+      if (ac.signal.aborted) { append("\\n\\n⛔ หยุดการทำงานแล้ว"); setStreamStatus("หยุดแล้ว ⛔"); }
+      else { const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด"; append(`\\n\\n${message}`); toast.error(message); setStreamStatus("เกิดข้อผิดพลาด"); }
     } finally {
       finishVoice(); setBusyChat(false); setStreamingId(null);
     }
@@ -433,7 +433,7 @@ export function AppShell({ search }: { search: Search }) {
                 busy={busyChat}
                 contextualActions={quickActions}
                 toolActions={roomTools}
-                activeTool={activeTool}\n                onToolAction={(tool) => {\n                  setActiveTool(tool);\n                  const prompts: Record<string, string> = {\n                    auto: "ทำงานแบบ Auto ให้ Boss เลือกเครื่องมือที่เหมาะสม",\n                    sandbox: "ใช้ Sandbox เพื่อรันและทดสอบงานนี้จริง",\n                    web: "ค้นข้อมูลสดจากเว็บและตรวจแหล่งข้อมูล",\n                    github: "ตรวจและทำงานกับ GitHub/Repo ที่เกี่ยวข้อง",\n                    builder: "ใช้โหมด AI Builder เพื่อสร้างหรือปรับแอปแบบครบวงจร",\n                  };\n                  const hint = prompts[tool];\n                  if (hint && !draft.trim()) setDraft(hint);\n                }}
+                activeTool={activeTool}\\n                onToolAction={(tool) => {\\n                  setActiveTool(tool);\\n                  const prompts: Record<string, string> = {\\n                    auto: "ทำงานแบบ Auto ให้ Boss เลือกเครื่องมือที่เหมาะสม",\\n                    sandbox: "ใช้ Sandbox เพื่อรันและทดสอบงานนี้จริง",\\n                    web: "ค้นข้อมูลสดจากเว็บและตรวจแหล่งข้อมูล",\\n                    github: "ตรวจและทำงานกับ GitHub/Repo ที่เกี่ยวข้อง",\\n                    builder: "ใช้โหมด AI Builder เพื่อสร้างหรือปรับแอปแบบครบวงจร",\\n                  };\\n                  const hint = prompts[tool];\\n                  if (hint && !draft.trim()) setDraft(hint);\\n                }}
             voiceEnabled={voiceEnabled}
             onToggleVoice={() => {
               const next = !voiceEnabled;
