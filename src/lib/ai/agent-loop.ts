@@ -50,8 +50,17 @@ export async function runAgentLoop(opts: {
       }
     };
 
+    const agentContext = [
+      "Agent Core: CowAgent-style operating loop.",
+      "Goal: " + goal.slice(0, 1000),
+      "Active skills: " + (selectedSkills.map(skill => skill.name).join(", ") || "General"),
+      "Plan: " + plan.join(" → "),
+      "Relevant memory:",
+      core.context(goal),
+      "Rule: use tools when needed, observe their real output, fix failures, and do not claim completion before verification.",
+    ].join("\n");
     await untilAborted(
-      opts.model(messages, text => {
+      opts.model([{ role: "assistant", content: agentContext }, ...messages], text => {
         if (opts.signal.aborted) return;
         raw += text;
         if (opts.tools) accept(scanner.push(text));
@@ -86,7 +95,7 @@ export async function runAgentLoop(opts: {
       core.attempt();
       core.setPhase("act");
       opts.onPhase?.("act", "🛠️ Act • กำลังลงมือ");
-      opts.onPhase?.("run", `กำลังรัน ${call.language}`);
+      opts.onPhase?.("run", `💻 Run • กำลังรัน ${call.language}`);
 
       let result: ToolResult;
       try {
