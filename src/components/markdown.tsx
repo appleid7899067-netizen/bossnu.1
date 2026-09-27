@@ -71,6 +71,18 @@ function splitFences(src: string) {
   return parts;
 }
 
+function SandboxPreview({ url }: { url: string }) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-primary/20 bg-ink-soft shadow-[0_0_28px_rgba(139,92,246,0.14)]">
+      <div className="flex h-7 items-center justify-between border-b border-white/8 px-2.5 text-[10px] text-white/45">
+        <span>🌐 Sandbox Live Preview</span>
+        <a href={url} target="_blank" rel="noreferrer" className="text-primary hover:underline">เปิดเต็มจอ</a>
+      </div>
+      <iframe title="Sandbox live preview" src={url} sandbox="allow-scripts allow-forms" className="h-[420px] w-full bg-white" />
+    </div>
+  );
+}
+
 function MdBlock({ text }: { text: string }) {
   const lines = text.replace(/\n{3,}/g, "\n\n").split("\n");
   const blocks: ReactNode[] = [];
