@@ -21,6 +21,14 @@ export type WorkspaceFile = {
   updatedAt: string;
 };
 
+export type LearnedWorkspaceSkill = {
+  name: string;
+  runtime: string;
+  command: string;
+  goal: string;
+  evidence: string;
+};
+
 export type WorkspaceMemory = {
   key: string;
   value: string;
@@ -168,6 +176,59 @@ export async function recallWorkspaceMemory(id: string, query = "", limit = 12):
     .sort((a, b) => b.score - a.score || b.item.updatedAt.localeCompare(a.item.updatedAt))
     .map(row => row.item)
     .slice(0, Math.min(Math.max(limit, 1), 40));
+}
+
+function skillSlug(value: string): string {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9ก-๙]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) hash = Math.imul(hash ^ value.charCodeAt(i), 16777619);
+  return (normalized || "learned-skill") + "-" + (hash >>> 0).toString(16);
+}
+
+function redactSensitive(value: string): string {
+  return value
+    .replace(/(authorization\s*[:=]\s*bearer\s+)[^\s]+/gi, "$1[REDACTED]")
+    .replace(/([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API[_-]?KEY)[A-Z0-9_]*\s*[=:]\s*)[^\s]+/gi, "$1[REDACTED]")
+    .slice(0, 12000);
+}
+
+export async function learnWorkspaceSkill(id: string, skill: LearnedWorkspaceSkill) {
+  const workspaceId = await ensureBossWorkspace(id);
+  const command = redactSensitive(skill.command);
+  const goal = redactSensitive(skill.goal);
+  const evidence = redactSensitive(skill.evidence);
+  const fingerprint = goal + "\n" + command;
+  const path = "skills/learned/" + skillSlug(fingerprint) + ".md";
+  const existing = await readWorkspaceFile(workspaceId, path);
+  const uses = Number(existing?.content.match(/uses:\s*(\d+)/i)?.[1] || 0) + 1;
+  const content = [
+    "---",
+    "type: learned-skill",
+    "status: verified",
+    "uses: " + uses,
+    "runtime: " + skill.runtime,
+    "---",
+    "",
+    "# " + skill.name.slice(0, 160),
+    "",
+    "## When to use",
+    goal,
+    "",
+    "## Proven command",
+    "~~~" + skill.runtime,
+    command,
+    "~~~",
+    "",
+    "## Verified evidence",
+    evidence,
+    "",
+    "## Learning rule",
+    "Saved only after the Agent verification gate passed. Re-run and verify before trusting it in a changed environment.",
+    "",
+  ].join("\n");
+  await upsertWorkspaceFile(workspaceId, path, content);
+  await rememberWorkspace(workspaceId, "skill:" + skillSlug(fingerprint), "verified skill: " + path + " (uses " + uses + ")", "run");
+  return { path, uses };
 }
 
 export async function rememberWorkspace(id: string, key: string, value: string, source = "conversation") {
