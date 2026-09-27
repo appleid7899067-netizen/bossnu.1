@@ -14,15 +14,15 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
   view: AppView; onView: (view: AppView) => void; conversations: Conversation[]; maps: SavedMap[]; activeChatId: string | null; activeMapId: string | null;
   onNewChat: () => void; onOpenChat: (id: string) => void; onDeleteChat: (id: string) => void; onOpenMap: (id: string) => void;
 }) {
-  return <aside className="flex h-full min-h-0 w-[280px] shrink-0 flex-col border-r border-border bg-bg">
+  return <aside className="flex h-full min-h-0 w-[260px] shrink-0 flex-col border-r border-border bg-[#f8f9fb]">
     <div className="flex items-center justify-between px-4 py-4"><LuminaWordmark /></div>
     <div className="px-3"><Button className="h-11 w-full justify-center rounded-xl" onClick={onNewChat}><Plus className="size-4" />New chat</Button></div>
     <nav className="mt-4 flex flex-col gap-1 px-3">
       <NavItem active={view === "chat"} icon={MessageSquare} label="Chat" onClick={() => onView("chat")} />
-      <NavItem active={view === "maps"} icon={GitBranch} label="Mind maps" onClick={() => onView("maps")} />
-      <NavItem active={view === "studio"} icon={ImageIcon} label="Studio" onClick={() => onView("studio")} />
-      <NavItem active={view === "builder"} icon={Bot} label="AI Builder" onClick={() => onView("builder")} />
-      <NavItem active={view === "settings"} icon={Settings} label="Agent settings" onClick={() => onView("settings")} />
+      <NavItem active={view === "maps"} icon={GitBranch} label="History" onClick={() => onView("maps")} />
+      <NavItem active={view === "studio"} icon={ImageIcon} label="Explore" onClick={() => onView("studio")} />
+      <NavItem active={view === "builder"} icon={Bot} label="DeepSeek V3" onClick={() => onView("builder")} />
+      <NavItem active={view === "settings"} icon={Settings} label="Settings" onClick={() => onView("settings")} />
     </nav>
     <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-3 pb-4 no-scrollbar">
       {view === "maps" ? <ListBlock title="Saved maps" empty="Maps you build will live here." items={maps.map((m) => ({ id: m.id, label: m.data.topic, active: m.id === activeMapId, onOpen: () => onOpenMap(m.id) }))} />

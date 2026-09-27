@@ -345,7 +345,7 @@ export function AppShell({ search }: { search: Search }) {
             {drawer ? <X className="size-5" /> : <Menu className="size-5" />}
           </Button>
           <LuminaWordmark compact />
-          <Button variant="ghost" size="icon-sm" aria-label="โทรหาสลี่" onClick={() => setCallOpen(true)}><Phone className="size-5" /></Button>
+          <Button variant="ghost" size="icon-sm" aria-label="Voice mode" onClick={() => setCallOpen(true)}><Phone className="size-5" /></Button>
         </header>
 
         {view === "maps" ? (
@@ -407,7 +407,7 @@ export function AppShell({ search }: { search: Search }) {
                 onChange={setDraft}
                 onSubmit={() => void send(draft, activeChat?.id)}
                 onStop={stopChat}
-                placeholder={showDiscover ? "ถามสลี่ได้เลยค่ะ…" : "พิมพ์สิ่งที่อยากให้สลี่ทำ…"}
+                placeholder={showDiscover ? "Message DeepSeek…" : "Message DeepSeek…"}
                 busy={busyChat}
                 contextualActions={quickActions}
             voiceEnabled={voiceEnabled}
