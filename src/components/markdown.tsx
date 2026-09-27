@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Check, Copy, Maximize2, Minimize2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -88,75 +89,73 @@ function MdBlock({ text }: { text: string }) {
   const blocks: ReactNode[] = [];
   let list: { ordered: boolean; items: string[] } | null = null;
   let para: string[] = [];
-
   const flushPara = () => {
     if (!para.length) return;
     const body = para.join(" ");
-    blocks.push(
-      <p key={`p-${blocks.length}`} className="leading-[1.55]">
-        {inline(body, `p${blocks.length}`)}
-      </p>,
-    );
+    blocks.push(<p key={`p-${blocks.length}`} className="leading-[1.7]">{inline(body, `p${blocks.length}`)}</p>);
     para = [];
   };
   const flushList = () => {
     if (!list) return;
     const Tag = list.ordered ? "ol" : "ul";
-    blocks.push(
-      <Tag
-        key={`l-${blocks.length}`}
-        className={cn(
-          "flex flex-col gap-1 pl-5 leading-relaxed",
-          list.ordered ? "list-decimal" : "list-disc",
-        )}
-      >
-        {list.items.map((item, i) => (
-          <li key={i}>{inline(item, `li${blocks.length}-${i}`)}</li>
-        ))}
-      </Tag>,
-    );
+    blocks.push(<Tag key={`l-${blocks.length}`} className={cn("flex flex-col gap-2 pl-6 leading-[1.7]", list.ordered ? "list-decimal" : "list-disc")}>
+      {list.items.map((item, i) => <li key={i}>{inline(item, `li${blocks.length}-${i}`)}</li>)}
+    </Tag>);
     list = null;
   };
+  const cells = (row: string) => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
 
-  for (const raw of lines) {
-    const line = raw.trimEnd();
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index].trimEnd();
+    const next = lines[index + 1] ?? "";
+    if (line.includes("|") && /^\s*\|?\s*:?-{3,}/.test(next) && next.includes("-")) {
+      flushPara(); flushList();
+      const headers = cells(line);
+      const rows: string[][] = [];
+      index += 2;
+      while (index < lines.length && lines[index].includes("|")) rows.push(cells(lines[index++]));
+      index--;
+      blocks.push(<div key={`table-${blocks.length}`} className="max-w-full overflow-x-auto rounded-xl border border-border">
+        <table className="w-full min-w-[420px] border-collapse text-left text-[0.9em]">
+          <thead className="bg-elevated"><tr>{headers.map((cell, i) => <th key={i} className="border-b border-r border-border px-3 py-2.5 font-semibold last:border-r-0">{inline(cell, `th${blocks.length}-${i}`)}</th>)}</tr></thead>
+          <tbody>{rows.map((row, rowIndex) => <tr key={rowIndex} className="even:bg-elevated/50">{headers.map((_, i) => <td key={i} className="max-w-[18rem] border-b border-r border-border px-3 py-2.5 align-top last:border-r-0">{inline(row[i] ?? "", `td${blocks.length}-${rowIndex}-${i}`)}</td>)}</tr>)}</tbody>
+        </table>
+      </div>);
+      continue;
+    }
     const heading = /^(#{1,3})\s+(.+)$/.exec(line);
     const ul = /^[-*]\s+(.+)$/.exec(line.trim());
     const ol = /^\d+\.\s+(.+)$/.exec(line.trim());
+    if (/^\s*(?:---+|___+|\*\*\*+)\s*$/.test(line)) {
+      flushPara(); flushList();
+      blocks.push(<hr key={`hr-${blocks.length}`} className="my-3 border-border" />);
+      continue;
+    }
     if (heading) {
-      flushPara();
-      flushList();
-      const Tag = heading[1].length === 1 ? "h3" : heading[1].length === 2 ? "h4" : "h5";
-      blocks.push(
-        <Tag
-          key={`h-${blocks.length}`}
-          className="font-display text-[1.02em] font-medium tracking-tight"
-        >
-          {inline(heading[2], `h${blocks.length}`)}
-        </Tag>,
-      );
+      flushPara(); flushList();
+      const level = heading[1].length;
+      const Tag = level === 1 ? "h3" : level === 2 ? "h4" : "h5";
+      const size = level === 1 ? "text-[1.65em]" : level === 2 ? "text-[1.35em]" : "text-[1.12em]";
+      blocks.push(<Tag key={`h-${blocks.length}`} className={cn("font-display font-semibold tracking-tight leading-snug", size)}>{inline(heading[2], `h${blocks.length}`)}</Tag>);
+      continue;
+    }
+    if (/^>\s?/.test(line)) {
+      flushPara(); flushList();
+      blocks.push(<blockquote key={`q-${blocks.length}`} className="border-l-2 border-primary/50 pl-4 text-muted">{inline(line.replace(/^>\s?/, ""), `q${blocks.length}`)}</blockquote>);
       continue;
     }
     if (ul || ol) {
       flushPara();
       const ordered = Boolean(ol);
-      if (!list || list.ordered !== ordered) {
-        flushList();
-        list = { ordered, items: [] };
-      }
+      if (!list || list.ordered !== ordered) { flushList(); list = { ordered, items: [] }; }
       list.items.push((ul?.[1] ?? ol?.[1] ?? "").trim());
       continue;
     }
-    if (line.trim() === "") {
-      flushPara();
-      flushList();
-      continue;
-    }
+    if (line.trim() === "") { flushPara(); flushList(); continue; }
     flushList();
     para.push(line.trim());
   }
-  flushPara();
-  flushList();
+  flushPara(); flushList();
   return <>{blocks}</>;
 }
 
@@ -193,29 +192,40 @@ function CodeBlock({ code, lang, live, showPreview = true }: { code: string; lan
   const isTooLong = code.length > MAX_RENDER_CHARS;
   const isWeb = isWebLang(value);
   const [preview, setPreview] = useState(isWeb && value !== "css" && value !== "tailwind" && value !== "tailwindcss");
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch { /* Clipboard may be unavailable in embedded previews. */ }
+  }
   return (
-    <div className={cn("overflow-hidden rounded-lg bg-[#f3f4f6]", isWeb && live ? "html-live" : "")}>
-      <div className="flex h-7 items-center justify-between border-b border-[#e5e7eb] px-2.5 text-[10px] font-medium uppercase tracking-wide text-[#667085]">
-        <span>{isTooLong ? "txt" : (lang || "code")}</span>
-        {isWeb ? <button type="button" onClick={() => setPreview(v => !v)} className={cn("rounded px-2 py-1 text-[10px] font-semibold transition", preview ? "bg-primary/20 text-primary" : "bg-[#e5e7eb] text-[#475467] hover:bg-[#dfe3e8] hover:text-[#202124]")}>{preview ? "‹ Code" : "▶ รันในแซนด์บ็อก"}</button> : null}
+    <div className={cn("overflow-hidden rounded-2xl border border-[#303030] bg-[#171717] text-[#e5e7eb]", isWeb && live ? "html-live" : "")}>
+      <div className="flex min-h-12 items-center justify-between gap-3 border-b border-[#303030] bg-[#111111] px-4 py-2 text-xs text-[#b8bec8]">
+        <span>{isTooLong ? "Text" : (lang || "Code")}</span>
+        <div className="flex items-center gap-1">
+          {isWeb ? <button type="button" onClick={() => setPreview((v) => !v)} className="rounded-lg px-2.5 py-1.5 text-xs hover:bg-white/10">{preview ? "‹ Code" : "▶ Preview"}</button> : null}
+          <button type="button" onClick={() => void copyCode()} aria-label="Copy code" title="Copy code" className="grid size-8 place-items-center rounded-lg hover:bg-white/10">{copied ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}</button>
+          <button type="button" onClick={() => setExpanded((v) => !v)} aria-label={expanded ? "Collapse code" : "Expand code"} title={expanded ? "Collapse" : "Expand"} className="grid size-8 place-items-center rounded-lg hover:bg-white/10">{expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}</button>
+        </div>
       </div>
       {isTooLong ? (
-        <div className="bg-[#f3f4f6]">
-          <div className="flex items-center justify-between border-b border-[#e5e7eb] px-2.5 py-1.5 text-[10px] text-[#667085]">
-            <span>TXT • ข้อความยาว</span>
-            <span>{code.length.toLocaleString()} ตัวอักษร</span>
-          </div>
-          <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words px-3 py-2.5 font-mono text-[11px] leading-[1.45] text-[#202124]"><code>{code}</code></pre>
+        <div className="bg-[#171717]">
+          <div className="flex items-center justify-between border-b border-[#303030] px-4 py-2 text-[11px] text-[#9ca3af]"><span>Long text</span><span>{code.length.toLocaleString()} characters</span></div>
+          <pre className={cn("overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-[#e5e7eb]", expanded ? "max-h-[75vh]" : "max-h-[320px]")}><code>{code}</code></pre>
         </div>
       ) : preview && isWeb && showPreview && value !== "css" && value !== "tailwind" && value !== "tailwindcss" ? (
-        <iframe title="HTML preview" sandbox="allow-scripts" srcDoc={code} className="h-[360px] w-full bg-white" />
+        <iframe title="HTML preview" sandbox="allow-scripts" srcDoc={code} className={cn("w-full bg-white", expanded ? "h-[75vh]" : "h-[360px]")} />
       ) : (
-        <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words px-3 py-2.5 font-mono text-[11px] leading-[1.45] text-[#202124]"><code>{code}</code></pre>
+        <pre className={cn("overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-[#e5e7eb]", expanded ? "max-h-[75vh]" : "max-h-[320px]")}><code>{code}</code></pre>
       )}
-      {isWeb ? <div className="flex items-center justify-between border-t border-[#e5e7eb] px-2.5 py-1 text-[10px] text-[#667085]"><span>{value === "css" ? "CSS • Sandbox Style" : value.startsWith("tailwind") ? "Tailwind CSS • Sandbox" : "HTML • Sandboxed Live Preview"}</span><span>แยกกรอบโค้ดชัดเจน</span></div> : null}
+      {isWeb ? <div className="flex items-center justify-between border-t border-[#303030] px-4 py-2 text-[10px] text-[#9ca3af]"><span>{value === "css" ? "CSS • Sandbox Style" : value.startsWith("tailwind") ? "Tailwind CSS • Sandbox" : "HTML • Sandboxed Preview"}</span><span>Isolated preview</span></div> : null}
     </div>
   );
 }
+
 export function Markdown({
   text,
   className,
@@ -234,7 +244,7 @@ export function Markdown({
   const firstWebIndex = parts.findIndex((part) => part.type === "code" && isWebLang(part.lang));
 
   return (
-    <div className={cn("flex min-w-0 max-w-full flex-col gap-2 text-[0.9rem] leading-[1.55] [overflow-wrap:anywhere]", className)}>
+    <div className={cn("flex min-w-0 max-w-full flex-col gap-4 text-[1rem] leading-[1.7] [overflow-wrap:anywhere]", className)}>
       {parts.map((part, i) =>
         part.type === "code" ? (
           <div key={i} className="contents">
