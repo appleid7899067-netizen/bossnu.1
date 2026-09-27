@@ -169,9 +169,11 @@ function CodeBlock({ code, lang, live }: { code: string; lang?: string; live?: b
 export function Markdown({
   text,
   className,
+  live = false,
 }: {
   text: string;
   className?: string;
+  live?: boolean;
 }) {
   const parts = splitFences(text);
   return (
