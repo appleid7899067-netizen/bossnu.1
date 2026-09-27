@@ -21,6 +21,7 @@ import { useAppStore } from "@/lib/store";
 import type { BuilderProject, ChatMode, MindMapData } from "@/lib/types";
 import { cn, uid } from "@/lib/utils";
 import { detectSandboxInput } from "@/lib/sandbox/detect";
+import { executeSandbox, sandboxPreviewUrl } from "@/lib/sandbox/client";
 
 export function AppShell({ search }: { search: Search }) {
   const navigate = useNavigate();
@@ -96,6 +97,24 @@ export function AppShell({ search }: { search: Search }) {
     stopVoice();
     go({ view: "chat", c: id });
 
+    let sandboxNote = "";
+    if (sandboxDetection.runtime !== "unknown" && sandboxDetection.command && ["node", "python", "bash", "go", "rust", "java", "cpp"].includes(sandboxDetection.runtime)) {
+      setStreamStatus("กำลังรันในแซนด์บ็อกจริง…");
+      setWorkSteps((steps) => [...steps, "กำลังรันในแซนด์บ็อกจริง"]);
+      try {
+        const result = await executeSandbox(sandboxDetection);
+        const output = [result?.stdout, result?.stderr].filter(Boolean).join("\\n").trim();
+        sandboxNote = output ? "\\n\\n**ผลการรัน Sandbox**\\n\\n\`\`\`text\\n" + output + "\\n\`\`\`" : "";
+        const preview = result ? sandboxPreviewUrl(result) : null;
+        if (preview) sandboxNote += "\\n\\n:::sandbox-preview " + preview + "\\n";
+        setWorkSteps((steps) => [...steps, result?.status === "running" ? "เว็บกำลังทำงานและเปิด Preview" : result?.status === "success" ? "Sandbox รันสำเร็จ" : "Sandbox แจ้งข้อผิดพลาด"]);
+        setStreamStatus(result?.status === "running" ? "เปิด Live Preview แล้ว…" : "ตรวจผล Sandbox แล้ว…");
+      } catch (error) {
+        sandboxNote = "\\n\\n**Sandbox:** " + (error instanceof Error ? error.message : "รัน Sandbox ไม่สำเร็จ");
+        setWorkSteps((steps) => [...steps, "Sandbox พบข้อผิดพลาด"]);
+      }
+    }
+
     const history = (
       useAppStore.getState().conversations.find((c) => c.id === id)?.messages ?? []
     )
@@ -107,7 +126,7 @@ export function AppShell({ search }: { search: Search }) {
     abortRef.current = ac;
 
     let thinking = "";
-    let reply = "";
+    let reply = sandboxNote;
     try {
       await streamChat({
         messages: history,
