@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Download, Eye, FileCode2, Monitor, RefreshCw, Send, Smartphone, Sparkles, Tablet } from "lucide-react";
+import { Download, ExternalLink, Eye, FileCode2, FilePlus2, Monitor, RefreshCw, Send, Smartphone, Sparkles, Tablet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { generateAppBuilder } from "@/lib/ai/client";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ const STARTER: BuilderProject = {
   updatedAt: Date.now(),
 };
 
-export function AppBuilderView({ project, onProject }: { project?: BuilderProject; onProject: (project: BuilderProject) => void }) {
+export function AppBuilderView({ project, onProject, onReset }: { project?: BuilderProject; onProject: (project: BuilderProject) => void; onReset?: () => void }) {
   const current = project ?? STARTER;
   const [prompt, setPrompt] = useState("");
   const [selected, setSelected] = useState(current.entry);
@@ -39,6 +39,12 @@ export function AppBuilderView({ project, onProject }: { project?: BuilderProjec
     finally { setBusy(false); }
   }
 
+  function openInTab() {
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+    window.open(url, "_blank", "noopener");
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
   function download() {
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -50,11 +56,13 @@ export function AppBuilderView({ project, onProject }: { project?: BuilderProjec
       <div className="flex size-9 items-center justify-center rounded-xl bg-clay text-primary"><Sparkles className="size-4" /></div>
       <div className="min-w-0"><h1 className="truncate text-sm font-semibold">AI Builder</h1><p className="truncate text-xs text-muted">Build, preview, iterate, export</p></div>
       <div className="ml-auto flex items-center gap-1">
-        {(["desktop","tablet","mobile"] as const).map((d) => <button key={d} type="button" onClick={()=>setDevice(d)} className={cn("grid size-9 place-items-center rounded-lg text-muted hover:bg-hover hover:text-fg", device===d && "bg-elevated text-fg")}>{d==="desktop"?<Monitor className="size-4"/>:d==="tablet"?<Tablet className="size-4"/>:<Smartphone className="size-4"/>}</button>)}
-        <Button variant="ghost" size="sm" onClick={download}><Download className="size-4"/>Export</Button>
+        {(["desktop","tablet","mobile"] as const).map((d) => <button key={d} type="button" aria-label={d} title={d} onClick={()=>setDevice(d)} className={cn("hidden size-9 place-items-center sm:grid rounded-lg text-muted hover:bg-hover hover:text-fg", device===d && "bg-elevated text-fg")}>{d==="desktop"?<Monitor className="size-4"/>:d==="tablet"?<Tablet className="size-4"/>:<Smartphone className="size-4"/>}</button>)}
+        <Button variant="ghost" size="icon-sm" onClick={openInTab} aria-label="เปิดในแท็บใหม่" title="เปิดในแท็บใหม่"><ExternalLink className="size-4"/></Button>
+        <Button variant="ghost" size="sm" onClick={download}><Download className="size-4"/><span className="hidden sm:inline">Export</span></Button>
+        {onReset && project ? <Button variant="ghost" size="sm" onClick={() => { if (window.confirm("เริ่มโปรเจกต์ใหม่? โปรเจกต์ปัจจุบันจะถูกแทนที่")) { onReset(); setSelected(STARTER.entry); setTab("preview"); } }} title="โปรเจกต์ใหม่"><FilePlus2 className="size-4"/><span className="hidden sm:inline">ใหม่</span></Button> : null}
       </div>
     </header>
-    <div className="grid min-h-0 flex-1 lg:grid-cols-[250px_minmax(0,1fr)_minmax(360px,42%)]">
+    <div className="grid min-h-0 flex-1 overflow-y-auto lg:overflow-hidden lg:grid-cols-[250px_minmax(0,1fr)_minmax(360px,42%)]">
       <aside className="hidden min-h-0 overflow-y-auto border-r border-border p-3 lg:block">
         <p className="px-2 pb-2 text-[0.7rem] font-medium uppercase tracking-[0.08em] text-subtle">Project files</p>
         <div className="flex flex-col gap-1">{current.files.map((f)=><button key={f.path} type="button" onClick={()=>{setSelected(f.path);setTab("code")}} className={cn("flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm",selected===f.path?"bg-elevated text-fg":"text-muted hover:bg-hover hover:text-fg")}><FileCode2 className="size-3.5 shrink-0"/><span className="truncate">{f.path}</span></button>)}</div>

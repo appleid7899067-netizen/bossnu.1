@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, Trash2 } from "lucide-react";
+import { ArrowDown, Check, Copy, FileText, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { formatBytes } from "@/lib/attachments";
 import { Markdown } from "@/components/markdown";
 import type { ChatMessage } from "@/lib/types";
 import { LuminaMark } from "@/components/lumina-mark";
@@ -18,6 +19,9 @@ export function ChatThread({
   messages,
   streamingId,
   onDeleteMessage,
+  onEditMessage,
+  onRegenerate,
+  busy = false,
   workStatus,
   workSteps = [],
   sandboxRun,
@@ -25,6 +29,11 @@ export function ChatThread({
   messages: ChatMessage[];
   streamingId?: string | null;
   onDeleteMessage?: (id: string) => void;
+  /** Replace a user message (and everything after it) and resend. */
+  onEditMessage?: (id: string, content: string) => void;
+  /** Re-ask the last user message. */
+  onRegenerate?: () => void;
+  busy?: boolean;
   workStatus?: string;
   workSteps?: string[];
   sandboxRun?: SandboxRunView | null;
@@ -60,17 +69,32 @@ export function ChatThread({
           <WorkStatus status={workStatus} steps={workSteps} sandboxRun={sandboxRun} />
         ) : null}
 
-        {messages.map((m) => (
+        {messages.map((m, index) => (
           <MessageBubble
             key={m.id}
             message={m}
             live={m.id === streamingId}
+            busy={busy}
+            isLast={index === messages.length - 1}
             onDelete={() => onDeleteMessage?.(m.id)}
+            onEdit={onEditMessage ? (content) => onEditMessage(m.id, content) : undefined}
+            onRegenerate={onRegenerate}
           />
         ))}
         {sandboxRun?.previewHtml ? <SandboxHtmlPreview html={sandboxRun.previewHtml} /> : null}
         <div ref={bottomRef} aria-hidden="true" className="h-px w-full shrink-0" />
       </div>
+      {!autoScroll && messages.length ? (
+        <button
+          type="button"
+          onClick={() => { setAutoScroll(true); bottomRef.current?.scrollIntoView({ block: "end", behavior: "smooth" }); }}
+          className="sticky bottom-3 z-20 mx-auto -mt-11 flex size-10 items-center justify-center rounded-full border border-border bg-elevated text-muted shadow-lg transition hover:text-fg"
+          aria-label="เลื่อนไปข้อความล่าสุด"
+          title="เลื่อนไปข้อความล่าสุด"
+        >
+          <ArrowDown className="size-4" />
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -78,27 +102,94 @@ export function ChatThread({
 function MessageBubble({
   message,
   live,
+  busy,
+  isLast,
   onDelete,
+  onEdit,
+  onRegenerate,
 }: {
   message: ChatMessage;
   live: boolean;
+  busy: boolean;
+  isLast: boolean;
   onDelete: () => void;
+  onEdit?: (content: string) => void;
+  onRegenerate?: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(message.content);
+
   if (message.role === "user") {
+    if (editing) {
+      const save = () => {
+        const next = draft.trim();
+        if (!next && !message.attachments?.length) return;
+        setEditing(false);
+        onEdit?.(next);
+      };
+      return (
+        <div className="lumina-rise flex justify-end">
+          <div className="w-full max-w-[min(92%,48rem)] rounded-[20px] bg-elevated p-2.5 shadow-[var(--shadow-border)]">
+            <textarea
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); save(); }
+                if (e.key === "Escape") { setEditing(false); setDraft(message.content); }
+              }}
+              rows={Math.min(8, Math.max(2, draft.split("\n").length))}
+              aria-label="แก้ไขข้อความ"
+              className="block w-full resize-y rounded-xl bg-bg px-3 py-2 text-[13px] leading-[1.5] text-fg outline-none focus:ring-1 focus:ring-ring"
+            />
+            <div className="mt-2 flex items-center justify-end gap-2">
+              <span className="mr-auto px-1 text-[11px] text-subtle">คำตอบหลังข้อความนี้จะถูกสร้างใหม่</span>
+              <button type="button" onClick={() => { setEditing(false); setDraft(message.content); }} className="rounded-lg px-3 py-1.5 text-xs text-muted hover:bg-hover hover:text-fg">ยกเลิก</button>
+              <button type="button" onClick={save} disabled={busy} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-fg hover:bg-primary-hover disabled:opacity-50">ส่งใหม่</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="lumina-rise group flex justify-end">
-        <div className="flex max-w-[min(88%,48rem)] items-end gap-1.5">
-          <button
-            type="button"
-            onClick={onDelete}
-            className="grid size-7 shrink-0 place-items-center rounded-lg text-subtle opacity-0 transition hover:bg-hover hover:text-danger group-hover:opacity-100 focus:opacity-100"
-            aria-label="ลบข้อความ"
-            title="ลบข้อความ"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-          <div className="rounded-[20px] rounded-br-md bg-elevated px-3.5 py-2.5 text-[13px] leading-[1.5] shadow-[var(--shadow-border)]">
-            {message.content}
+        <div className="flex max-w-[min(88%,48rem)] items-end gap-1">
+          <div className="flex shrink-0 flex-col gap-0.5 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
+            {onEdit ? (
+              <button
+                type="button"
+                onClick={() => { setDraft(message.content); setEditing(true); }}
+                disabled={busy}
+                className="grid size-7 place-items-center rounded-lg text-subtle transition hover:bg-hover hover:text-fg disabled:opacity-40"
+                aria-label="แก้ไขข้อความ"
+                title="แก้ไขแล้วส่งใหม่"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onDelete}
+              className="grid size-7 place-items-center rounded-lg text-subtle transition hover:bg-hover hover:text-danger"
+              aria-label="ลบข้อความ"
+              title="ลบข้อความ"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
+          <div className="min-w-0 rounded-[20px] rounded-br-md bg-elevated px-3.5 py-2.5 text-[13px] leading-[1.5] shadow-[var(--shadow-border)]">
+            {message.attachments?.length ? (
+              <ul className="mb-2 flex flex-wrap gap-1.5">
+                {message.attachments.map((file, index) => (
+                  <li key={`${file.name}-${index}`} className="flex max-w-full items-center gap-1.5 rounded-lg bg-bg/60 px-2 py-1 text-[11px]">
+                    <FileText className="size-3 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="truncate font-medium">{file.name}</span>
+                    <span className="text-subtle">{formatBytes(file.size)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {message.content ? <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p> : null}
           </div>
         </div>
       </div>
@@ -121,6 +212,19 @@ function MessageBubble({
         {!live && message.content ? (
           <div className="flex items-center gap-1">
             <CopyLine text={message.content} />
+            {isLast && onRegenerate ? (
+              <button
+                type="button"
+                onClick={onRegenerate}
+                disabled={busy}
+                className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-fg disabled:opacity-40"
+                aria-label="สร้างคำตอบใหม่"
+                title="สร้างคำตอบใหม่"
+              >
+                <RefreshCw className="size-3.5" />
+                ตอบใหม่
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onDelete}

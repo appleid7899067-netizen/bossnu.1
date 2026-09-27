@@ -28,17 +28,7 @@ export type WorkspaceMemory = {
   updatedAt: string;
 };
 
-export type WorkspaceSyncEvidence = {
-  saved: number;
-  deleted: number;
-  total: number;
-  verified: boolean;
-  complete: boolean;
-  missing: string[];
-  mismatched: string[];
-};
-
-function safePath(input: string): string {
+export function safePath(input: string): string {
   let path = input.trim().split(String.fromCharCode(92)).join("/");
   while (path.startsWith("/")) path = path.slice(1);
   if (!path || path.length > MAX_PATH || path.includes("\0")) throw new Error("Invalid workspace path");
@@ -48,7 +38,7 @@ function safePath(input: string): string {
   return path;
 }
 
-function safeContent(content: string): string {
+export function safeContent(content: string): string {
   if (content.length > MAX_CONTENT) throw new Error("Workspace file is too large");
   return content;
 }
@@ -56,17 +46,18 @@ function safeContent(content: string): string {
 export async function ensureBossWorkspace(id: string, name = "Boss Workspace") {
   const workspaceId = safeWorkspaceId(id);
   const sql = await getSql();
-  await sql`
+  // Defaults are seeded only when the workspace is first created. Re-adding
+  // them on every call would resurrect files the sandbox deliberately deleted.
+  const created = await sql<{ id: string }>`
     INSERT INTO boss_workspaces (id, name)
     VALUES (${workspaceId}, ${name.slice(0, 120)})
-    ON CONFLICT (id) DO UPDATE SET updated_at = now()
+    ON CONFLICT (id) DO NOTHING
+    RETURNING id
   `;
-  const rows = await sql<{ path: string }>`
-    SELECT path FROM boss_workspace_files WHERE workspace_id = ${workspaceId}
-  `;
-  const existing = new Set(rows.map(row => row.path));
-  for (const [path, content] of Object.entries(BOSS_WORKSPACE_DEFAULT_FILES)) {
-    if (!existing.has(path)) await upsertWorkspaceFile(workspaceId, path, content);
+  if (created.length) {
+    for (const [path, content] of Object.entries(BOSS_WORKSPACE_DEFAULT_FILES)) {
+      await upsertWorkspaceFile(workspaceId, path, content);
+    }
   }
   return workspaceId;
 }
@@ -118,57 +109,33 @@ export async function upsertWorkspaceFile(id: string, path: string, content: str
   `;
 }
 
-export async function listProjectFiles(id: string, limit = 40): Promise<WorkspaceFile[]> {
-  const files = await listWorkspaceFiles(id);
-  return files.filter(file => file.path.startsWith("project/")).slice(0, Math.min(Math.max(limit, 1), 80));
+export async function listProjectFiles(id: string, limit = 5000): Promise<WorkspaceFile[]> {
+  const workspaceId = await ensureBossWorkspace(id);
+  const sql = await getSql();
+  return sql<WorkspaceFile>`
+    SELECT path, content, updated_at::text AS "updatedAt"
+    FROM boss_workspace_files
+    WHERE workspace_id = ${workspaceId} AND path LIKE 'project/%'
+    ORDER BY path
+    LIMIT ${Math.min(Math.max(limit, 1), 5000)}
+  `;
 }
 
-export async function saveProjectFiles(
-  id: string,
-  files: Array<{ path: string; content: string }>,
-  options: { complete?: boolean } = {},
-): Promise<WorkspaceSyncEvidence> {
-  const workspaceId = await ensureBossWorkspace(id);
-  const incoming = new Map<string, string>();
-  for (const file of files.slice(0, 80)) {
-    if (typeof file?.path !== "string" || typeof file?.content !== "string") continue;
-    const path = safePath(file.path);
-    if (!path.startsWith("project/")) continue;
-    incoming.set(path, safeContent(file.content));
-  }
-
-  let saved = 0;
-  for (const [path, content] of incoming) {
-    await upsertWorkspaceFile(workspaceId, path, content);
-    saved++;
-  }
-
-  let deleted = 0;
-  if (options.complete) {
-    const existing = await listProjectFiles(workspaceId, 80);
-    for (const file of existing) {
-      if (!incoming.has(file.path)) {
-        await deleteWorkspaceFile(workspaceId, file.path);
-        deleted++;
-      }
-    }
-  }
-
-  const stored = await listProjectFiles(workspaceId, 80);
-  const storedMap = new Map(stored.map(file => [file.path, file.content]));
-  const missing = [...incoming.keys()].filter(path => !storedMap.has(path));
-  const mismatched = [...incoming.keys()].filter(
-    path => storedMap.has(path) && storedMap.get(path) !== incoming.get(path),
-  );
-  return {
-    saved,
-    deleted,
-    total: stored.length,
-    verified: missing.length === 0 && mismatched.length === 0 && (!options.complete || stored.length === incoming.size),
-    complete: Boolean(options.complete),
-    missing,
-    mismatched,
-  };
+/** Move a file to a new path, keeping the row (rename detected in the sandbox). */
+export async function renameWorkspaceFile(id: string, from: string, to: string, content: string) {
+  const workspaceId = safeWorkspaceId(id);
+  const fromPath = safePath(from);
+  const toPath = safePath(to);
+  const safe = safeContent(content);
+  const sql = await getSql();
+  await sql`DELETE FROM boss_workspace_files WHERE workspace_id = ${workspaceId} AND path = ${toPath}`;
+  const moved = await sql<{ path: string }>`
+    UPDATE boss_workspace_files
+    SET path = ${toPath}, content = ${safe}, updated_at = now()
+    WHERE workspace_id = ${workspaceId} AND path = ${fromPath}
+    RETURNING path
+  `;
+  if (!moved.length) await upsertWorkspaceFile(workspaceId, toPath, safe);
 }
 
 export async function deleteWorkspaceFile(id: string, path: string) {
@@ -189,7 +156,7 @@ export async function recallWorkspaceMemory(id: string, query = "", limit = 12):
     LIMIT ${Math.min(Math.max(limit, 1), 40)}
   `;
   if (!query.trim()) return rows;
-  const words = query.toLowerCase().split(/\\s+/).filter(Boolean);
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   return rows
     .map(item => ({
       item,
@@ -205,7 +172,7 @@ export async function recallWorkspaceMemory(id: string, query = "", limit = 12):
 
 export async function rememberWorkspace(id: string, key: string, value: string, source = "conversation") {
   const workspaceId = await ensureBossWorkspace(id);
-  const cleanKey = key.trim().toLowerCase().replace(/\\s+/g, " ").slice(0, 180);
+  const cleanKey = key.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 180);
   if (!cleanKey || !value.trim()) return;
   const sql = await getSql();
   await sql`
@@ -249,17 +216,22 @@ export function formatWorkspaceContext(files: WorkspaceFile[], memories: Workspa
   const home = files
     .filter(file => file.path.startsWith("agent/") || file.path.startsWith("memory/"))
     .slice(0, 8)
-    .map(file => `--- ${file.path} ---\\n${file.content.slice(0, 6000)}`)
-    .join("\\n");
+    .map(file => `--- ${file.path} ---\n${file.content.slice(0, 6000)}`)
+    .join("\n");
   const memory = memories
     .slice(0, 12)
     .map(item => `- ${item.key}: ${item.value.slice(0, 3000)}`)
-    .join("\\n");
+    .join("\n");
+  const project = files.filter(file => file.path.startsWith("project/") && !file.path.endsWith("/.gitkeep"));
+  const tree = project.slice(0, 120).map(file => `- ${file.path} (${file.content.length} chars)`).join("\n");
   return [
     "Boss Workspace (persistent Agent Home)",
     home || "ไม่มี Agent Home files",
+    `Project files synced in Neon (${project.length}):`,
+    tree || "ยังไม่มีไฟล์โปรเจกต์",
+    project.length > 120 ? `…และอีก ${project.length - 120} ไฟล์` : "",
     "Persistent memory:",
     memory || "ไม่มีความจำที่เกี่ยวข้อง",
-  ].join("\\n");
+  ].filter(Boolean).join("\n");
 }
 

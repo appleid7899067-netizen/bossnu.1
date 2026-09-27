@@ -1,9 +1,10 @@
 import { sandboxClient } from "@/lib/sandbox-client";
 import { assessSandboxRisk } from "@/lib/sandbox/detect";
 import { useEffect, useMemo, useState } from "react";
-import { Bot, Brain, FolderOpen, Play, Plus, Sparkles, Trash2, UserRound, WandSparkles } from "lucide-react";
+import { Bot, Brain, Database, Download, FolderOpen, Play, Plus, Sparkles, Trash2, Upload, UserRound, WandSparkles } from "lucide-react";
+import { toast } from "sonner";
 import type { PersonalitySettings } from "@/lib/types";
-import { useAppStore } from "@/lib/store";
+import { exportBackup, useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getAvailableVoices, getVoiceSettings, isVoiceSupported, updateVoiceSettings, applyVoiceMode, VOICE_MODES, type VoiceSettings } from "@/lib/ai/voice";
@@ -37,7 +38,7 @@ const SANDBOX_DEFAULTS: Record<string, string> = {
 
 export function SettingsView() {
   const store = useAppStore();
-  const [tab, setTab] = useState<"personality"|"skills"|"agents"|"memory"|"profiles"|"sandbox"|"voice">("personality");
+  const [tab, setTab] = useState<"personality"|"skills"|"agents"|"memory"|"profiles"|"sandbox"|"voice"|"data">("personality");
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => getVoiceSettings());
   const [voiceList, setVoiceList] = useState<{ name: string; lang: string }[]>([]);
   const [newMemory, setNewMemory] = useState("");
@@ -124,12 +125,12 @@ printf %s ${quote(sandboxInput)} > stdin.txt
   return <section className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y [scrollbar-width:thin]">
     <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle">BOSS CONTROL</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">ตั้งค่าตัวแทนและสมอง</h1><p className="mt-1 text-sm text-muted">บุคลิก • สกิล • ตัวแทน • ความจำ • โปรไฟล์ • Sandbox</p></div>
+        <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle">BOSS CONTROL</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">ตั้งค่าตัวแทนและสมอง</h1><p className="mt-1 text-sm text-muted">บุคลิก • สกิล • ตัวแทน • ความจำ • โปรไฟล์ • Sandbox • ข้อมูล</p></div>
         {saved ? <span className="text-xs text-muted">บันทึกแล้ว ✓</span> : null}
       </div>
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3">
         {[
-          ["personality","บุคลิค",Sparkles],["skills","สกิล",WandSparkles],["agents","ตัวแทน",Bot],["memory","ความจำ",Brain],["profiles","แฟ้มโปรไฟล์",FolderOpen],["voice","เสียง",Sparkles],["sandbox","Sandbox",Play],
+          ["personality","บุคลิค",Sparkles],["skills","สกิล",WandSparkles],["agents","ตัวแทน",Bot],["memory","ความจำ",Brain],["profiles","แฟ้มโปรไฟล์",FolderOpen],["voice","เสียง",Sparkles],["sandbox","Sandbox",Play],["data","ข้อมูล",Database],
         ].map(([id,label,Icon]) => <button key={id as string} type="button" onClick={() => setTab(id as typeof tab)} className={cn("flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-sm",tab===id?"bg-elevated text-fg":"text-muted hover:bg-hover hover:text-fg")}><Icon className="size-4"/>{label as string}</button>)}
       </div>
 
@@ -149,6 +150,8 @@ printf %s ${quote(sandboxInput)} > stdin.txt
       {tab==="memory" ? <Panel title="สมองความจำ" icon={Brain}><div className="mb-4 rounded-xl bg-clay p-3 text-sm text-muted">ความจำชุดนี้เก็บในเครื่องและถูกใช้เป็นบริบทของสลี่ในการสนทนาครั้งต่อไป</div><div className="space-y-2">{store.memory.map(item=><div key={item.id} className="flex items-start gap-3 rounded-xl bg-clay p-3"><div className="min-w-0 flex-1"><p className="text-sm">{item.content}</p><p className="mt-1 text-[11px] text-subtle">{new Date(item.createdAt).toLocaleString("th-TH")}</p></div><button type="button" onClick={()=>store.deleteMemory(item.id)} className="text-subtle hover:text-fg"><Trash2 className="size-4"/></button></div>)}</div><div className="mt-4 flex gap-2"><input value={newMemory} onChange={e=>setNewMemory(e.target.value)} placeholder="เช่น ชอบ UI แบบกว้างและเรียบ" className="min-w-0 flex-1 rounded-xl bg-clay px-3 py-2.5 outline-none"/><Button onClick={()=>{if(newMemory.trim()){store.addMemory(newMemory.trim());setNewMemory("")}}}><Plus className="size-4"/>จำ</Button></div></Panel> : null}
 
       {tab==="profiles" ? <Panel title="แฟ้มโปรไฟล์ตัวแทน" icon={FolderOpen}><div className="grid gap-3 md:grid-cols-2">{store.agentProfiles.map(agent=><div key={agent.id} className="rounded-2xl bg-clay p-4"><div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-elevated"><Bot className="size-5"/></div><div><p className="font-medium">{agent.name}</p><p className="text-xs text-muted">{agent.role}</p></div></div><div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted"><span>สกิล {agent.skills.length}</span><span>สร้าง {new Date(agent.createdAt).toLocaleDateString("th-TH")}</span></div><div className="mt-3 rounded-xl bg-bg/50 p-3 text-xs leading-relaxed text-muted">{agent.instructions}</div></div>)}</div></Panel> : null}
+
+      {tab==="data" ? <DataPanel /> : null}
 
       {tab==="sandbox" ? <Panel title="แซนบ็อกซ์รันโค้ด" icon={Play}>
         <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -204,6 +207,58 @@ function VoicePanel({ supported, settings, voices, onChange }: { supported: bool
       <p className="text-xs leading-relaxed text-subtle">ค่าจะบันทึกในเครื่องทันที และมีผลกับเสียงระหว่างการตอบแบบสตรีมด้วย</p>
     </div>
   </Panel>;
+}
+
+function DataPanel() {
+  const store = useAppStore();
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [usage, setUsage] = useState(0);
+  useEffect(() => {
+    try { setUsage(new Blob([window.localStorage.getItem("bossnu-silelo-v1") ?? ""]).size); } catch { setUsage(0); }
+  }, [store.conversations, store.maps, store.memory, store.builderProject]);
+  const messageCount = store.conversations.reduce((sum, c) => sum + c.messages.length, 0);
+
+  const download = () => {
+    const blob = new Blob([JSON.stringify(exportBackup(), null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bossnu-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast.success("ดาวน์โหลดไฟล์สำรองแล้ว");
+  };
+
+  const restore = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const result = store.importBackup(JSON.parse(await file.text()));
+      if (result.ok) toast.success(`นำเข้าแล้ว • ${result.chats} แชต (แชตเดิมไม่ถูกลบ)`);
+      else toast.error(result.error);
+    } catch {
+      toast.error("อ่านไฟล์ไม่สำเร็จ — ต้องเป็นไฟล์ JSON ที่ส่งออกจากแอปนี้");
+    }
+  };
+
+  const stats: [string, string | number][] = [
+    ["แชต", store.conversations.length], ["ข้อความ", messageCount], ["แผนผังความคิด", store.maps.length],
+    ["ความจำ", store.memory.length], ["ทักษะที่เรียนรู้", store.learnedSkills.length], ["พื้นที่ที่ใช้", usage < 1024 * 1024 ? `${(usage / 1024).toFixed(1)} KB` : `${(usage / 1024 / 1024).toFixed(2)} MB`],
+  ];
+
+  return <div className="grid gap-4 md:grid-cols-2">
+    <Panel title="ข้อมูลบนอุปกรณ์นี้" icon={Database}>
+      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">{stats.map(([label, value]) => <div key={label} className="rounded-xl bg-clay p-3"><dt className="text-[11px] text-muted">{label}</dt><dd className="mt-1 text-lg font-semibold tabular-nums">{value}</dd></div>)}</dl>
+      <p className="mt-3 text-xs leading-relaxed text-subtle">ทุกอย่างเก็บในเบราว์เซอร์ (localStorage) — ล้างข้อมูลเบราว์เซอร์แล้วจะหายไป ควรสำรองไว้เป็นระยะ</p>
+    </Panel>
+    <Panel title="สำรอง • กู้คืน • ล้าง" icon={Download}>
+      <div className="space-y-2">
+        <button type="button" onClick={download} className="flex w-full items-center gap-3 rounded-xl bg-clay p-3 text-left hover:bg-hover"><Download className="size-4 text-primary"/><span><span className="block text-sm font-medium">ส่งออกไฟล์สำรอง (JSON)</span><span className="block text-xs text-muted">แชต แผนผัง ความจำ บุคลิก และโปรเจกต์ AI Builder</span></span></button>
+        <label className="flex w-full cursor-pointer items-center gap-3 rounded-xl bg-clay p-3 text-left hover:bg-hover"><Upload className="size-4 text-primary"/><span><span className="block text-sm font-medium">นำเข้าไฟล์สำรอง</span><span className="block text-xs text-muted">รวมกับข้อมูลเดิม ไม่เขียนทับแชตที่มีอยู่</span></span><input type="file" accept="application/json,.json" className="hidden" onChange={e => { void restore(e.target.files?.[0]); e.target.value = ""; }}/></label>
+        {confirmReset ? <div className="rounded-xl border border-danger/40 bg-danger/10 p-3"><p className="text-sm font-medium">ล้างข้อมูลทั้งหมดบนอุปกรณ์นี้?</p><p className="mt-1 text-xs text-muted">แชต แผนผัง รูป ความจำ ทักษะ และการตั้งค่าจะถูกลบถาวร</p><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setConfirmReset(false)} className="rounded-lg px-3 py-1.5 text-xs text-muted hover:bg-hover hover:text-fg">ยกเลิก</button><button type="button" onClick={() => { store.resetAll(); setConfirmReset(false); toast.success("ล้างข้อมูลแล้ว"); }} className="rounded-lg bg-danger px-3 py-1.5 text-xs font-medium text-white">ล้างทั้งหมด</button></div></div>
+          : <button type="button" onClick={() => setConfirmReset(true)} className="flex w-full items-center gap-3 rounded-xl bg-clay p-3 text-left text-danger hover:bg-hover"><Trash2 className="size-4"/><span className="text-sm font-medium">ล้างข้อมูลทั้งหมด</span></button>}
+      </div>
+    </Panel>
+  </div>;
 }
 
 function Panel({ title, icon: Icon, children }: { title: string; icon: typeof Sparkles; children: React.ReactNode }) {

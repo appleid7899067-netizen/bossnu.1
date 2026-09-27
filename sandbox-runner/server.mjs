@@ -1,11 +1,14 @@
 import http from "node:http";
-import { mkdtemp, rm, mkdir, stat, readdir, utimes, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, stat, readdir, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
+import { reconcileSeed, snapshotWorkspace, SNAPSHOT_VERSION } from "./sync.mjs";
 
 const PORT = Number(process.env.PORT || 8787);
-const MAX_BODY = 128 * 1024;
+// Seeds carry the workspace's project files from Neon, so the body limit is generous.
+const MAX_BODY = Number(process.env.MAX_BODY_BYTES) || 16 * 1024 * 1024;
+const RUNNER_VERSION = 5;
 const MAX_OUTPUT = 64 * 1024;
 const TIMEOUT_MS = Math.min(300000, Math.max(1000, Number(process.env.COMMAND_TIMEOUT_MS || process.env.SANDBOX_TIMEOUT_MS) || 120000));
 const DEV_TIMEOUT_MS = Math.min(300000, Math.max(1000, Number(process.env.SANDBOX_DEV_TIMEOUT_MS) || 180000));
@@ -25,7 +28,7 @@ async function acquireWorkspace(id) {
   if (id === undefined) {
     const dir = await mkdtemp(join(tmpdir(), "bossnu-work-"));
     await cloneWorkspace(dir);
-    return dir;
+    return { dir, fresh: true };
   }
   if (typeof id !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(id)) throw new Error("invalid_workspace");
   if (busyWorkspaces.has(id)) throw new Error("workspace_busy");
@@ -33,12 +36,14 @@ async function acquireWorkspace(id) {
   const dir = join(workspaceRoot, id);
   try {
     await mkdir(workspaceRoot, { recursive: true });
+    let fresh = false;
     try { await stat(dir); } catch {
       await mkdir(dir);
+      fresh = true;
       try { await cloneWorkspace(dir); } catch (error) { await rm(dir, { recursive: true, force: true }); throw error; }
     }
     await utimes(dir, new Date(), new Date());
-    return dir;
+    return { dir, fresh };
   } catch (error) { busyWorkspaces.delete(id); throw error; }
 }
 async function releaseWorkspace(dir, id, keep) {
@@ -105,52 +110,26 @@ function spawnProcess(command, args, cwd, timeoutMs, signal) {
     });
   });
 }
-const SYNC_MAX_FILES = 60;
-const SYNC_MAX_FILE_BYTES = 120000;
-const SYNC_SKIP = new Set(["node_modules", ".git", ".next", "dist", "build", "coverage", ".cache", "target"]);
-
-async function seedWorkspace(dir, files) {
-  if (!Array.isArray(files)) return;
-  for (const item of files.slice(0, SYNC_MAX_FILES)) {
-    if (!item || typeof item.path !== "string" || typeof item.content !== "string") continue;
-    if (!item.path.startsWith("project/") || item.path.includes("..")) continue;
-    if (Buffer.byteLength(item.content, "utf8") > SYNC_MAX_FILE_BYTES) continue;
-    const relative = item.path.slice("project/".length);
-    if (!relative || relative.includes("\\") || relative.split("/").some(part => !part || part === "." || part === ".." || SYNC_SKIP.has(part))) continue;
-    const target = join(dir, "project", relative);
-    await mkdir(join(target, ".."), { recursive: true });
-    await writeFile(target, item.content, "utf8");
-  }
+/** Runner result fields describing the workspace after a command. */
+async function workspaceResult(dir, seed, body = {}) {
+  const snapshot = await snapshotWorkspace(dir).catch((error) => ({
+    version: SNAPSHOT_VERSION, root: "project/", files: [], paths: [], skipped: [], complete: false,
+    manifestHash: "", fileCount: 0, totalBytes: 0, takenAt: new Date().toISOString(), error: String(error?.message || error),
+  }));
+  // v5 apps send `snapshot: 1` and only need the snapshot; older app builds
+  // still get the legacy (v4) fields. Never send contents twice.
+  if (Number(body.snapshot) >= SNAPSHOT_VERSION) return { workspaceSnapshot: snapshot, workspaceSeed: seed };
+  return {
+    workspaceSnapshot: snapshot,
+    workspaceSeed: seed,
+    workspaceFiles: snapshot.files.map(({ path, content }) => ({ path, content })),
+    workspaceSyncComplete: snapshot.complete,
+  };
 }
 
-async function collectWorkspaceSnapshot(root) {
-  const result = [];
-  let complete = true;
-  async function walk(dir, relative) {
-    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-    for (const entry of entries) {
-      if (SYNC_SKIP.has(entry.name)) continue;
-      const full = join(dir, entry.name);
-      const rel = relative ? relative + "/" + entry.name : entry.name;
-      if (entry.isDirectory()) {
-        await walk(full, rel);
-        if (result.length >= SYNC_MAX_FILES) return;
-      } else if (entry.isFile()) {
-        if (result.length >= SYNC_MAX_FILES) { complete = false; return; }
-        const info = await stat(full).catch(() => null);
-        if (!info) { complete = false; continue; }
-        if (info.size > SYNC_MAX_FILE_BYTES) { complete = false; continue; }
-        const content = await readFile(full).catch(() => null);
-        if (!content || content.includes(0)) { complete = false; continue; }
-        result.push({ path: "project/" + rel, content: content.toString("utf8") });
-      }
-    }
-  }
-  await walk(join(root, "project"), "");
-  return { files: result, complete };
-}
-async function collectWorkspaceFiles(root) {
-  return (await collectWorkspaceSnapshot(root)).files;
+async function seed(workspace, body) {
+  if (!Array.isArray(body.workspaceFiles) && !body.workspaceBase) return { mode: "none", written: [], deleted: [], conflicts: [], rejected: [] };
+  return reconcileSeed({ dir: workspace.dir, fresh: workspace.fresh, files: body.workspaceFiles, base: body.workspaceBase });
 }
 
 async function cloneWorkspace(dir) {
@@ -208,20 +187,24 @@ async function executeStream(body, res) {
   const command = typeof body.command === "string" ? body.command.trim() : "";
   if (!command) throw new Error("command_required");
   if (command.length > 32000) throw new Error("command_too_large");
-  const dir = await acquireWorkspace(body.workspace);
-  await seedWorkspace(dir, body.workspaceFiles);
+  const workspace = await acquireWorkspace(body.workspace);
+  const dir = workspace.dir;
   let keep = false;
   const started = Date.now();
   try {
+    const seedReport = await seed(workspace, body);
     sseHeaders(res);
     sse(res, { type: "status", status: "queued", message: "รับคำสั่ง Sandbox" });
+    if (seedReport.written.length || seedReport.deleted.length || seedReport.conflicts.length) {
+      sse(res, { type: "status", status: "seeded", message: `Seed จาก Neon • เขียน ${seedReport.written.length} • ลบ ${seedReport.deleted.length} • ขัดแย้ง ${seedReport.conflicts.length}` });
+    }
     sse(res, { type: "status", status: "running", message: "กำลังรันจริงใน Sandbox Runner" });
     if ((language === "node" || language === "javascript") && /^npm\s+run\s+dev\b/i.test(command)) {
       const install = await prepareNode(dir);
       if (install.exitCode !== 0) {
         sse(res, { type: "output", stream: "stderr", text: install.stderr || install.stdout });
-        sse(res, { type: "complete", result: { success: false, status: "error", type: language, runtime: language, command, stdout: install.stdout, stderr: install.stderr, exitCode: install.exitCode, durationMs: Date.now() - started } });
-        return res.end();
+        sse(res, { type: "complete", result: { success: false, status: "error", type: language, runtime: language, command, stdout: install.stdout, stderr: install.stderr, exitCode: install.exitCode, durationMs: Date.now() - started, ...(await workspaceResult(dir, seedReport, body)) } });
+        return; // ended by the caller after the workspace lock is released
       }
       const session = startPersistent("npm", ["run", "dev", "--", "--host", "0.0.0.0"], dir);
       keep = true;
@@ -234,7 +217,6 @@ async function executeStream(body, res) {
       await new Promise(r => setTimeout(r, 2200));
       sendOutput();
       const port = detectPort(session);
-      const snapshot = await collectWorkspaceSnapshot(dir);
       const result = {
         success: !session.exited,
         status: session.exited ? "error" : "running",
@@ -244,11 +226,10 @@ async function executeStream(body, res) {
         output: [session.stdout(), session.stderr()].filter(Boolean).join("\n").trim().slice(-MAX_OUTPUT),
         sessionId: session.id, port, previewPath: "/preview/" + session.id + "/",
         durationMs: Date.now() - started,
-        workspaceFiles: snapshot.files,
-        workspaceSyncComplete: snapshot.complete,
+        ...(await workspaceResult(dir, seedReport, body)),
       };
       sse(res, { type: "complete", result });
-      return res.end();
+      return; // ended by the caller after the workspace lock is released
     }
     const child = spawn("bash", ["-c", command], {
       cwd: dir, env: executionEnv(dir),
@@ -271,9 +252,17 @@ async function executeStream(body, res) {
     child.stderr.on("data", c => { stderr=append(stderr,c); output("stderr", c); });
     await new Promise(resolve => {
       child.on("error", e => { stderr=append(stderr,e); });
-      child.on("close", code => { clearTimeout(timer); res.off("close", cancel); cancel(); const status=timedOut?"timeout":code===0?"success":"error"; sse(res,{type:"complete",result:{success:status==="success",status,type:language,runtime:language,command,stdout,stderr,output:[stdout,stderr].filter(Boolean).join("\n").trim(),exitCode:code,durationMs:Date.now()-started,workspaceFiles:await collectWorkspaceFiles(dir)}}); resolve(); });
+      child.on("close", code => {
+        clearTimeout(timer); res.off("close", cancel); cancel();
+        const status = timedOut ? "timeout" : code === 0 ? "success" : "error";
+        const durationMs = Date.now() - started;
+        workspaceResult(dir, seedReport, body).then(workspace => {
+          sse(res, { type: "complete", result: { success: status === "success", status, type: language, runtime: language, command, stdout, stderr, output: [stdout, stderr].filter(Boolean).join("\n").trim(), exitCode: code, durationMs, ...workspace } });
+          resolve();
+        });
+      });
     });
-    return res.end();
+    return; // ended by the caller after the workspace lock is released
   } finally {
     await releaseWorkspace(dir, body.workspace, keep);
   }
@@ -285,33 +274,30 @@ async function execute(body, signal) {
   if (!command) throw new Error("command_required");
   if (command.length > 32000) throw new Error("command_too_large");
 
-  const dir = await acquireWorkspace(body.workspace);
-  await seedWorkspace(dir, body.workspaceFiles);
+  const workspace = await acquireWorkspace(body.workspace);
+  const dir = workspace.dir;
   let keep = false;
   try {
+    const seedReport = await seed(workspace, body);
     if ((language === "node" || language === "javascript") && /^npm\s+run\s+dev\b/i.test(command)) {
       const install = await prepareNode(dir);
-      if (install.exitCode !== 0) return { status: "error", stdout: install.stdout, stderr: install.stderr, exitCode: install.exitCode };
+      if (install.exitCode !== 0) return { status: "error", stdout: install.stdout, stderr: install.stderr, exitCode: install.exitCode, ...(await workspaceResult(dir, seedReport, body)) };
       const session = startPersistent("npm", ["run", "dev", "--", "--host", "0.0.0.0"], dir);
       keep = true;
       await new Promise(r => setTimeout(r, 2200));
       const port = detectPort(session);
-      const snapshot = await collectWorkspaceSnapshot(dir);
       return {
         status: session.exited ? "error" : "running",
         stdout: session.stdout(), stderr: session.stderr(),
         sessionId: session.id, port, previewPath: "/preview/" + session.id + "/",
-        workspaceFiles: snapshot.files,
-        workspaceSyncComplete: snapshot.complete,
+        ...(await workspaceResult(dir, seedReport, body)),
       };
     }
     const r = await spawnProcess("bash", ["-c", command], dir, TIMEOUT_MS, signal);
-    const snapshot = await collectWorkspaceSnapshot(dir);
     return {
       status: r.timedOut ? "timeout" : r.exitCode === 0 ? "success" : "error",
       stdout: r.stdout, stderr: r.stderr, exitCode: r.exitCode, signal: r.signal,
-      workspaceFiles: snapshot.files,
-      workspaceSyncComplete: snapshot.complete,
+      ...(await workspaceResult(dir, seedReport, body)),
     };
   } finally {
     await releaseWorkspace(dir, body.workspace, keep);
@@ -337,14 +323,16 @@ async function proxyPreview(req, res, sessionId, rest) {
 }
 const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") return send(res, 204, {});
-  if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, runner: "universal-shell", version: 4, sessions: sessions.size });
+  if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, runner: "universal-shell", version: RUNNER_VERSION, snapshot: SNAPSHOT_VERSION, sessions: sessions.size });
   if (req.method === "GET" && req.url && req.url.startsWith("/preview/")) {
     const parts = req.url.split("/").filter(Boolean);
     return proxyPreview(req, res, parts[1], parts.slice(2).join("/"));
   }
   if (req.method === "POST" && req.url === "/execute/stream") {
-    try { return await executeStream(await readBody(req), res); }
-    catch (error) { if (!res.headersSent) send(res, 400, { error: error instanceof Error ? error.message : "bad_request" }); else res.end(); return; }
+    // executeStream releases the workspace in its own finally; the response is
+    // ended only afterwards so a client can immediately run the next command.
+    try { await executeStream(await readBody(req), res); if (!res.writableEnded) res.end(); return; }
+    catch (error) { if (!res.headersSent) send(res, 400, { error: error instanceof Error ? error.message : "bad_request" }); else if (!res.writableEnded) res.end(); return; }
   }
   if (req.method !== "POST" || req.url !== "/execute") return send(res, 404, { error: "not_found" });
   try {

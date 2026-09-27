@@ -1,5 +1,6 @@
 import { assessSandboxRisk } from "@/lib/sandbox/detect";
-import { listProjectFiles, saveProjectFiles } from "@/lib/ai/boss-workspace";
+import { loadSeed, publicRunnerResult, runnerBody, syncRunnerResult } from "@/lib/workspace/sync.server";
+import { describeEvidence } from "@/lib/workspace/snapshot";
 /**
  * Sali Sandbox Agent API — `/api/sandbox`
  *
@@ -182,14 +183,16 @@ async function runOnRunner(
   const runner = runnerConfig();
   steps.push(`ส่งไปรันที่ Sandbox Runner (${runtime})`);
   const started = Date.now();
-  const workspaceFiles = workspace ? await listProjectFiles(workspace, 60) : [];
+  const seed = workspace ? await loadSeed(workspace) : undefined;
+  if (seed && !seed.ok) steps.push(`โหลด Workspace จาก Neon ไม่สำเร็จ • ${seed.error}`);
+  else if (seed) steps.push(`Seed จาก Neon • ${seed.files.length} ไฟล์`);
 
   let response: Response;
   try {
     response = await fetch(`${runner.url}/execute`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ language: runtime, command, workspace, workspaceFiles }),
+      body: runnerBody({ language: runtime, command, workspace, seed }),
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(runner.timeoutMs)]) : AbortSignal.timeout(runner.timeoutMs),
     });
   } catch (error) {
@@ -258,19 +261,12 @@ async function runOnRunner(
   );
 
   const exitCode = typeof data.exitCode === "number" ? data.exitCode : null;
-  const returnedFiles = Array.isArray(data.workspaceFiles) ? data.workspaceFiles as Array<{ path: string; content: string }> : [];
-  const workspaceSyncComplete = data.workspaceSyncComplete === true;
   let workspaceSync;
   if (workspace) {
-    workspaceSync = await saveProjectFiles(workspace, returnedFiles, { complete: workspaceSyncComplete });
-    steps.push(
-      workspaceSync.verified
-        ? `Workspace Sync ผ่าน • ${workspaceSync.total} ไฟล์ตรงกับ Neon`
-        : workspaceSyncComplete
-          ? `Workspace Sync ยังไม่ผ่าน • missing=${workspaceSync.missing.length}, mismatch=${workspaceSync.mismatched.length}`
-          : "Workspace Sync เป็น snapshot ไม่สมบูรณ์ • ไม่ลบไฟล์เก่า",
-    );
+    workspaceSync = await syncRunnerResult(workspace, data, { command, seedOk: seed?.ok });
+    steps.push(describeEvidence(workspaceSync));
   }
+  const publicData = publicRunnerResult(data, workspaceSync);
   const error =
     status === "timeout"
       ? "หมดเวลาการรัน — Runner จำกัดเวลาต่อคำสั่ง"
@@ -297,7 +293,8 @@ async function runOnRunner(
       previewUrl,
       durationMs,
       steps,
-      workspaceFiles: returnedFiles,
+      workspaceFiles: publicData.workspaceFiles as CommandResult["workspaceFiles"],
+      workspaceSeed: data.workspaceSeed,
       workspaceSync,
     },
   };

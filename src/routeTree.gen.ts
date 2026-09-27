@@ -14,6 +14,7 @@ import { Route as SandboxRouteImport } from './routes/sandbox'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiSandboxRouteImport } from './routes/api/sandbox'
 import { Route as ApiSandboxDotstreamRouteImport } from './routes/api/sandbox[.]stream'
+import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +41,11 @@ const ApiSandboxDotstreamRoute = ApiSandboxDotstreamRouteImport.update({
   path: '/api/sandbox.stream',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
+  id: '/api/workspace',
+  path: '/api/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/sandbox': typeof ApiSandboxRoute
   '/api/sandbox.stream': typeof ApiSandboxDotstreamRoute
+  '/api/workspace': typeof ApiWorkspaceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/sandbox': typeof ApiSandboxRoute
   '/api/sandbox.stream': typeof ApiSandboxDotstreamRoute
+  '/api/workspace': typeof ApiWorkspaceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,25 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/sandbox': typeof ApiSandboxRoute
   '/api/sandbox.stream': typeof ApiSandboxDotstreamRoute
+  '/api/workspace': typeof ApiWorkspaceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/sandbox' | '/api/chat' | '/api/sandbox' | '/api/sandbox.stream'
+    | '/'
+    | '/sandbox'
+    | '/api/chat'
+    | '/api/sandbox'
+    | '/api/sandbox.stream'
+    | '/api/workspace'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sandbox' | '/api/chat' | '/api/sandbox' | '/api/sandbox.stream'
+  to:
+    | '/'
+    | '/sandbox'
+    | '/api/chat'
+    | '/api/sandbox'
+    | '/api/sandbox.stream'
+    | '/api/workspace'
   id:
     | '__root__'
     | '/'
@@ -76,6 +96,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/sandbox'
     | '/api/sandbox.stream'
+    | '/api/workspace'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -84,6 +105,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiSandboxRoute: typeof ApiSandboxRoute
   ApiSandboxDotstreamRoute: typeof ApiSandboxDotstreamRoute
+  ApiWorkspaceRoute: typeof ApiWorkspaceRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -123,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSandboxDotstreamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/workspace': {
+      id: '/api/workspace'
+      path: '/api/workspace'
+      fullPath: '/api/workspace'
+      preLoaderRoute: typeof ApiWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -132,6 +161,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiSandboxRoute: ApiSandboxRoute,
   ApiSandboxDotstreamRoute: ApiSandboxDotstreamRoute,
+  ApiWorkspaceRoute: ApiWorkspaceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
