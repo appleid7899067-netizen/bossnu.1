@@ -28,7 +28,7 @@ type PendingActivity = ChatActivity extends infer Activity ? Activity extends Ch
 import { messageForModel } from "@/lib/attachments";
 import { conversationToMarkdown } from "@/lib/store";
 import { cn, uid } from "@/lib/utils";
-import { detectSandboxInput } from "@/lib/sandbox/detect";
+import { detectSandboxInput, shouldExecuteSandboxInput } from "@/lib/sandbox/detect";
 import { sandboxClient } from "@/lib/sandbox-client";
 import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
 import { PUTER_MODELS } from "@/lib/ai/models";
@@ -105,6 +105,7 @@ export function AppShell({ search }: { search: Search }) {
     const content = text.trim();
     if ((!content && !files.length) || busyChat) return;
     const detection = detectSandboxInput(content);
+    const executionRequested = shouldExecuteSandboxInput(content, detection);
     if (detection.command && detection.dangerous && !allowDangerous) {
       setDangerousApproval({ content, chatId, mode, attachments: files, reason: detection.riskReason ?? "คำสั่งนี้อาจกระทบไฟล์" });
       return;
@@ -134,7 +135,7 @@ export function AppShell({ search }: { search: Search }) {
       const current = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
       store.patchAssistant(id, assistantId, { activities: current.map(activity => activity.id === activityId ? { ...activity, ...patch } as ChatActivity : activity) });
     };
-    const tools = true;
+    const tools = executionRequested;
     const execute = async (call: RunCall) => {
       ac.signal.throwIfAborted();
       let output = "";
@@ -188,6 +189,25 @@ export function AppShell({ search }: { search: Search }) {
       ? { language: isRunnerRuntime(detection.runtime) ? detection.runtime : "bash", command: detection.command } as RunCall
       : undefined;
     try {
+      if (!executionRequested) {
+        let failure = "";
+        await streamChat({
+          messages: history,
+          mode: chatMode,
+          signal: ac.signal,
+          tools: false,
+          latestUser: content,
+          model: store.selectedModel,
+          onEvent: event => {
+            if (ac.signal.aborted) return;
+            if (event.type === "text") append(event.text);
+            else if (event.type === "error") failure = event.error;
+          },
+        });
+        if (failure) throw new Error(failure);
+        if (!reply && !ac.signal.aborted) append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
+        return;
+      }
       if (detection.webPreview && detection.code && ["html", "javascript", "css", "tailwind"].includes(detection.runtime)) {
         setSandboxRun({ runtime: detection.runtime, label: detection.label, command: "browser sandbox", status: "Preview พร้อมแล้ว", previewHtml: sandboxPreviewDocument(detection.runtime, detection.code) });
         append("แสดง Live Preview ในแชตแล้วค่ะ\n\n");
