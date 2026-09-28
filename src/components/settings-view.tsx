@@ -180,9 +180,9 @@ printf %s ${quote(sandboxInput)} > stdin.txt
         ) : null}
       </div>
 
-      <div className="flex gap-5">
+      <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-start md:gap-5">
         {/* Tab rail — vertical on desktop, horizontally scrollable pills on mobile. */}
-        <div className="no-scrollbar -mx-4 flex shrink-0 gap-1 overflow-x-auto px-4 pb-3 md:mx-0 md:w-[178px] md:shrink-0 md:flex-col md:overflow-visible md:px-0 md:pb-0">
+        <div className="no-scrollbar -mx-4 flex shrink-0 gap-1 overflow-x-auto px-4 pb-3 md:sticky md:top-4 md:mx-0 md:w-[178px] md:flex-col md:overflow-visible md:px-0 md:pb-0">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -204,7 +204,7 @@ printf %s ${quote(sandboxInput)} > stdin.txt
           ))}
         </div>
 
-        <div key={tab} className="view-enter min-w-0 flex-1">
+        <div key={tab} className="view-enter min-w-0 flex-1 overflow-hidden">
           {tab === "appearance" ? <AppearancePanel /> : null}
           {tab === "personality" ? <PersonalityPanel save={save} /> : null}
           {tab === "prompts" ? <PromptsPanel /> : null}
@@ -366,7 +366,7 @@ function PersonalityPanel({ save }: { save: (patch: Partial<PersonalitySettings>
             >{preset.label}</button>
           ))}
         </div>
-        <textarea value={personality.tone} onChange={e => save({ tone: e.target.value })} rows={4} className="w-full resize-none rounded-xl border border-border bg-clay px-3 py-2.5 outline-none transition-all focus:border-primary/50 focus:bg-surface focus:shadow-[0_0_0_3px_var(--accent-soft)]" />
+        <textarea value={personality.tone} onChange={e => save({ tone: e.target.value })} rows={4} className="w-full resize-none rounded-xl border border-border bg-clay px-3 py-2.5 outline-none transition-all focus:border-primary/50 focus:bg-surface focus:shadow-[0_0_0_3px_var(--accent-soft)]" />\n      <Button className="mt-3 w-full" onClick={() => void rememberSaliSettings()}><Brain className="size-4" />บันทึกเข้าความจำสลี่</Button>
       </div>
     </Panel>
     <Panel title="พฤติกรรม" icon={UserRound}>
@@ -631,7 +631,7 @@ function SandboxPanel({ language, code, input, output, busy, preview, setPreview
         </button>
       ))}
     </div>
-    <div className="grid gap-3 lg:grid-cols-[1fr_360px]">
+    <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
       <div className="overflow-hidden rounded-2xl bg-[#0f1116] shadow-[var(--shadow-border)]">
         <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 text-xs text-white/60">
           <span className="font-mono">{SANDBOX_LANGUAGES.find(x => x.id === language)?.file}</span>
@@ -751,7 +751,7 @@ function DataPanel() {
 /* ---------------------------------- Shared UI ---------------------------------- */
 
 function Panel({ title, icon: Icon, hint, children }: { title: string; icon: typeof Sparkles; hint?: string; children: React.ReactNode }) {
-  return <div className="rounded-2xl border border-border bg-elevated p-4 shadow-[var(--shadow-border)] sm:p-5">
+  return <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-elevated p-4 shadow-[var(--shadow-border)] sm:p-5">
     <div className="mb-4 flex items-center gap-2.5">
       <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Icon className="size-4" /></span>
       <div className="min-w-0">
