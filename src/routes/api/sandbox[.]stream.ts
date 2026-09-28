@@ -1,5 +1,6 @@
 import { loadSkill } from "@/lib/sandbox/skills.server";
 import { createFileRoute } from "@tanstack/react-router";
+import { PYTHON_SAFE_RUNNER_ERROR, runnerSupportsPythonSafe } from "@/lib/sandbox/runner-capabilities";
 import { loadSeed, publicRunnerResult, runnerBody, syncRunnerResult, type WorkspaceSeed } from "@/lib/workspace/sync.server";
 import { describeEvidence } from "@/lib/workspace/snapshot";
 import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
@@ -11,7 +12,7 @@ import {
   type SkillContent,
 } from "@/types/sandbox";
 
-const MAX_BODY_BYTES = 96 * 1024;
+const MAX_BODY_BYTES = 256 * 1024;
 
 function runnerUrl() {
   return (
@@ -49,8 +50,10 @@ async function handle(request: Request): Promise<Response> {
   try { body = raw ? JSON.parse(raw) : {}; } catch { return Response.json({ error: "Body ต้องเป็น JSON" }, { status: 400, headers: corsHeaders() }); }
   const parsed = CommandRequestSchema.safeParse(body);
   if (!parsed.success || !parsed.data.cmd) return Response.json({ error: parsed.success ? "ต้องส่ง cmd" : parsed.error.issues[0]?.message }, { status: 400, headers: corsHeaders() });
-  const { cmd, type, allowDangerous, workspace } = parsed.data;
-  const risk = assessSandboxRisk(cmd);
+  const { cmd, type, stdin, allowDangerous, workspace } = parsed.data;
+  const command = type === "python-safe" ? cmd : cmd.trim();
+  const runtime = resolveRuntime(command, type);
+  const risk = runtime === "python-safe" ? { dangerous: false } : assessSandboxRisk(command);
   if (risk.dangerous && !allowDangerous) {
     return Response.json(
       { error: "ต้องอนุญาตก่อนรันคำสั่งอันตราย", dangerous: true, riskReason: risk.riskReason },
@@ -63,7 +66,10 @@ async function handle(request: Request): Promise<Response> {
     if (!loaded.ok) return Response.json({ error: loaded.error }, { status: loaded.status, headers: corsHeaders() });
     attachedSkill = loaded.skill;
   }
-  const runtime = resolveRuntime(cmd, type);
+  const runner = runnerUrl();
+  if (runtime === "python-safe" && !(await runnerSupportsPythonSafe(runner, request.signal))) {
+    return Response.json({ error: PYTHON_SAFE_RUNNER_ERROR }, { status: 503, headers: corsHeaders() });
+  }
   const encoder = new TextEncoder();
   const abort = new AbortController();
   let closed = false;
@@ -82,7 +88,7 @@ async function handle(request: Request): Promise<Response> {
       const finish = async (result: Record<string, unknown>) => {
         if (!workspace) return publicRunnerResult(result);
         send({ type: "status", status: "syncing", message: "กำลัง Sync Workspace → Neon แล้วอ่านกลับเพื่อตรวจ" });
-        const evidence = await syncRunnerResult(workspace, result, { command: cmd, seedOk: seed?.ok });
+        const evidence = await syncRunnerResult(workspace, result, { command, seedOk: seed?.ok });
         send({ type: "status", status: evidence.verified && evidence.complete ? "verified" : "unverified", message: describeEvidence(evidence) });
         return publicRunnerResult(result, evidence);
       };
@@ -92,35 +98,41 @@ async function handle(request: Request): Promise<Response> {
           seed = await loadSeed(workspace);
           send({ type: "status", status: "seed", message: seed.ok ? `โหลด Workspace จาก Neon • ${seed.files.length} ไฟล์` : `โหลด Workspace จาก Neon ไม่สำเร็จ • ${seed.error}` });
         }
-        const response = await fetch(runnerUrl() + "/execute/stream", {
+        const response = await fetch(runner + "/execute/stream", {
           method: "POST",
           headers: { "content-type": "application/json", accept: "text/event-stream" },
-          body: runnerBody({ language: runtime, command: cmd, workspace, seed }),
+          body: runnerBody({ language: runtime, command, stdin, workspace, seed }),
           signal: AbortSignal.any([request.signal, abort.signal, AbortSignal.timeout(Number(process.env.SANDBOX_RUNNER_TIMEOUT_MS) || 140000)]),
         });
         // Only retry when the streaming endpoint is absent: never rerun a command
         // after a transient 5xx or a partially consumed stream.
         if (response.status === 404 || response.status === 405) {
-          const legacy = await fetch(runnerUrl() + "/execute", {
+          if (runtime === "python-safe") {
+            const error = "Python Safe requires the Runner streaming endpoint; source was not retried through a legacy command path";
+            send({ type: "error", error });
+            send({ type: "complete", result: { success: false, status: "error", type: runtime, runtime, command, error, durationMs: Date.now() - started } });
+            close(); return;
+          }
+          const legacy = await fetch(runner + "/execute", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: runnerBody({ language: runtime, command: cmd, workspace, seed }),
+            body: runnerBody({ language: runtime, command, stdin, workspace, seed }),
             signal: AbortSignal.any([request.signal, abort.signal, AbortSignal.timeout(140000)]),
           });
           const result = await legacy.json();
           if (!legacy.ok) throw new Error(result.error || `Runner HTTP ${legacy.status}`);
-          const warning = "Legacy runner: live output and persistent workspace may be unavailable. Redeploy Sandbox Runner v5.";
+          const warning = "Legacy runner: live output and persistent workspace may be unavailable. Redeploy Sandbox Runner v6.";
           send({ type: "status", status: "running", message: warning });
           if (result.stdout) send({ type: "output", stream: "stdout", text: result.stdout });
           if (result.stderr) send({ type: "output", stream: "stderr", text: result.stderr });
           const synced = await finish(result);
-          send({ type: "complete", result: { ...synced, success: result.status === "success", type: runtime, runtime, command: cmd,
+          send({ type: "complete", result: { ...synced, success: result.status === "success", type: runtime, runtime, command,
             output: [result.stdout, result.stderr, warning].filter(Boolean).join("\n"), durationMs: Date.now() - started } });
           close(); return;
         }
         if (!response.ok || !response.body) {
           const data = await response.json().catch(() => null);
           send({ type: "error", error: data?.error || `Sandbox Runner HTTP ${response.status}` });
-          send({ type: "complete", result: { success:false, status:"error", type:runtime, runtime, command:cmd, error:data?.error || `Runner HTTP ${response.status}`, durationMs:Date.now()-started } });
+          send({ type: "complete", result: { success:false, status:"error", type:runtime, runtime, command, error:data?.error || `Runner HTTP ${response.status}`, durationMs:Date.now()-started } });
           close(); return;
         }
         const reader = response.body.getReader();
@@ -145,12 +157,12 @@ async function handle(request: Request): Promise<Response> {
           if (done) break;
         }
         if (runnerResult) send({ type: "complete", result: await finish(runnerResult) });
-        if (!completed) send({ type:"complete", result:{ success:false,status:"error",type:runtime,runtime,command:cmd,error:"Runner stream ended without a complete event",durationMs:Date.now()-started } });
+        if (!completed) send({ type:"complete", result:{ success:false,status:"error",type:runtime,runtime,command,error:"Runner stream ended without a complete event",durationMs:Date.now()-started } });
         close();
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         send({ type:"error", error:message });
-        send({ type:"complete", result:{ success:false,status:/timeout|abort/i.test(message)?"timeout":"error",type:runtime,runtime,command:cmd,error:message,durationMs:Date.now()-started } });
+        send({ type:"complete", result:{ success:false,status:/timeout|abort/i.test(message)?"timeout":"error",type:runtime,runtime,command,error:message,durationMs:Date.now()-started } });
         close();
       }
     },

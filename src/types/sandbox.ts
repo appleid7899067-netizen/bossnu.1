@@ -17,8 +17,10 @@ export const DEFAULT_SANDBOX_RUNNER_URL = "https://bossnu1-bash-runner.onrender.
 
 /** Hard limits shared by client validation and the server route. */
 export const SANDBOX_LIMITS = {
-  /** Max characters accepted in `cmd` (also the runner's script limit). */
+  /** Max characters accepted in `cmd` (also the runner's script/source limit). */
   commandChars: 32_000,
+  /** Max characters of optional stdin passed to Python Safe programs. */
+  stdinChars: 32_000,
   /** Max characters of combined stdout/stderr echoed back to the browser. */
   outputChars: 64_000,
   /** Requests per minute per client before the route answers 429. */
@@ -52,7 +54,7 @@ export type ResultStatus = (typeof RESULT_STATUSES)[number];
 // ---------------------------------------------------------------------------
 
 /** Runtimes that are forwarded to the isolated Sandbox Runner. */
-export const RUNNER_RUNTIMES = ["node", "python", "bash", "go", "rust", "java", "cpp"] as const;
+export const RUNNER_RUNTIMES = ["node", "python", "python-safe", "bash", "go", "rust", "java", "cpp"] as const;
 export type RunnerRuntime = (typeof RUNNER_RUNTIMES)[number];
 
 /** Inputs that are rendered in the browser (sandboxed iframe) instead of executed. */
@@ -229,8 +231,10 @@ export type SkillsListResponse = z.infer<typeof SkillsListResponseSchema>;
 
 export const CommandRequestSchema = z
   .object({
-    /** Command line, script or HTML/CSS/JS source to run. */
-    cmd: z.string().trim().min(1).max(SANDBOX_LIMITS.commandChars).optional(),
+    /** Command line or raw script/source; kept untrimmed for Python Safe. */
+    cmd: z.string().min(1).max(SANDBOX_LIMITS.commandChars).optional(),
+    /** Program stdin (Python Safe only). */
+    stdin: z.string().max(SANDBOX_LIMITS.stdinChars).optional(),
     /** Grok skill to load (alone) or to attach to the run. */
     skill: skillIdSchema.optional(),
     /** Reference markdown inside the skill folder, e.g. `references/modes.md`. */
@@ -241,7 +245,7 @@ export const CommandRequestSchema = z
     workspace: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/).optional(),
     allowDangerous: z.boolean().optional(),
   })
-  .refine((value) => Boolean(value.cmd || value.skill), {
+  .refine((value) => Boolean(value.cmd?.trim() || value.skill), {
     message: "ต้องส่ง cmd หรือ skill อย่างน้อยหนึ่งอย่าง",
     path: ["cmd"],
   });

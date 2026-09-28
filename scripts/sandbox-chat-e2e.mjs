@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import { runAgentLoop } from '../src/lib/ai/agent-loop.ts';
 const base = process.env.APP_TEST_URL || 'http://127.0.0.1:8080';
 const workspace = 'e2e_' + Date.now();
-async function execute(command, stream = true, signal) {
+async function execute(command, stream = true, signal, type = 'bash', stdin) {
   const response = await fetch(base + '/api/sandbox' + (stream ? '.stream' : ''), {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ cmd: command, type: 'bash', workspace }), signal,
+    body: JSON.stringify({ cmd: command, type, stdin, workspace }), signal,
   });
   assert.equal(response.status, 200, await (!response.ok ? response.text() : Promise.resolve('')));
   if (!stream) return response.json();
@@ -23,10 +23,35 @@ await runAgentLoop({ messages: [{ role: 'user', content: 'write and read a file'
       for (const chunk of ['<ru', 'n lang="bash">\n', 'printf actual-result > proof.txt; cat proof.txt\n', '</run>']) emit(chunk);
     } else { assert.match(messages.at(-1).content, /actual-result/); emit('Verified actual-result'); }
   },
-  execute: call => execute(call.command), onText: text => output += text,
+  execute: call => execute(call.command, true, undefined, call.language), onText: text => output += text,
 });
 assert.match(output, /✅/); assert.match(output, /Verified actual-result/);
 assert.equal((await execute('cat proof.txt', false)).stdout, 'actual-result');
+
+const safeSource = "\nvalues = [2, 3, 5]\nprint(sum(values))\nprint(input())  \n";
+let safeTurns = 0, safeOutput = '';
+await runAgentLoop({ messages: [{ role: 'user', content: 'Verify this small Python calculation' }], tools: true, signal: new AbortController().signal,
+  model: async (messages, emit) => {
+    if (safeTurns++ === 0) emit(`<run lang="python-safe">\n${safeSource}</run>`);
+    else {
+      assert.match(messages.at(-1).content, /python-safe/);
+      assert.match(messages.at(-1).content, /10/);
+      assert.match(messages.at(-1).content, /safe-input/);
+      emit('Python Safe returned the real result.');
+    }
+  },
+  execute: async call => {
+    assert.equal(call.language, 'python-safe');
+    assert.equal(call.command, safeSource);
+    const result = await execute(call.command, true, undefined, call.language, 'safe-input\n');
+    assert.equal(result.command, safeSource);
+    return result;
+  },
+  onText: text => safeOutput += text,
+});
+assert.match(safeOutput, /10/);
+assert.match(safeOutput, /safe-input/);
+assert.match(safeOutput, /Python Safe returned the real result/);
 const query = new URLSearchParams({ cmd: 'cat proof.txt', type: 'bash', workspace });
 const get = await fetch(`${base}/api/sandbox.stream?${query}`);
 assert.equal(get.status, 200); assert.match(await get.text(), /actual-result/);
@@ -40,4 +65,4 @@ const reader = stream.body.getReader(); let data = '';
 while (!data.includes('starting')) data += new TextDecoder().decode((await reader.read()).value);
 ac.abort(); await new Promise(resolve => setTimeout(resolve, 2400));
 assert.equal((await execute('test ! -e cancelled-marker')).status, 'success');
-console.log('PASS: mock-model loop → app SSE → real runner; cross-transport workspace; GET; npm/dayjs; npx; git; Python; risk gate; cancellation.');
+console.log('PASS: mock-model loop → app SSE → real runner; Python Safe result feedback/raw source; cross-transport workspace; GET; npm/dayjs; npx; git; Python; risk gate; cancellation.');

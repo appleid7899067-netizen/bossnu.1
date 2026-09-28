@@ -78,7 +78,7 @@ test('seed: unsafe paths are rejected', async t => {
   assert.equal(report.rejected.length, 2);
 });
 
-test('real runner v5: create, modify, rename and delete are all visible in the returned snapshot', { timeout: 30000 }, async t => {
+test('real runner v6: create, modify, rename and delete are all visible in the returned snapshot', { timeout: 30000 }, async t => {
   const root = await tmp();
   const runner = spawn(process.execPath, ['sandbox-runner/server.mjs'], {
     env: { ...process.env, PORT: '0', WORKSPACE_ROOT: root, WORKSPACE_REPO: '', COMMAND_TIMEOUT_MS: '5000' },
@@ -91,7 +91,7 @@ test('real runner v5: create, modify, rename and delete are all visible in the r
   });
   const base = `http://127.0.0.1:${port}`;
   const health = await (await fetch(base + '/health')).json();
-  assert.equal(health.version, 5);
+  assert.equal(health.version, 6);
 
   const run = async (command, extra = {}) => (await fetch(base + '/execute', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'bash', command, workspace: 'sync_e2e', snapshot: 1, ...extra }) })).json();
   const stream = async (command, extra = {}) => {

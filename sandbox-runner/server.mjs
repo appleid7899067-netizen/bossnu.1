@@ -2,13 +2,18 @@ import http from "node:http";
 import { mkdtemp, rm, mkdir, stat, readdir, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { reconcileSeed, snapshotWorkspace, SNAPSHOT_VERSION } from "./sync.mjs";
 
 const PORT = Number(process.env.PORT || 8787);
+const HOST = process.env.HOST || "0.0.0.0";
+const GUARDED_PYTHON = fileURLToPath(new URL("./guarded/run_guarded.py", import.meta.url));
+const MAX_PYTHON_SAFE_INPUT = 32_000;
 // Seeds carry the workspace's project files from Neon, so the body limit is generous.
 const MAX_BODY = Number(process.env.MAX_BODY_BYTES) || 16 * 1024 * 1024;
-const RUNNER_VERSION = 5;
+const RUNNER_VERSION = 6;
+const RUNNER_RUNTIMES = ["node", "python", "python-safe", "bash", "go", "rust", "java", "cpp"];
 const MAX_OUTPUT = 64 * 1024;
 const TIMEOUT_MS = Math.min(300000, Math.max(1000, Number(process.env.COMMAND_TIMEOUT_MS || process.env.SANDBOX_TIMEOUT_MS) || 120000));
 const DEV_TIMEOUT_MS = Math.min(300000, Math.max(1000, Number(process.env.SANDBOX_DEV_TIMEOUT_MS) || 180000));
@@ -21,7 +26,8 @@ const busyWorkspaces = new Set();
 const workspaceTTL = Number(process.env.WORKSPACE_TTL_MS) || 86400000;
 function executionEnv(cwd) {
   return { PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin", HOME: cwd, LANG: "C.UTF-8", HOST: "0.0.0.0",
-    CI: "1", npm_config_yes: "true", npm_config_audit: "false", npm_config_fund: "false",
+    CI: "1", PYTHONNOUSERSITE: "1", PYTHONDONTWRITEBYTECODE: "1", PYTHONUNBUFFERED: "1",
+    npm_config_yes: "true", npm_config_audit: "false", npm_config_fund: "false",
     npm_config_update_notifier: "false", npm_config_progress: "false", npm_config_loglevel: "error" };
 }
 async function acquireWorkspace(id) {
@@ -83,14 +89,16 @@ async function readBody(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 function append(target, chunk) { return (target + chunk.toString("utf8")).slice(-MAX_OUTPUT); }
-function spawnProcess(command, args, cwd, timeoutMs, signal) {
+function spawnProcess(command, args, cwd, timeoutMs, signal, stdin = "", extraStdin) {
   return new Promise((resolve) => {
+    const stdio = extraStdin === undefined ? ["pipe", "pipe", "pipe"] : ["pipe", "pipe", "pipe", "pipe"];
     const child = spawn(command, args, {
       cwd,
       env: executionEnv(cwd),
-      detached: true, stdio: ["pipe", "pipe", "pipe"],
+      detached: true, stdio,
     });
-    child.stdin.end();
+    child.stdin.end(stdin, "utf8");
+    if (extraStdin !== undefined) child.stdio[3].end(extraStdin, "utf8");
     const cancel = () => { try { process.kill(-child.pid, "SIGKILL"); } catch { /* intentionally ignored */ } };
     let stdout = "", stderr = "", timedOut = false;
     signal?.addEventListener("abort", cancel, { once: true });
@@ -182,10 +190,41 @@ function sse(res, event) {
   if (res.destroyed) return;
   res.write("data: " + JSON.stringify(event) + "\n\n");
 }
+function commandText(body, language) {
+  const raw = typeof body.command === "string" ? body.command : "";
+  return language === "python-safe" ? raw : raw.trim();
+}
+function pythonProgramInput(body, language) {
+  const value = language === "python-safe" && typeof body.stdin === "string" ? body.stdin : "";
+  if (value.length > MAX_PYTHON_SAFE_INPUT) throw new Error("stdin_too_large");
+  return value;
+}
+function spawnExecution(language, command, stdin, cwd) {
+  if (language === "python-safe") {
+    const child = spawn("python3", ["-I", "-S", "-u", GUARDED_PYTHON], {
+      cwd,
+      env: executionEnv(cwd),
+      detached: true,
+      stdio: ["pipe", "pipe", "pipe", "pipe"],
+    });
+    // fd 0 carries raw Python source to run_guarded.py. fd 3 carries the
+    // program's own stdin so it never has to be mixed with the source.
+    child.stdin.end(command, "utf8");
+    child.stdio[3].end(stdin, "utf8");
+    return child;
+  }
+  const child = spawn("bash", ["-c", command], {
+    cwd, env: executionEnv(cwd),
+    detached: true, stdio: ["pipe", "pipe", "pipe"],
+  });
+  child.stdin.end();
+  return child;
+}
 async function executeStream(body, res) {
   const language = String(body.language || "bash").toLowerCase();
-  const command = typeof body.command === "string" ? body.command.trim() : "";
-  if (!command) throw new Error("command_required");
+  const command = commandText(body, language);
+  const stdin = pythonProgramInput(body, language);
+  if (!command.trim()) throw new Error("command_required");
   if (command.length > 32000) throw new Error("command_too_large");
   const workspace = await acquireWorkspace(body.workspace);
   const dir = workspace.dir;
@@ -231,11 +270,7 @@ async function executeStream(body, res) {
       sse(res, { type: "complete", result });
       return; // ended by the caller after the workspace lock is released
     }
-    const child = spawn("bash", ["-c", command], {
-      cwd: dir, env: executionEnv(dir),
-      detached: true, stdio: ["pipe", "pipe", "pipe"],
-    });
-    child.stdin.end();
+    const child = spawnExecution(language, command, stdin, dir);
     const cancel = () => { try { process.kill(-child.pid, "SIGKILL"); } catch { /* intentionally ignored */ } };
     let stdout = "", stderr = "", timedOut = false;
     res.on("close", cancel);
@@ -270,8 +305,9 @@ async function executeStream(body, res) {
 
 async function execute(body, signal) {
   const language = String(body.language || "bash").toLowerCase();
-  const command = typeof body.command === "string" ? body.command.trim() : "";
-  if (!command) throw new Error("command_required");
+  const command = commandText(body, language);
+  const stdin = pythonProgramInput(body, language);
+  if (!command.trim()) throw new Error("command_required");
   if (command.length > 32000) throw new Error("command_too_large");
 
   const workspace = await acquireWorkspace(body.workspace);
@@ -293,7 +329,9 @@ async function execute(body, signal) {
         ...(await workspaceResult(dir, seedReport, body)),
       };
     }
-    const r = await spawnProcess("bash", ["-c", command], dir, TIMEOUT_MS, signal);
+    const r = language === "python-safe"
+      ? await spawnProcess("python3", ["-I", "-S", "-u", GUARDED_PYTHON], dir, TIMEOUT_MS, signal, command, stdin)
+      : await spawnProcess("bash", ["-c", command], dir, TIMEOUT_MS, signal);
     return {
       status: r.timedOut ? "timeout" : r.exitCode === 0 ? "success" : "error",
       stdout: r.stdout, stderr: r.stderr, exitCode: r.exitCode, signal: r.signal,
@@ -323,7 +361,7 @@ async function proxyPreview(req, res, sessionId, rest) {
 }
 const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") return send(res, 204, {});
-  if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, runner: "universal-shell", version: RUNNER_VERSION, snapshot: SNAPSHOT_VERSION, sessions: sessions.size });
+  if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, runner: "universal-shell", version: RUNNER_VERSION, snapshot: SNAPSHOT_VERSION, runtimes: RUNNER_RUNTIMES, sessions: sessions.size });
   if (req.method === "GET" && req.url && req.url.startsWith("/preview/")) {
     const parts = req.url.split("/").filter(Boolean);
     return proxyPreview(req, res, parts[1], parts.slice(2).join("/"));
@@ -347,4 +385,4 @@ const server = http.createServer(async (req, res) => {
     return send(res, 400, { error: error instanceof Error ? error.message : "bad_request" });
   }
 });
-server.listen(PORT, "0.0.0.0", () => console.log("bossnu multi-runtime sandbox listening on :" + server.address().port));
+server.listen(PORT, HOST, () => console.log("bossnu multi-runtime sandbox listening on :" + server.address().port));

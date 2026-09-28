@@ -1,7 +1,6 @@
 import { sandboxClient } from "@/lib/sandbox-client";
-import { assessSandboxRisk } from "@/lib/sandbox/detect";
 import { useEffect, useMemo, useState } from "react";
-import { Bot, Brain, Database, Download, FolderOpen, Play, Plus, Sparkles, Trash2, Upload, UserRound, WandSparkles } from "lucide-react";
+import { Bot, Brain, Database, Download, FolderOpen, Play, Plus, ShieldCheck, Sparkles, Trash2, Upload, UserRound, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { PersonalitySettings } from "@/lib/types";
 import { exportBackup, useAppStore } from "@/lib/store";
@@ -11,6 +10,7 @@ import { getAvailableVoices, getVoiceSettings, isVoiceSupported, updateVoiceSett
 
 const SANDBOX_LANGUAGES = [
   { id: "python", label: "Python", file: "main.py" },
+  { id: "python-safe", label: "Python (Safe)", file: "main.py" },
   { id: "javascript", label: "JavaScript", file: "main.js" },
   { id: "cpp", label: "C++", file: "main.cpp" },
   { id: "java", label: "Java", file: "Main.java" },
@@ -21,6 +21,7 @@ const SANDBOX_LANGUAGES = [
 
 const SANDBOX_DEFAULTS: Record<string, string> = {
   python: 'print("Hello from Python")',
+  "python-safe": 'values = [2, 3, 5]\nprint(sum(values))',
   javascript: 'console.log("Hello from JavaScript")',
   cpp: '#include <iostream>\nint main(){ std::cout << "Hello from C++\\n"; }',
   java: 'public class Main { public static void main(String[] args) { System.out.println("Hello from Java"); } }',
@@ -89,14 +90,36 @@ export function SettingsView() {
         return;
       }
 
+      if (sandboxLanguage === "python-safe") {
+        let output = "";
+        const data = await sandboxClient.executeStream(sandboxCode, {
+          type: "python-safe",
+          stdin: sandboxInput,
+          workspace: sandboxWorkspace,
+          allowDangerous: true,
+          onEvent: event => {
+            if (event.type === "output") {
+              output = (output + event.text).slice(-64000);
+              setSandboxOutput(output);
+            }
+          },
+        });
+        if (data.error) throw new Error(data.error);
+        setSandboxOutput([
+          data.stdout || "",
+          data.stderr ? "[stderr]\n" + data.stderr : "",
+          data.status ? "\nstatus: " + data.status : "",
+          data.durationMs ? "duration: " + data.durationMs + "ms" : "",
+        ].filter(Boolean).join("\n"));
+        return;
+      }
+
       const quote = (text: string) => "'" + text.replaceAll("'", "'\"'\"'") + "'";
       const file = SANDBOX_LANGUAGES.find(lang => lang.id === sandboxLanguage)?.file || "main.sh";
       const launch: Record<string, string> = { python: "python3 main.py", javascript: "node main.js", bash: "bash main.sh", cpp: "g++ main.cpp -o main && ./main", java: "javac Main.java && java Main" };
       const command = `printf %s ${quote(sandboxCode)} > ${file}
 printf %s ${quote(sandboxInput)} > stdin.txt
 (${launch[sandboxLanguage]}) < stdin.txt`;
-      const risk = assessSandboxRisk(sandboxCode);
-      
       let output = "";
       const data = await sandboxClient.executeStream(command, { type: "bash", workspace: sandboxWorkspace, allowDangerous: true,
         onEvent: event => { if (event.type === "output") { output = (output + event.text).slice(-64000); setSandboxOutput(output); } },
@@ -155,7 +178,7 @@ printf %s ${quote(sandboxInput)} > stdin.txt
 
       {tab==="sandbox" ? <Panel title="แซนบ็อกซ์รันโค้ด" icon={Play}>
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          {SANDBOX_LANGUAGES.map(lang=><button key={lang.id} type="button" onClick={()=>changeSandboxLanguage(lang.id)} className={cn("rounded-full px-3 py-1.5 text-xs",sandboxLanguage===lang.id?"bg-fg text-bg":"bg-clay text-muted hover:text-fg")}>{lang.label}</button>)}
+          {SANDBOX_LANGUAGES.map(lang=><button key={lang.id} type="button" onClick={()=>changeSandboxLanguage(lang.id)} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs",sandboxLanguage===lang.id?"bg-fg text-bg":"bg-clay text-muted hover:text-fg")}>{lang.id === "python-safe" ? <ShieldCheck className="size-3.5"/> : null}{lang.label}</button>)}
         </div>
         <div className="grid gap-3 lg:grid-cols-[1fr_360px]">
           <div className="overflow-hidden rounded-2xl bg-[#111]">
@@ -171,7 +194,7 @@ printf %s ${quote(sandboxInput)} > stdin.txt
           </div>
         </div>
         {sandboxLanguage === "html" && sandboxPreview ? <div className="mt-4 overflow-hidden rounded-2xl bg-clay"><div className="border-b border-border px-3 py-2 text-xs font-medium">Live Preview</div><iframe title="HTML Live Preview" sandbox="allow-scripts" srcDoc={sandboxCode} className="h-[420px] w-full bg-white" /></div> : null}
-        <p className="mt-3 text-xs text-subtle">HTML = Live Preview แบบ sandboxed iframe • Bash = isolated runner ผ่าน VITE_SANDBOX_RUNNER_URL • ภาษาอื่นใช้ runner เดิม • JSON ตรวจ syntax ในเครื่อง</p>
+        <p className="mt-3 text-xs text-subtle">Python (Safe) = ส่งโค้ดดิบเข้า Aether AST guard ผ่าน stdin โดยไม่ผ่าน shell • HTML = Preview ใน sandboxed iframe • JSON ตรวจ syntax ในเครื่อง</p>
       </Panel> : null}
     </div>
   </section>;

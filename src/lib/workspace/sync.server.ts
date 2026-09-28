@@ -189,10 +189,11 @@ export function publicRunnerResult<T extends Record<string, unknown>>(result: T,
 }
 
 /** JSON body for the runner's /execute and /execute/stream endpoints. */
-export function runnerBody(input: { language: string; command: string; workspace?: string; seed?: WorkspaceSeed }) {
+export function runnerBody(input: { language: string; command: string; stdin?: string; workspace?: string; seed?: WorkspaceSeed }) {
   return JSON.stringify({
     language: input.language,
     command: input.command,
+    stdin: input.stdin,
     workspace: input.workspace,
     snapshot: 1,
     ...(input.seed?.ok ? { workspaceFiles: input.seed.files, workspaceBase: input.seed.base } : {}),
