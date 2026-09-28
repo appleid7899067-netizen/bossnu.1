@@ -148,6 +148,12 @@ export async function runAgentLoop(opts: {
   let rejections = 0;
   let initialCallPending = opts.initialCall ?? null;
   let lastVerdict: EvidenceVerdict | null = opts.priorResult ? evaluateEvidence(opts.priorResult, { requireWorkspace }) : null;
+  // A passing run is only a candidate until the loop reaches its final
+  // verification boundary. Never persist a Verified Skill mid-recovery.
+  let pendingVerified: { call: RunCall; result: ToolResult } | null =
+    opts.priorResult && lastVerdict?.passed && opts.initialCall
+      ? { call: opts.initialCall, result: opts.priorResult }
+      : null;
 
   opts.onPhase?.("goal", "🎯 เป้าหมาย");
   opts.onText(`\n> 🎯 เป้าหมาย: ${goal.slice(0, 300)}\n`);
@@ -155,7 +161,26 @@ export async function runAgentLoop(opts: {
   if (workspace) await safely(() => workspace.startTask(goal, core.task.id), undefined);
 
   const finish = async (status: AgentLoopStatus): Promise<AgentLoopSummary> => {
-    if (status === "verified" || status === "answered") core.complete();
+    if (status === "verified" || status === "answered") {
+      // Skill persistence is intentionally delayed until the final gate.
+      if (status === "verified" && pendingVerified && pendingVerified.result.workspaceSync?.verified && pendingVerified.result.workspaceSync.complete && workspace) {
+        const skill = buildVerifiedSkill(goal, pendingVerified.call, pendingVerified.result);
+        const saved = await safely(async () => {
+          await workspace.writeFile(skill.path, skill.content);
+          return true;
+        }, false);
+        if (saved) {
+          const memoryValue = `Verified reusable skill saved at ${skill.path}. Project snapshot: ${pendingVerified.result.workspaceSync.expectedCount ?? 0} files, manifest ${pendingVerified.result.workspaceSync.manifestHash ?? "unavailable"}.`;
+          await safely(() => workspace.remember(`verified skill ${skill.path}`, memoryValue, "run"), undefined);
+          opts.onSkillSaved?.(skill.path, true);
+          opts.onText(`\n> 🧠 บันทึกสกิลจากงานที่ตรวจสอบผ่านขั้นสุดท้ายแล้ว: ${skill.path}\n`);
+        } else {
+          opts.onSkillSaved?.(skill.path, false);
+          opts.onText(`\n> ⚠️ Verification ผ่าน แต่บันทึกสกิลลง Agent Workspace ไม่สำเร็จ (${skill.path})\n`);
+        }
+      }
+      core.complete();
+    }
     else if (status !== "aborted") core.fail();
     if (workspace && status !== "aborted") {
       const outcome = status === "verified" || status === "answered" ? "success" : "failure";
@@ -306,22 +331,7 @@ export async function runAgentLoop(opts: {
           ? requireWorkspace ? "🔍 Verify • รันผ่าน + Neon อ่านกลับตรงกับ Sandbox" : "🔍 Verify • รันผ่าน"
           : `🔍 Verify • ไม่ผ่าน: ${lastVerdict.reasons[0]}`,
       );
-      if (lastVerdict.passed && result.workspaceSync?.verified && result.workspaceSync.complete && workspace) {
-        const skill = buildVerifiedSkill(goal, call, result);
-        const saved = await safely(async () => {
-          await workspace.writeFile(skill.path, skill.content);
-          return true;
-        }, false);
-        if (saved) {
-          const memoryValue = `Verified reusable skill saved at ${skill.path}. Project snapshot: ${result.workspaceSync.expectedCount ?? 0} files, manifest ${result.workspaceSync.manifestHash ?? "unavailable"}.`;
-          await safely(() => workspace.remember(`verified skill ${skill.path}`, memoryValue, "run"), undefined);
-          opts.onSkillSaved?.(skill.path, true);
-          opts.onText(`\n> 🧠 บันทึกสกิลจากงานที่ตรวจสอบผ่านแล้ว: ${skill.path}\n`);
-        } else {
-          opts.onSkillSaved?.(skill.path, false);
-          opts.onText(`\n> ⚠️ รันผ่าน แต่บันทึกสกิลลง Agent Workspace ไม่สำเร็จ (${skill.path})\n`);
-        }
-      }
+      pendingVerified = lastVerdict.passed ? { call, result } : null;
       messages.push({ role: "user", content: observed });
 
       if (!lastVerdict.passed) {
