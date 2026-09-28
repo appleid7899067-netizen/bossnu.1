@@ -20,13 +20,14 @@ import { useCurrentUser } from "@/lib/auth/use-current-user";
 import type { RunCall } from "@/lib/ai/sandbox-tool";
 import { isRunnerRuntime } from "@/types/sandbox";
 import { streamChat } from "@/lib/ai/stream";
-import { finishVoice, setVoiceEnabled, speakRealtime, stopVoice } from "@/lib/ai/voice";
+import { finishVoice, getVoiceSettings, setVoiceEnabled, speakRealtime, stopVoice } from "@/lib/ai/voice";
 import type { Search } from "@/lib/search";
 import { useAppStore } from "@/lib/store";
 import type { ChatActivity, ChatAttachment, ChatMode, MindMapData } from "@/lib/types";
 type PendingActivity = ChatActivity extends infer Activity ? Activity extends ChatActivity ? Omit<Activity, "id" | "createdAt"> : never : never;
 import { messageForModel } from "@/lib/attachments";
 import { conversationToMarkdown } from "@/lib/store";
+import { useAppearance } from "@/lib/use-appearance";
 import { cn, uid } from "@/lib/utils";
 import { detectSandboxInput, shouldExecuteSandboxInput } from "@/lib/sandbox/detect";
 import { sandboxClient } from "@/lib/sandbox-client";
@@ -60,14 +61,13 @@ export function AppShell({ search }: { search: Search }) {
     attachments?: ChatAttachment[];
     reason: string;
   } | null>(null);
-  const [voiceEnabled, setVoiceEnabledState] = useState(true);
+  const [voiceEnabled, setVoiceEnabledState] = useState(() => (typeof window === "undefined" ? true : getVoiceSettings().enabled));
   const [callOpen, setCallOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = store.personality.darkMode ? "dark" : "light";
-  }, [store.personality.darkMode]);
+  // Applies persisted theme / accent / font scale / motion to <html>.
+  useAppearance();
 
 
   useEffect(() => {
@@ -304,6 +304,11 @@ export function AppShell({ search }: { search: Search }) {
       else setDrawer(true);
       return;
     }
+    if (mod && e.key === ",") {
+      e.preventDefault();
+      setAgentSettingsOpen(true);
+      return;
+    }
     if (mod && e.shiftKey && e.key.toLowerCase() === "o") {
       e.preventDefault();
       const id = store.newChat(mode);
@@ -429,14 +434,14 @@ export function AppShell({ search }: { search: Search }) {
       </div>
 
       {drawer ? (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="เมนูด้านข้าง">
           <button
             type="button"
-            className="absolute inset-0 bg-fg/30"
+            className="anim-fade absolute inset-0 bg-fg/30 backdrop-blur-[2px]"
             aria-label="Close menu"
             onClick={() => setDrawer(false)}
           />
-          <div className="relative z-10 h-full w-[min(100%,18rem)] bg-surface shadow-[var(--shadow-border)]">
+          <div className="anim-drawer relative z-10 h-full w-[min(100%,18rem)] bg-surface shadow-[var(--shadow-border)]">
             <Sidebar
               view={view}
               conversations={store.conversations}
@@ -472,7 +477,7 @@ export function AppShell({ search }: { search: Search }) {
       ) : null}
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between border-b border-border px-3 md:hidden">
+        <header className="flex h-14 items-center justify-between border-b border-border bg-bg/80 px-3 backdrop-blur-md md:hidden">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -562,6 +567,8 @@ export function AppShell({ search }: { search: Search }) {
                 busy={busyChat}
                 contextualActions={quickActions}
                 toolActions={roomTools}
+                quickPrompts={store.quickPrompts}
+                onInsertPrompt={(prompt) => setDraft((prev) => [prev.trim(), prompt].filter(Boolean).join(prev.trim() ? "\n\n" : ""))}
                 activeTool={activeTool}
                 onToolAction={(tool) => {
                   setActiveTool(tool);
@@ -600,7 +607,7 @@ export function AppShell({ search }: { search: Search }) {
                 }
               />
               <p className="mt-2 px-1 text-center text-[0.7rem] text-subtle">
-                สลี่พร้อมช่วยค่ะ • แชตเก็บไว้บนอุปกรณ์นี้ • <kbd className="font-sans">/</kbd> พิมพ์ • <kbd className="font-sans">Ctrl K</kbd> ค้นหา • <kbd className="font-sans">Esc</kbd> หยุด
+                สลี่พร้อมช่วยค่ะ • แชตเก็บไว้บนอุปกรณ์นี้ • <kbd className="font-sans">/</kbd> พิมพ์ • <kbd className="font-sans">Ctrl K</kbd> ค้นหา • <kbd className="font-sans">Ctrl ,</kbd> ตั้งค่า • <kbd className="font-sans">Esc</kbd> หยุด
               </p>
             </div>}
           </>
@@ -622,11 +629,11 @@ export function AppShell({ search }: { search: Search }) {
       ) : null}
       {agentSettingsOpen ? (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-fg/25 p-0 backdrop-blur-[2px] sm:items-center sm:p-5" role="dialog" aria-modal="true" aria-label="ตั้งค่าตัวแทน AI">
-          <button type="button" className="absolute inset-0 cursor-default" aria-label="ปิดหน้าต่างตั้งค่าตัวแทน" onClick={() => setAgentSettingsOpen(false)} />
-          <div className="relative z-10 flex max-h-[94dvh] w-full max-w-[1400px] flex-col overflow-hidden rounded-t-3xl bg-bg shadow-2xl sm:rounded-3xl">
+          <button type="button" className="anim-fade absolute inset-0 cursor-default" aria-label="ปิดหน้าต่างตั้งค่าตัวแทน" onClick={() => setAgentSettingsOpen(false)} />
+          <div className="anim-sheet relative z-10 flex max-h-[94dvh] w-full max-w-[1400px] flex-col overflow-hidden rounded-t-3xl border border-border bg-bg shadow-2xl sm:rounded-3xl">
             <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:px-5">
-              <div><p className="text-sm font-semibold">🤖 ตัวแทน AI</p><p className="text-[11px] text-muted">ตั้งค่าบุคลิก • สกิล • ตัวแทน • ความจำ • Sandbox</p></div>
-              <button type="button" onClick={() => setAgentSettingsOpen(false)} className="grid size-9 place-items-center rounded-xl bg-clay text-muted hover:text-fg" aria-label="ปิด"><X className="size-4" /></button>
+              <div><p className="text-sm font-semibold">🤖 ตั้งค่าทั้งหมด</p><p className="text-[11px] text-muted">หน้าตา • บุคลิก • คลังพรอมป์ • สกิล • ตัวแทน • ความจำ • เสียง • Sandbox</p></div>
+              <button type="button" onClick={() => setAgentSettingsOpen(false)} className="grid size-9 place-items-center rounded-xl bg-clay text-muted transition-colors hover:bg-hover hover:text-fg" aria-label="ปิด"><X className="size-4" /></button>
             </div>
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden"><SettingsView /></div>
           </div>
@@ -634,7 +641,7 @@ export function AppShell({ search }: { search: Search }) {
       ) : null}
       {dangerousApproval ? (
         <div className="fixed inset-0 z-[120] grid place-items-center bg-fg/30 p-4 backdrop-blur-[2px]" role="alertdialog" aria-modal="true" aria-labelledby="dangerous-command-title" aria-describedby="dangerous-command-description">
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-elevated p-5 shadow-2xl">
+          <div className="anim-pop w-full max-w-lg rounded-2xl border border-border bg-elevated p-5 shadow-2xl">
             <div className="mb-3">
               <p id="dangerous-command-title" className="text-base font-semibold">⚠️ อนุญาตให้รันคำสั่งนี้ไหม?</p>
               <p id="dangerous-command-description" className="mt-1 text-sm text-muted">{dangerousApproval.reason}</p>

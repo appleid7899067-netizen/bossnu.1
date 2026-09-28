@@ -169,19 +169,22 @@ function MessageBubble({
               <Trash2 className="size-3.5" />
             </button>
           </div>
-          <div className="min-w-0 rounded-[20px] rounded-br-md bg-elevated px-3.5 py-2.5 text-[12px] leading-[1.5] shadow-[var(--shadow-border)]">
-            {message.attachments?.length ? (
-              <ul className="mb-2 flex flex-wrap gap-1.5">
-                {message.attachments.map((file, index) => (
-                  <li key={`${file.name}-${index}`} className="flex max-w-full items-center gap-1.5 rounded-lg bg-bg/60 px-2 py-1 text-[11px]">
-                    <FileText className="size-3 shrink-0 text-primary" aria-hidden="true" />
-                    <span className="truncate font-medium">{file.name}</span>
-                    <span className="text-subtle">{formatBytes(file.size)}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {message.content ? <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p> : null}
+          <div className="min-w-0">
+            <div className="rounded-[20px] rounded-br-md bg-primary/[0.08] px-3.5 py-2.5 text-[12px] leading-[1.5] shadow-[var(--shadow-border)] ring-1 ring-primary/10">
+              {message.attachments?.length ? (
+                <ul className="mb-2 flex flex-wrap gap-1.5">
+                  {message.attachments.map((file, index) => (
+                    <li key={`${file.name}-${index}`} className="flex max-w-full items-center gap-1.5 rounded-lg bg-bg/60 px-2 py-1 text-[11px]">
+                      <FileText className="size-3 shrink-0 text-primary" aria-hidden="true" />
+                      <span className="truncate font-medium">{file.name}</span>
+                      <span className="text-subtle">{formatBytes(file.size)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {message.content ? <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p> : null}
+            </div>
+            <time className="mt-1 block text-right text-[10px] tabular-nums text-subtle opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-60">{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
           </div>
         </div>
       </div>
@@ -203,7 +206,8 @@ function MessageBubble({
         ) : null}
         {live && message.content ? <span className="lumina-caret" /> : null}
         {!live && message.content ? (
-          <div className="flex items-center gap-1">
+          <div className="mt-2 flex items-center gap-1">
+            <time className="mr-1 inline-flex h-8 items-center rounded-lg px-1 text-[10px] tabular-nums text-subtle opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100">{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
             <CopyLine text={message.content} />
             {isLast && onRegenerate ? (
               <button

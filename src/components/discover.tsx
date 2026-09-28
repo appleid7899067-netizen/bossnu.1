@@ -19,7 +19,7 @@ export function Discover({ onPrompt, onView }: { onPrompt: (text: string) => voi
       <p className="mt-2 text-center text-[15px] text-muted">How can I help you today?</p>
       <div className="mt-10 grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
         {PROMPTS.map((p, i) => (
-          <button key={p.title} type="button" onClick={() => onPrompt(p.body)} className="lumina-rise group min-h-[112px] rounded-2xl border border-border bg-surface p-4 text-left transition hover:border-primary/40 hover:bg-hover" style={{ animationDelay: `${i * 35}ms` }}>
+          <button key={p.title} type="button" onClick={() => onPrompt(p.body)} className="lumina-rise card-lift group min-h-[112px] rounded-2xl border border-border bg-surface p-4 text-left hover:border-primary/40 hover:bg-hover hover:shadow-[0_8px_30px_-12px_var(--accent-glow)]" style={{ animationDelay: `${i * 35}ms` }}>
             <p className="text-[14px] font-semibold text-fg">{p.title}</p>
             <p className="mt-2 line-clamp-2 text-[13px] leading-[1.6] text-muted">{p.body}</p>
           </button>
