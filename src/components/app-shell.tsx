@@ -549,6 +549,7 @@ export function AppShell({ search }: { search: Search }) {
                 onDeleteMessage={(messageId) => { if (activeChat) store.deleteMessage(activeChat.id, messageId); }}
                 onEditMessage={editAndResend}
                 onRegenerate={regenerate}
+                onContextAction={(action) => { if (!activeChat?.id || busyChat) return; void send(action, activeChat.id); }}
               />
             )}
             {view === "settings" ? null : <div className="mx-auto w-full max-w-[1400px] px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
