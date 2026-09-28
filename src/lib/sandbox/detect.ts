@@ -93,16 +93,16 @@ export function detectSandboxInput(input: string): SandboxDetection {
   }
 
   // Code-only payloads are execution intent even without words like "run".
-  if (/^\s*\`{3,}[\\s\\S]*\`{3,}\s*$/.test(value)) {
+  if (/^\`{3,}[\s\S]*\`{3,}$/.test(value)) {
     return { runtime: "node", label: "Code", code: value, confidence: "high", webPreview: false, dangerous: false };
   }
-  if (/^(?:print\\s*\\(|def\\s+\\w+\\s*\\(|class\\s+\\w+\\s*[:(]|import\\s+\\w+|from\\s+\\w+\\s+import\\s+)/m.test(value)) {
+  if (/^(?:print\s*\(|def\s+\w+\s*\(|class\s+\w+\s*[:(]|import\s+\w+|from\s+\w+\s+import\s+)/m.test(value)) {
     return { runtime: "python", label: "Python Code", code: value, confidence: "high", webPreview: false, dangerous: false };
   }
-  if (/^(?:#!\\/usr\\/bin\\/env\\s+(?:bash|sh)|set\\s+-[eux]+|echo\\s+|cd\\s+[^\\n]+\\n|cat\\s+>)/m.test(value)) {
+  if (/^(?:#!\/usr\/bin\/env\s+(?:bash|sh)|set\s+-[eux]+|echo\s+|cd\s+[^\n]+\n|cat\s+>)/m.test(value)) {
     return withRisk({ runtime: "bash", label: "Shell Code", command: value, confidence: "high", webPreview: false });
   }
-  if (/^(?:const|let|var|function|class|interface|type)\\s+/m.test(value) || /(?:console\\.log|document\\.|window\\.)/.test(value)) {
+  if (/^(?:const|let|var|function|class|interface|type)\s+/m.test(value) || /(?:console\.log|document\.|window\.)/.test(value)) {
     return { runtime: "node", label: "JavaScript / TypeScript Code", code: value, confidence: "high", webPreview: false, dangerous: false };
   }
 
