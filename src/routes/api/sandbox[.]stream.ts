@@ -1,6 +1,10 @@
 import { loadSkill } from "@/lib/sandbox/skills.server";
 import { createFileRoute } from "@tanstack/react-router";
-import { PYTHON_SAFE_RUNNER_ERROR, runnerSupportsPythonSafe } from "@/lib/sandbox/runner-capabilities";
+import {
+  PYTHON_SAFE_RUNNER_ERROR,
+  RUNNER_NOT_READY_ERROR,
+  probeRunnerHealth,
+} from "@/lib/sandbox/runner-capabilities";
 import { loadSeed, publicRunnerResult, runnerBody, syncRunnerResult, type WorkspaceSeed } from "@/lib/workspace/sync.server";
 import { describeEvidence } from "@/lib/workspace/snapshot";
 import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
@@ -62,8 +66,14 @@ async function handle(request: Request): Promise<Response> {
     attachedSkill = loaded.skill;
   }
   const runner = runnerUrl();
-  if (runtime === "python-safe" && !(await runnerSupportsPythonSafe(runner, request.signal))) {
-    return Response.json({ error: PYTHON_SAFE_RUNNER_ERROR }, { status: 503, headers: corsHeaders() });
+  if (runtime === "python-safe") {
+    const health = await probeRunnerHealth(runner, request.signal);
+    if (!health.ok) {
+      return Response.json(
+        { error: health.reason === "legacy" ? PYTHON_SAFE_RUNNER_ERROR : RUNNER_NOT_READY_ERROR },
+        { status: 503, headers: corsHeaders() },
+      );
+    }
   }
   const encoder = new TextEncoder();
   const abort = new AbortController();
@@ -125,13 +135,24 @@ async function handle(request: Request): Promise<Response> {
           close(); return;
         }
         if (!response.ok || !response.body) {
-          const data = await response.json().catch(() => null);
+          const rawText = await response.text();
+          let data: { error?: string } | null = null;
+          try { data = rawText ? (JSON.parse(rawText) as { error?: string }) : null; } catch { data = null; }
           // Same auth guidance as the JSON route: a v6 runner answers 401 when
           // the app's SANDBOX_RUNNER_TOKEN is missing or mismatched.
           const authRejected = response.status === 401 || response.status === 403;
           const error = authRejected
             ? "Sandbox Runner ปฏิเสธการยืนยันตัวตน — ตั้ง SANDBOX_RUNNER_TOKEN ให้ตรงกับ RUNNER_TOKEN ของ Runner"
-            : data?.error || `Sandbox Runner HTTP ${response.status}`;
+            : data?.error || (rawText.trimStart().startsWith("<") ? RUNNER_NOT_READY_ERROR : `Sandbox Runner HTTP ${response.status}`);
+          send({ type: "error", error });
+          send({ type: "complete", result: { success:false, status:"error", type:runtime, runtime, command, error, durationMs:Date.now()-started } });
+          close(); return;
+        }
+        // A platform interstitial (Render's "Application loading" HTML while the
+        // service cold-starts) answers 200 with text/html; parsing it as SSE
+        // would just end the stream silently.
+        if (!/text\/event-stream/i.test(response.headers.get("content-type") || "")) {
+          const error = RUNNER_NOT_READY_ERROR;
           send({ type: "error", error });
           send({ type: "complete", result: { success:false, status:"error", type:runtime, runtime, command, error, durationMs:Date.now()-started } });
           close(); return;
