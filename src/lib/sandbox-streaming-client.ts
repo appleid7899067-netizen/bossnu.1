@@ -1,4 +1,4 @@
-import { CommandResultSchema, errorResult, type CommandResult } from "../types/sandbox.ts";
+import { CommandResultSchema, errorResult, SANDBOX_LIMITS, type CommandResult } from "../types/sandbox.ts";
 
 export type SandboxStreamEvent =
   | { type: "status"; status: string; message?: string }
@@ -86,14 +86,15 @@ export async function streamSandboxCommand(
   cmd: string,
   skill?: string,
   onEvent?: (event: SandboxStreamEvent) => void,
-  options: { baseUrl?: string; fetch?: typeof fetch; signal?: AbortSignal; timeoutMs?: number; workspace?: string; type?: string; allowDangerous?: boolean } = {},
+  options: { baseUrl?: string; fetch?: typeof fetch; signal?: AbortSignal; timeoutMs?: number; workspace?: string; type?: string; stdin?: string; allowDangerous?: boolean } = {},
 ): Promise<CommandResult> {
-  if (!cmd.trim() || cmd.length > 32000) return errorResult("คำสั่งต้องมีความยาว 1–32000 ตัวอักษร");
+  if (!cmd.trim() || cmd.length > SANDBOX_LIMITS.commandChars) return errorResult(`คำสั่งต้องมีความยาว 1–${SANDBOX_LIMITS.commandChars} ตัวอักษร`);
+  if ((options.stdin?.length ?? 0) > SANDBOX_LIMITS.stdinChars) return errorResult(`stdin ต้องไม่เกิน ${SANDBOX_LIMITS.stdinChars} ตัวอักษร`);
   const timeout = AbortSignal.timeout(options.timeoutMs ?? 150000);
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
   const response = await (options.fetch ?? fetch)(`${(options.baseUrl ?? "/api/sandbox").replace(/\/+$/, "")}.stream`, {
     method: "POST", headers: { "content-type": "application/json", accept: "text/event-stream" }, signal,
-    body: JSON.stringify({ cmd: cmd.trim(), skill, workspace: options.workspace, type: options.type, allowDangerous: options.allowDangerous }),
+    body: JSON.stringify({ cmd: options.type === "python-safe" ? cmd : cmd.trim(), skill, workspace: options.workspace, type: options.type, stdin: options.stdin, allowDangerous: options.allowDangerous }),
   });
   if (!response.ok || !response.body) {
     const data = await response.json().catch(() => null);

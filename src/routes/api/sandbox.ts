@@ -1,4 +1,5 @@
 import { assessSandboxRisk } from "@/lib/sandbox/detect";
+import { PYTHON_SAFE_RUNNER_ERROR, runnerSupportsPythonSafe } from "@/lib/sandbox/runner-capabilities";
 import { loadSeed, publicRunnerResult, runnerBody, syncRunnerResult } from "@/lib/workspace/sync.server";
 import { describeEvidence } from "@/lib/workspace/snapshot";
 /**
@@ -36,7 +37,7 @@ import {
   type SkillsListResponse,
 } from "@/types/sandbox";
 
-const MAX_BODY_BYTES = 96 * 1024;
+const MAX_BODY_BYTES = 256 * 1024;
 const DEFAULT_RUNNER_TIMEOUT_MS = 140_000;
 
 // ---------------------------------------------------------------------------
@@ -118,6 +119,7 @@ function labelFor(runtime: string): string {
   const labels: Record<string, string> = {
     node: "Node.js",
     python: "Python",
+    "python-safe": "Python (Safe)",
     bash: "Bash / Shell",
     go: "Go",
     rust: "Rust / Cargo",
@@ -178,11 +180,19 @@ async function runOnRunner(
   command: string,
   steps: string[],
   workspace?: string,
+  stdin?: string,
   signal?: AbortSignal,
 ): Promise<{ result: CommandResult; httpStatus: number }> {
   const runner = runnerConfig();
   steps.push(`ส่งไปรันที่ Sandbox Runner (${runtime})`);
   const started = Date.now();
+  if (runtime === "python-safe" && !(await runnerSupportsPythonSafe(runner.url, signal))) {
+    steps.push("Runner ไม่รองรับ Python (Safe); ไม่ได้ส่งโค้ดไปประมวลผล");
+    return {
+      httpStatus: 503,
+      result: { success: false, status: "error", type: runtime, runtime, label, command, error: PYTHON_SAFE_RUNNER_ERROR, steps },
+    };
+  }
   const seed = workspace ? await loadSeed(workspace) : undefined;
   if (seed && !seed.ok) steps.push(`โหลด Workspace จาก Neon ไม่สำเร็จ • ${seed.error}`);
   else if (seed) steps.push(`Seed จาก Neon • ${seed.files.length} ไฟล์`);
@@ -192,7 +202,7 @@ async function runOnRunner(
     response = await fetch(`${runner.url}/execute`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: runnerBody({ language: runtime, command, workspace, seed }),
+      body: runnerBody({ language: runtime, command, stdin, workspace, seed }),
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(runner.timeoutMs)]) : AbortSignal.timeout(runner.timeoutMs),
     });
   } catch (error) {
@@ -411,7 +421,7 @@ async function handlePost(request: Request): Promise<Response> {
       issue ? `${issue.path.join(".") || "body"}: ${issue.message}` : "Invalid request",
     );
   }
-  const { cmd, skill: skillId, reference, type } = parsed.data;
+  const { cmd, skill: skillId, reference, type, stdin } = parsed.data;
   const steps: string[] = ["รับคำสั่ง"];
 
   // Skill only (or explicit type=skill): load, don't run.
@@ -430,7 +440,7 @@ async function handlePost(request: Request): Promise<Response> {
     return json(result);
   }
 
-  const command = cmd as string;
+  const command = type === "python-safe" ? (cmd as string) : (cmd as string).trim();
   const action = plan(command, type, steps);
   const suggestions = skill ? [] : suggestSkills(command).map((s) => s.id);
 
@@ -445,7 +455,7 @@ async function handlePost(request: Request): Promise<Response> {
       suggestions,
     });
   }
-  const risk = assessSandboxRisk(action.command);
+  const risk = action.runtime === "python-safe" ? { dangerous: false } : assessSandboxRisk(action.command);
   if (risk.dangerous && !parsed.data.allowDangerous) return fail(409, risk.riskReason || "ต้องอนุญาตก่อนรันคำสั่งอันตราย");
   const { result, httpStatus } = await runOnRunner(
     action.runtime,
@@ -453,6 +463,7 @@ async function handlePost(request: Request): Promise<Response> {
     action.command,
     steps,
     parsed.data.workspace,
+    stdin,
     request.signal,
   );
   return json({ ...result, skill, suggestions }, httpStatus);

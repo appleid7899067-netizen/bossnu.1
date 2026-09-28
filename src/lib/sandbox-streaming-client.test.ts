@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { consumeSandboxStream, StreamCollector } from "./sandbox-streaming-client.ts";
+import { consumeSandboxStream, StreamCollector, streamSandboxCommand } from "./sandbox-streaming-client.ts";
+import { CommandRequestSchema } from "../types/sandbox.ts";
 const result = { success: true, status: "success", type: "bash", stdout: "สวัสดี" };
 function stream(text: string, size = 1) {
   const data = new TextEncoder().encode(text);
@@ -10,6 +11,25 @@ function stream(text: string, size = 1) {
     controller.enqueue(data.slice(offset, offset += size));
   } });
 }
+test("Python Safe streaming preserves source bytes and sends stdin separately", async () => {
+  const source = "\r\n  # keep indentation\r\nprint(\"raw ' quote\")  \r\n\r\n";
+  let sent: Record<string, unknown> | undefined;
+  const safeResult = { success: true, status: "success", type: "python-safe", runtime: "python-safe", stdout: "ok\n" };
+  const responseText = `data: ${JSON.stringify({ type: "complete", result: safeResult })}\n\n`;
+  const parsed = CommandRequestSchema.parse({ cmd: source, type: "python-safe", stdin: "input\n" });
+  assert.equal(parsed.cmd, source);
+  const received = await streamSandboxCommand(source, undefined, undefined, {
+    type: "python-safe",
+    stdin: "input\n",
+    fetch: async (_input, init) => {
+      sent = JSON.parse(String(init?.body));
+      return new Response(responseText);
+    },
+  });
+  assert.deepEqual(received, safeResult);
+  assert.equal(sent?.cmd, source);
+  assert.equal(sent?.stdin, "input\n");
+});
 test("SSE preserves split UTF-8 and CRLF frames", async () => {
   const events: unknown[] = [];
   const text = ': heartbeat\r\n\r\ndata: {"type":"output","stream":"stdout","text":"สวัสดี"}\r\n\r\n' + `data: ${JSON.stringify({ type: "complete", result })}\r\n\r\n`;

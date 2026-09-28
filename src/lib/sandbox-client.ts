@@ -42,6 +42,8 @@ export type ExecuteOptions = {
   skill?: string;
   /** Runtime hint; omit for auto-detection. */
   type?: CommandType;
+  /** Program stdin (Python Safe only). */
+  stdin?: string;
   signal?: AbortSignal;
   /** Explicit approval from the user for a command classified as dangerous. */
   allowDangerous?: boolean;
@@ -94,12 +96,15 @@ export class SandboxClient {
 
   /** Run a command; the server detects the runtime unless `type` is given. */
   async execute(cmd: string, options: ExecuteOptions = {}): Promise<CommandResult> {
-    const command = cmd.trim();
-    if (!command) return errorResult("ยังไม่มีคำสั่ง");
+    const command = options.type === "python-safe" ? cmd : cmd.trim();
+    if (!command.trim()) return errorResult("ยังไม่มีคำสั่ง");
     if (command.length > SANDBOX_LIMITS.commandChars) {
       return errorResult(`คำสั่งยาวเกิน ${SANDBOX_LIMITS.commandChars.toLocaleString()} ตัวอักษร`);
     }
-    return this.post({ cmd: command, workspace: options.workspace, skill: options.skill, type: options.type, allowDangerous: options.allowDangerous }, options.signal);
+    if ((options.stdin?.length ?? 0) > SANDBOX_LIMITS.stdinChars) {
+      return errorResult(`stdin ยาวเกิน ${SANDBOX_LIMITS.stdinChars.toLocaleString()} ตัวอักษร`);
+    }
+    return this.post({ cmd: command, stdin: options.stdin, workspace: options.workspace, skill: options.skill, type: options.type, allowDangerous: options.allowDangerous }, options.signal);
   }
 
   executeNode(cmd: string, options: Omit<ExecuteOptions, "type"> = {}) {

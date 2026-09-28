@@ -17,7 +17,7 @@ import { generateMindMap, generateStudioImage } from "@/lib/ai/client";
 import { redactSensitiveCommand, runAgentLoop, type AgentPhase } from "@/lib/ai/agent-loop";
 import { agentWorkspaceIdFor, createHttpWorkspace } from "@/lib/workspace/http-workspace";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
-import { sandboxRequestedByUser, type RunCall } from "@/lib/ai/sandbox-tool";
+import type { RunCall } from "@/lib/ai/sandbox-tool";
 import { isRunnerRuntime } from "@/types/sandbox";
 import { streamChat } from "@/lib/ai/stream";
 import { finishVoice, setVoiceEnabled, speakRealtime, stopVoice } from "@/lib/ai/voice";
@@ -28,7 +28,7 @@ type PendingActivity = ChatActivity extends infer Activity ? Activity extends Ch
 import { messageForModel } from "@/lib/attachments";
 import { conversationToMarkdown } from "@/lib/store";
 import { cn, uid } from "@/lib/utils";
-import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
+import { detectSandboxInput } from "@/lib/sandbox/detect";
 import { sandboxClient } from "@/lib/sandbox-client";
 import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
 
@@ -134,10 +134,8 @@ export function AppShell({ search }: { search: Search }) {
       store.patchAssistant(id, assistantId, { activities: current.map(activity => activity.id === activityId ? { ...activity, ...patch } as ChatActivity : activity) });
     };
     const tools = true;
-    const execute = async (call: RunCall, approved = false) => {
+    const execute = async (call: RunCall) => {
       ac.signal.throwIfAborted();
-      const risk = assessSandboxRisk(call.command);
-      
       let output = "";
       const startedAt = Date.now();
       const activityId = uid("activity");

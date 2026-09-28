@@ -1,4 +1,5 @@
 const hasSpeech = typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+
 export type VoiceMode = "cute" | "warm" | "calm" | "bright" | "special" | "deep" | "energetic" | "gentle" | "professional" | "story";
 
 type VoiceProfile = {
@@ -22,50 +23,6 @@ export const VOICE_MODES: VoiceProfile[] = [
   { id: "gentle", label: "🌸 ละมุนใจ", description: "อ่อนโยน นุ่มนวล", voice: "device", rate: 0.93, pitch: 1.04, instructions: "Speak Thai gently with a soft, caring adult voice. Smooth phrasing, natural warmth, and delicate expression." },
   { id: "professional", label: "🎙️ มืออาชีพ", description: "ชัด สุขุม น่าเชื่อถือ", voice: "device", rate: 0.96, pitch: 0.92, instructions: "Speak Thai clearly and professionally with calm confidence. Precise diction, balanced pacing, and natural authority." },
   { id: "story", label: "📖 เล่าเรื่อง", description: "มีมิติ น่าฟัง", voice: "device", rate: 0.97, pitch: 0.98, instructions: "Speak Thai as an engaging storyteller. Use natural rhythm, expressive emphasis, and varied pacing without overacting." },
-];pe PuterTTS = {
-  ai: {
-    txt2speech: (
-      text: string,
-      options?: {
-        provider?: string;
-        model?: string;
-        voice?: string;
-        instructions?: string;
-        language?: string;
-        response_format?: string;
-      }
-    ) => Promise<HTMLAudioElement>;
-  };
-};
-
-declare global {
-  interface Window {
-    puter?: PuterTTS;
-  }
-}
-
-const hasSpeech = typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
-const hasPuter = () => typeof window !== "undefined" && !!window.puter?.ai?.txt2speech;
-
-export type VoiceMode = "cute" | "warm" | "calm" | "bright" | "special" | "deep" | "energetic" | "gentle" | "professional" | "story";
-
-type VoiceProfile = {
-  id: VoiceMode;
-  label: string;
-  description: string;
-  voice: string;
-  rate: number;
-  pitch: number;
-  instructions: string;
-};
-
-export const VOICE_MODES: VoiceProfile[] = [
-  { id: "cute", label: "😊 น่ารักใสๆ", description: "สดใส เป็นกันเอง", voice: "device", rate: 1.05, pitch: 1.1, instructions: "Speak Thai warmly and playfully, bright and cute but natural. Do not sound childish or exaggerated." },
-  { id: "warm", label: "🥰 อ่อนโยนอบอุ่น", description: "นุ่ม ฟังสบาย", voice: "device", rate: 0.98, pitch: 1, instructions: "Speak Thai with a warm, calm, friendly adult voice. Natural pacing, reassuring and clear." },
-  { id: "calm", label: "😌 สงบผ่อนคลาย", description: "ช้า ชัด ฟังง่าย", voice: "device", rate: 0.88, pitch: 0.98, instructions: "Speak Thai slowly and clearly with a peaceful, composed adult voice. Keep pauses natural." },
-  { id: "bright", label: "✨ ร่าเริงสดใส", description: "มีพลังแต่ไม่แหลม", voice: "device", rate: 1.08, pitch: 1.02, instructions: "Speak Thai with upbeat energy and friendly confidence. Keep the delivery natural, crisp, and not rushed." },
-  { id: "special", label: "💜 ที่รักพิเศษ", description: "นุ่มลึก เป็นส่วนตัว", voice: "device", rate: 0.94, pitch: 0.96, instructions: "Speak Thai softly and intimately, warm and sincere, like talking to one person. Avoid theatrical delivery." },
-  { id: "deep", label: "🌙 ลึกหนักแน่น", description: "ต่ำ มั่นคง ชัดเจน", voice: "device", rate: 0.9, pitch: 0.86, instructions: "Speak Thai with a grounded, confident adult voice. Calm, low, precise, and authoritative without sounding harsh." },
 ];
 
 export type VoiceSettings = {
@@ -110,7 +67,9 @@ function saveSettings() {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem("bossnu-voice-settings", JSON.stringify(settings));
-  } catch {}
+  } catch {
+    // Voice preferences are optional; ignore unavailable local storage.
+  }
 }
 
 function pickThaiVoice() {
@@ -131,10 +90,6 @@ function cleanSpeechText(value: string) {
     .replace(/https?:\/\/\S+/g, "")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function profile() {
-  return VOICE_MODES.find((item) => item.id === settings.mode) ?? VOICE_MODES[1];
 }
 
 function createDeviceUtterance(text: string) {

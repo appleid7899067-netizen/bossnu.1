@@ -18,6 +18,8 @@ test('real runner: persistence, SSE, runtimes, validation, timeout and cancellat
     runner.stdout.on('data', c => { const m = c.toString().match(/listening on :(\d+)/); if (m) { clearTimeout(timer); resolve(m[1]); } });
   });
   const base = `http://127.0.0.1:${port}`;
+  const health = await (await fetch(base + "/health")).json();
+  assert.ok(health.runtimes.includes("python-safe")); assert.equal(health.version, 6);
   // Preserve main's universal-shell contract: language is an optional label.
   for (const language of [undefined, 'javascript', 'custom-toolchain']) {
     const response = await fetch(base + '/execute', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ command: 'printf universal', language }) });
@@ -25,14 +27,31 @@ test('real runner: persistence, SSE, runtimes, validation, timeout and cancellat
     assert.equal(result.status, 'success'); assert.equal(result.stdout, 'universal');
   }
 
-  const post = (path, command, workspace, signal) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'bash', command, workspace }), signal });
-  const execute = async (command, workspace = 'chat_a') => (await post('/execute', command, workspace)).json();
+  const post = (path, command, workspace, signal, language = 'bash', stdin) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language, command, stdin, workspace }), signal });
+  const execute = async (command, workspace = 'chat_a', language = 'bash', stdin) => (await post('/execute', command, workspace, undefined, language, stdin)).json();
   assert.equal((await execute('printf persistent > note.txt')).status, 'success');
   assert.equal((await execute('cat note.txt')).stdout, 'persistent');
   assert.equal((await execute('test ! -e note.txt', 'chat_b')).status, 'success');
   assert.equal((await post('/execute', 'pwd', '../escape')).status, 400);
   const runtimes = await execute('npm --version && git init -q && python3 -c "print(6*7)"');
   assert.equal(runtimes.status, 'success', runtimes.stderr); assert.match(runtimes.stdout, /42/);
+
+  const pythonSource = 'values = [2, 3, 5]\nprint(sum(values))\nprint(input())';
+  const pythonSafe = await execute(pythonSource, 'python_safe', 'python-safe', 'from stdin\n');
+  assert.equal(pythonSafe.status, 'success', pythonSafe.stderr);
+  assert.equal(pythonSafe.stdout, '10\nfrom stdin\n');
+  const deniedImport = await execute('import os\nprint(1)', 'python_safe', 'python-safe');
+  assert.equal(deniedImport.status, 'error'); assert.match(deniedImport.stderr, /Python Safe blocked: Import/);
+  const deniedOpen = await execute('open("python-safe-open-probe", "w")', 'python_safe', 'python-safe');
+  assert.equal(deniedOpen.status, 'error'); assert.match(deniedOpen.stderr, /call to 'open' is not allowed/);
+  assert.equal((await execute('test ! -e python-safe-open-probe', 'python_safe')).status, 'success');
+  const shellProbe = await execute('touch python-safe-shell-probe', 'python_safe', 'python-safe');
+  assert.equal(shellProbe.status, 'error');
+  assert.equal((await execute('test ! -e python-safe-shell-probe', 'python_safe')).status, 'success');
+  const safeStreaming = await post('/execute/stream', 'print(sum([1, 2, 3]))', 'python_safe', undefined, 'python-safe');
+  const safeEvents = (await safeStreaming.text()).split('\n').filter(l => l.startsWith('data:')).map(l => JSON.parse(l.slice(5)));
+  assert.equal(safeEvents.at(-1).result.status, 'success'); assert.equal(safeEvents.at(-1).result.stdout, '6\n');
+
   const streaming = await post('/execute/stream', 'printf first; sleep 0.2; printf second', 'chat_a');
   const events = (await streaming.text()).split('\n').filter(l => l.startsWith('data:')).map(l => JSON.parse(l.slice(5)));
   assert.ok(events.some(e => e.type === 'output' && e.text === 'first'));
