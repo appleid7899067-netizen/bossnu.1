@@ -12,7 +12,7 @@ const CONTEXT_RECENT_MESSAGES = 18;
 const RETRY_DELAYS_MS = [350, 800, 1600];
 
 function compactMessage(message: ChatMessage, maxChars = 1_200) {
-  const content = message.content.replace(/\\s+/g, " ").trim();
+  const content = message.content.replace(/\s+/g, " ").trim();
   return content.length > maxChars ? content.slice(0, maxChars) + "…" : content;
 }
 
@@ -25,10 +25,10 @@ export function manageChatContext(messages: ChatMessage[], budget = CONTEXT_CHAR
   const older = messages.slice(0, -CONTEXT_RECENT_MESSAGES);
   const digest = older.map((message, index) =>
     `[${index + 1}] ${message.role}: ${compactMessage(message)}`,
-  ).join("\\n");
+  ).join("\n");
   const digestMessage: ChatMessage = {
     role: "user",
-    content: `CONTEXT DIGEST (older conversation, compressed for context safety):\\n${digest.slice(0, 9_000)}`,
+    content: `CONTEXT DIGEST (older conversation, compressed for context safety):\n${digest.slice(0, 9_000)}`,
   };
   const result = [digestMessage, ...recent];
   let total = result.reduce((sum, message) => sum + message.content.length, 0);
