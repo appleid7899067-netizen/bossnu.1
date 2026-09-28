@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>สนามหลวง — Sandbox Web Console</title>
+    <meta
+      name="description"
+      content="คอนโซลรันโค้ดบนเซิร์ฟเวอร์จริง — แท็บหลายเซสชัน, เทอร์มินัล, ตัวแก้ไขไฟล์, ดูตัวอย่าง dev server"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>▦</text></svg>" />
+  </head>
+  <body data-app="sandbox-console">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">▦</span>
+        <div class="brand-text">
+          <h1>สนามหลวง</h1>
+          <p>Sandbox Web Console — รันโค้ดบนเซิร์ฟเวอร์จริง</p>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <div class="health" id="health" role="status" aria-live="polite">
+          <span class="dot" id="health-dot"></span>
+          <span id="health-text">กำลังตรวจสถานะ…</span>
+        </div>
+        <label class="token-field" for="token">
+          <span class="visually-hidden">Bearer token</span>
+          <input
+            id="token"
+            type="password"
+            placeholder="Bearer token"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </label>
+      </div>
+    </header>
+
+    <div class="tabbar" role="tablist" aria-label="เซสชัน">
+      <div class="tabs" id="tabs"></div>
+      <button class="tab-new" id="tab-new" type="button" title="เปิดเซสชันใหม่">＋</button>
+    </div>
+
+    <main class="console">
+      <aside class="sidebar">
+        <section class="panel">
+          <h2 class="panel-title">เซสชันนี้</h2>
+          <div class="stack">
+            <label class="field">
+              <span>Runtime</span>
+              <select id="language"></select>
+            </label>
+            <label class="field">
+              <span>Workspace</span>
+              <input id="workspace" type="text" placeholder="my_project" autocomplete="off" spellcheck="false" />
+            </label>
+            <label class="field" id="stdin-field" hidden>
+              <span>stdin (python-safe)</span>
+              <textarea id="stdin" rows="2" spellcheck="false" placeholder="ข้อความที่ส่งเข้า input()"></textarea>
+            </label>
+          </div>
+          <div class="actions">
+            <button id="run" class="primary" type="button" title="Ctrl/Cmd + Enter">รัน ▶</button>
+            <button id="stop" type="button" disabled>หยุด</button>
+          </div>
+          <div class="actions secondary">
+            <button id="save-file" type="button" title="เขียนไฟล์จากตัวแก้ไขลง workspace">บันทึกไฟล์</button>
+            <button id="run-dev" type="button" hidden>dev server</button>
+          </div>
+          <div class="actions secondary">
+            <button id="copy-curl" type="button" class="ghost">คัดลอก curl</button>
+            <button id="clear" type="button" class="ghost">ล้างจอ</button>
+          </div>
+        </section>
+
+        <section class="panel grow">
+          <h2 class="panel-title">
+            ไฟล์ใน workspace
+            <button id="files-refresh" type="button" class="mini" title="อ่านรายการไฟล์ใหม่">↻</button>
+          </h2>
+          <p class="hint" id="files-hint">รันคำสั่งสักครั้งเพื่ออ่านรายการไฟล์</p>
+          <div class="tree" id="tree" role="tree" aria-label="ไฟล์ใน workspace"></div>
+        </section>
+      </aside>
+
+      <section class="panes">
+        <div class="pane editor-pane">
+          <div class="pane-head">
+            <span class="pane-title" id="editor-title">main.mjs</span>
+            <span class="pane-meta" id="editor-meta"></span>
+          </div>
+          <div class="editor">
+            <pre class="gutter" id="gutter" aria-hidden="true">1</pre>
+            <textarea id="command" spellcheck="false" wrap="off" aria-label="ตัวแก้ไขโค้ด"></textarea>
+          </div>
+        </div>
+
+        <div class="pane terminal-pane">
+          <div class="pane-head">
+            <span class="pane-title">เทอร์มินัล</span>
+            <span class="pill" id="status-pill">idle</span>
+            <span class="pane-meta" id="meta"></span>
+          </div>
+          <pre id="output" class="output" tabindex="0" aria-live="polite"></pre>
+          <form class="prompt" id="prompt-form">
+            <span class="prompt-label" id="prompt-label">~/project $</span>
+            <input id="prompt" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="พิมพ์คำสั่ง shell" />
+          </form>
+        </div>
+      </section>
+
+      <section class="preview" id="preview-box" hidden>
+        <div class="pane-head">
+          <span class="pane-title">ตัวอย่างหน้าเว็บ</span>
+          <span class="pane-meta" id="preview-meta"></span>
+          <button id="preview-reload" type="button" class="mini" title="โหลดใหม่">↻</button>
+          <a id="preview-open" href="#" target="_blank" rel="noopener" class="mini">เปิดแท็บใหม่ ↗</a>
+          <button id="preview-close" type="button" class="mini" title="ปิด">✕</button>
+        </div>
+        <iframe id="preview-frame" title="ตัวอย่างหน้าเว็บจาก dev server" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+      </section>
+    </main>
+
+    <footer class="statusbar">
+      <span id="status-left">พร้อมใช้งาน — ใส่ token แล้วกด รัน</span>
+      <span id="limits"></span>
+    </footer>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

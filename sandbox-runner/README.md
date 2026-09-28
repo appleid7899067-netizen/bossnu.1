@@ -45,6 +45,10 @@ Python Safe uses source as `command` and optional program input as `stdin`:
 - One execution at a time per workspace; concurrent requests get `workspace_busy`.
 - Shell cwd starts at the workspace root every run. `cd` and exported variables
   do not survive; files do. Existing `WORKSPACE_REPO` is cloned on first use only.
+- `RUNNER_TOKEN`: required shared secret. `/execute` and `/execute/stream` answer
+  `401 unauthorized` unless the request carries `Authorization: Bearer $RUNNER_TOKEN`;
+  with the variable unset every execution is refused. `/health` and `/preview/*`
+  stay open. The web app sends it from its own server-side `SANDBOX_RUNNER_TOKEN`.
 - `WORKSPACE_ROOT` defaults to `/tmp/bossnu-workspaces`. Idle workspaces expire
   after `WORKSPACE_TTL_MS` (default 24h), swept once per minute. Persistence is
   local to one runner: redeploys/restarts with ephemeral disks can lose files;

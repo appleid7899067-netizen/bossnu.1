@@ -1,5 +1,9 @@
 import { assessSandboxRisk } from "@/lib/sandbox/detect";
-import { PYTHON_SAFE_RUNNER_ERROR, runnerSupportsPythonSafe } from "@/lib/sandbox/runner-capabilities";
+import {
+  PYTHON_SAFE_RUNNER_ERROR,
+  RUNNER_NOT_READY_ERROR,
+  probeRunnerHealth,
+} from "@/lib/sandbox/runner-capabilities";
 import { loadSeed, publicRunnerResult, runnerBody, syncRunnerResult } from "@/lib/workspace/sync.server";
 import { describeEvidence } from "@/lib/workspace/snapshot";
 /**
@@ -25,7 +29,6 @@ import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
 import { listSkills, loadSkill, suggestSkills } from "@/lib/sandbox/skills.server";
 import {
   CommandRequestSchema,
-  DEFAULT_SANDBOX_RUNNER_URL,
   RUNNER_RUNTIMES,
   SANDBOX_LIMITS,
   isRunnerRuntime,
@@ -36,26 +39,9 @@ import {
   type SkillContent,
   type SkillsListResponse,
 } from "@/types/sandbox";
+import { runnerAuthHeaders, runnerConfig } from "@/lib/sandbox/runner-config.server";
 
 const MAX_BODY_BYTES = 256 * 1024;
-const DEFAULT_RUNNER_TIMEOUT_MS = 140_000;
-
-// ---------------------------------------------------------------------------
-// Runner configuration
-// ---------------------------------------------------------------------------
-
-function runnerConfig(): { url: string; source: "env" | "default"; timeoutMs: number } {
-  const fromEnv =
-    process.env.SANDBOX_RUNNER_URL?.trim() ||
-    process.env.VITE_SANDBOX_RUNNER_URL?.trim() ||
-    (import.meta.env.VITE_SANDBOX_RUNNER_URL as string | undefined)?.trim();
-  const timeout = Number(process.env.SANDBOX_RUNNER_TIMEOUT_MS);
-  return {
-    url: (fromEnv || DEFAULT_SANDBOX_RUNNER_URL).replace(/\/+$/, ""),
-    source: fromEnv ? "env" : "default",
-    timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : DEFAULT_RUNNER_TIMEOUT_MS,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Response helpers
@@ -186,12 +172,23 @@ async function runOnRunner(
   const runner = runnerConfig();
   steps.push(`ส่งไปรันที่ Sandbox Runner (${runtime})`);
   const started = Date.now();
-  if (runtime === "python-safe" && !(await runnerSupportsPythonSafe(runner.url, signal))) {
-    steps.push("Runner ไม่รองรับ Python (Safe); ไม่ได้ส่งโค้ดไปประมวลผล");
-    return {
-      httpStatus: 503,
-      result: { success: false, status: "error", type: runtime, runtime, label, command, error: PYTHON_SAFE_RUNNER_ERROR, steps },
-    };
+  if (runtime === "python-safe") {
+    // Distinguish "old runner" (never send Python source) from "runner is not
+    // answering" (a sleeping free-tier service answers with an HTML
+    // interstitial) — they need different operator actions.
+    const health = await probeRunnerHealth(runner.url, signal);
+    if (!health.ok) {
+      const error = health.reason === "legacy" ? PYTHON_SAFE_RUNNER_ERROR : RUNNER_NOT_READY_ERROR;
+      steps.push(
+        health.reason === "legacy"
+          ? "Runner ไม่รองรับ Python (Safe); ไม่ได้ส่งโค้ดไปประมวลผล"
+          : `ติดต่อ Runner ไม่ได้ (${health.reason}); ไม่ได้ส่งโค้ดไปประมวลผล`,
+      );
+      return {
+        httpStatus: 503,
+        result: { success: false, status: "error", type: runtime, runtime, label, command, error, steps },
+      };
+    }
   }
   const seed = workspace ? await loadSeed(workspace) : undefined;
   if (seed && !seed.ok) steps.push(`โหลด Workspace จาก Neon ไม่สำเร็จ • ${seed.error}`);
@@ -201,7 +198,7 @@ async function runOnRunner(
   try {
     response = await fetch(`${runner.url}/execute`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...runnerAuthHeaders() },
       body: runnerBody({ language: runtime, command, stdin, workspace, seed }),
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(runner.timeoutMs)]) : AbortSignal.timeout(runner.timeoutMs),
     });
@@ -228,11 +225,28 @@ async function runOnRunner(
     };
   }
 
-  const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!response.ok) {
+  // A platform interstitial (Render's "Application loading" HTML while a
+  // service cold-starts) is not JSON; without this check it surfaces as a
+  // meaningless "exit code ?" failure.
+  const rawBody = await response.text();
+  let data: Record<string, unknown> = {};
+  let bodyIsJson = true;
+  try {
+    const parsed: unknown = rawBody ? JSON.parse(rawBody) : {};
+    if (parsed && typeof parsed === "object") data = parsed as Record<string, unknown>;
+    else bodyIsJson = false;
+  } catch {
+    bodyIsJson = false;
+  }
+  // v6 runners require `Authorization: Bearer $RUNNER_TOKEN`; a bare
+  // "unauthorized" tells the operator nothing about which side is missing it.
+  const authRejected = response.status === 401 || response.status === 403;
+  if (!response.ok || authRejected) {
     steps.push(`Runner ปฏิเสธคำสั่ง (HTTP ${response.status})`);
+    if (authRejected) steps.push("Runner ปฏิเสธการยืนยันตัวตน — ตรวจ SANDBOX_RUNNER_TOKEN ฝั่งเว็บและ RUNNER_TOKEN ฝั่ง Runner");
+    else if (!bodyIsJson) steps.push("Runner ตอบกลับไม่ใช่ JSON — มักเกิดจาก Runner ยังไม่พร้อม/กำลัง cold start");
     return {
-      httpStatus: response.status === 400 ? 400 : 502,
+      httpStatus: authRejected ? 401 : !bodyIsJson ? 503 : response.status === 400 ? 400 : 502,
       result: {
         success: false,
         status: "error",
@@ -240,8 +254,31 @@ async function runOnRunner(
         runtime,
         label,
         command,
-        error:
-          typeof data.error === "string" ? data.error : `Runner ตอบกลับ HTTP ${response.status}`,
+        error: authRejected
+          ? "Sandbox Runner ปฏิเสธการยืนยันตัวตน — ตั้ง SANDBOX_RUNNER_TOKEN ให้ตรงกับ RUNNER_TOKEN ของ Runner"
+          : !bodyIsJson
+            ? RUNNER_NOT_READY_ERROR
+            : typeof data.error === "string" ? data.error : `Runner ตอบกลับ HTTP ${response.status}`,
+        detail: !bodyIsJson ? rawBody.slice(0, 300) : undefined,
+        durationMs: Date.now() - started,
+        steps,
+      },
+    };
+  }
+
+  if (!bodyIsJson) {
+    steps.push(`Runner ตอบกลับ HTTP ${response.status} แต่ไม่ใช่ JSON — มักเกิดจาก Runner ยังไม่พร้อม/กำลัง cold start`);
+    return {
+      httpStatus: 503,
+      result: {
+        success: false,
+        status: "error",
+        type: runtime,
+        runtime,
+        label,
+        command,
+        error: RUNNER_NOT_READY_ERROR,
+        detail: rawBody.slice(0, 300),
         durationMs: Date.now() - started,
         steps,
       },
@@ -391,7 +428,12 @@ async function handleGet(request: Request): Promise<Response> {
     success: true,
     count: skills.length,
     skills,
-    runner: { configured: true, source: runner.source, runtimes: [...RUNNER_RUNTIMES] },
+    runner: {
+      configured: true,
+      source: runner.source,
+      runtimes: [...RUNNER_RUNTIMES],
+      tokenConfigured: runner.tokenConfigured,
+    },
   };
   return json(body);
 }

@@ -78,10 +78,13 @@ test('seed: unsafe paths are rejected', async t => {
   assert.equal(report.rejected.length, 2);
 });
 
+const SYNC_RUNNER_TOKEN = 'sync-test-token';
+const SYNC_AUTH = { authorization: `Bearer ${SYNC_RUNNER_TOKEN}` };
+
 test('real runner v6: create, modify, rename and delete are all visible in the returned snapshot', { timeout: 30000 }, async t => {
   const root = await tmp();
   const runner = spawn(process.execPath, ['sandbox-runner/server.mjs'], {
-    env: { ...process.env, PORT: '0', WORKSPACE_ROOT: root, WORKSPACE_REPO: '', COMMAND_TIMEOUT_MS: '5000' },
+    env: { ...process.env, PORT: '0', WORKSPACE_ROOT: root, WORKSPACE_REPO: '', COMMAND_TIMEOUT_MS: '5000', RUNNER_TOKEN: SYNC_RUNNER_TOKEN },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   t.after(async () => { runner.kill(); await rm(root, { recursive: true, force: true }); });
@@ -93,9 +96,9 @@ test('real runner v6: create, modify, rename and delete are all visible in the r
   const health = await (await fetch(base + '/health')).json();
   assert.equal(health.version, 6);
 
-  const run = async (command, extra = {}) => (await fetch(base + '/execute', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'bash', command, workspace: 'sync_e2e', snapshot: 1, ...extra }) })).json();
+  const run = async (command, extra = {}) => (await fetch(base + '/execute', { method: 'POST', headers: { 'content-type': 'application/json', ...SYNC_AUTH }, body: JSON.stringify({ language: 'bash', command, workspace: 'sync_e2e', snapshot: 1, ...extra }) })).json();
   const stream = async (command, extra = {}) => {
-    const text = await (await fetch(base + '/execute/stream', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'bash', command, workspace: 'sync_e2e', snapshot: 1, ...extra }) })).text();
+    const text = await (await fetch(base + '/execute/stream', { method: 'POST', headers: { 'content-type': 'application/json', ...SYNC_AUTH }, body: JSON.stringify({ language: 'bash', command, workspace: 'sync_e2e', snapshot: 1, ...extra }) })).text();
     return text.split('\n').filter(l => l.startsWith('data:')).map(l => JSON.parse(l.slice(5))).at(-1).result;
   };
   const files = r => Object.fromEntries(r.workspaceSnapshot.files.map(f => [f.path, f.content]));
@@ -116,7 +119,7 @@ test('real runner v6: create, modify, rename and delete are all visible in the r
   assert.deepEqual(files(deleted), { 'project/src/b.txt': 'two' });
   assert.deepEqual(deleted.workspaceSnapshot.paths, ['project/src/b.txt']);
 
-  const legacy = await (await fetch(base + '/execute', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'bash', command: 'true', workspace: 'sync_e2e' }) })).json();
+  const legacy = await (await fetch(base + '/execute', { method: 'POST', headers: { 'content-type': 'application/json', ...SYNC_AUTH }, body: JSON.stringify({ language: 'bash', command: 'true', workspace: 'sync_e2e' }) })).json();
   assert.deepEqual(legacy.workspaceFiles, [{ path: 'project/src/b.txt', content: 'two' }]);
   assert.equal(legacy.workspaceSyncComplete, true);
 });
