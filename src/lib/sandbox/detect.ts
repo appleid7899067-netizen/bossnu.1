@@ -113,13 +113,7 @@ export function detectSandboxInput(input: string): SandboxDetection {
     return withRisk({ runtime: "bash", label: "ตรวจพบ ecosystem command", command: value, confidence: "medium", webPreview: false });
   }
 
-  // Last resort: the main chat may send an arbitrary shell command without
-  // requiring the user to choose a language. The server still enforces limits.
-  if (/^[^\n]{2,32000}$/.test(value) && !/[?؟]$/.test(value)) {
-    return withRisk({ runtime: "bash", label: "คำสั่งทั่วไป / Auto", command: value, confidence: "low", webPreview: false });
-  }
-
-  return { runtime: "unknown", label: "คำสั่งทั่วไป", command: value, confidence: "low", webPreview: false, dangerous: false };
+  return { runtime: "unknown", label: "บทสนทนาปกติ", confidence: "low", webPreview: false, dangerous: false };
 }
 
 
