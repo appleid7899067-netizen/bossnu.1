@@ -38,6 +38,8 @@ export type VoiceSettings = {
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   enabled: true,
   mode: "warm",
+  // Browser/device speech synthesis is the single playback path.
+  // Keep "source" for backwards-compatible saved settings.
   source: "device",
   rate: 1,
   pitch: 1,
@@ -55,7 +57,7 @@ function loadSettings() {
   if (typeof window === "undefined") return;
   try {
     const raw = window.localStorage.getItem("bossnu-voice-settings");
-    if (raw) settings = { ...DEFAULT_VOICE_SETTINGS, ...JSON.parse(raw) };
+    if (raw) settings = { ...DEFAULT_VOICE_SETTINGS, ...JSON.parse(raw), source: "device" };
   } catch {
     settings = DEFAULT_VOICE_SETTINGS;
   }
@@ -66,7 +68,7 @@ loadSettings();
 function saveSettings() {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem("bossnu-voice-settings", JSON.stringify(settings));
+    window.localStorage.setItem("bossnu-voice-settings", JSON.stringify({ ...settings, source: "device" }));
   } catch {
     // Voice preferences are optional; ignore unavailable local storage.
   }
@@ -103,17 +105,9 @@ function createDeviceUtterance(text: string) {
   return utterance;
 }
 
-async function speakPuter(_text: string, _token: number) {
-  // Cloud TTS is intentionally disabled in voice/phone mode.
-  // Voice playback uses the device speech engine only, so no external AI TTS
-  // provider can be invoked from this path.
-  return false;
-}
 async function speakDevice(text: string) {
-  if (!hasSpeech || !settings.enabled || !text.trim()) return;
+  if (!hasSpeech || !settings.enabled || !text.trim()) return false;
   const synth = window.speechSynthesis;
-  // Android Chrome can leave the synthesis engine paused after a long stream.
-  // Always resume before enqueueing and clear a stale paused state.
   try { synth.resume(); } catch {}
   const utterance = createDeviceUtterance(text);
   speaking = true;
@@ -129,7 +123,6 @@ async function speakDevice(text: string) {
     utterance.onerror = done;
     try {
       synth.speak(utterance);
-      // Some mobile engines need a second resume immediately after speak().
       window.setTimeout(() => {
         try { synth.resume(); } catch {}
       }, 40);
@@ -137,12 +130,13 @@ async function speakDevice(text: string) {
       done();
     }
   });
+  return true;
 }
 
 async function speakChunk(text: string, token: number) {
   const cleaned = cleanSpeechText(text);
   if (!cleaned || token !== generation || !settings.enabled) return;
-  if (settings.source === "puter" && await speakPuter(cleaned, token)) return;
+  // Voice/phone mode intentionally uses the browser TTS engine only.
   await speakDevice(cleaned);
 }
 
@@ -175,7 +169,7 @@ export function isVoiceSupported() {
 }
 
 export function getVoiceSettings(): VoiceSettings {
-  return { ...settings };
+  return { ...settings, source: "device" };
 }
 
 export function getAvailableVoices(): { name: string; lang: string }[] {
@@ -185,11 +179,11 @@ export function getAvailableVoices(): { name: string; lang: string }[] {
 
 export function applyVoiceMode(mode: VoiceMode) {
   const preset = VOICE_MODES.find((item) => item.id === mode) ?? VOICE_MODES[1];
-  updateVoiceSettings({ mode, rate: preset.rate, pitch: preset.pitch });
+  updateVoiceSettings({ mode, rate: preset.rate, pitch: preset.pitch, source: "device" });
 }
 
 export function updateVoiceSettings(patch: Partial<VoiceSettings>) {
-  settings = { ...settings, ...patch };
+  settings = { ...settings, ...patch, source: "device" };
   saveSettings();
   if (!settings.enabled) stopVoice();
 }
@@ -217,24 +211,22 @@ export function finishVoice() {
     pending = "";
     return;
   }
-  // Flush every remaining streamed fragment. This is the authoritative
-  // end-of-response path, so a short final fragment can never stay silent.
   void drain(true);
 }
 
 export async function speakNow(text: string) {
   const cleaned = cleanSpeechText(text);
-  if (!cleaned || !settings.enabled) return false;
+  if (!cleaned || !settings.enabled || !hasSpeech) return false;
+
+  // A direct browser utterance is the reliable final fallback on mobile.
+  // Cancel any queued stream fragments first so the answer is never silent
+  // and never spoken twice by stale browser utterances.
   generation += 1;
   pending = "";
-  const token = generation;
-  try {
-    if (hasSpeech) {
-      await speakDevice(cleaned);
-      return true;
-    }
-  } catch {}
-  return false;
+  const synth = window.speechSynthesis;
+  try { synth.cancel(); } catch {}
+  await new Promise((resolve) => window.setTimeout(resolve, 30));
+  return speakDevice(cleaned);
 }
 
 export function stopVoice() {
