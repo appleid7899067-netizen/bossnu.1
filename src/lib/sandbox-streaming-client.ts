@@ -92,10 +92,45 @@ export async function streamSandboxCommand(
   if ((options.stdin?.length ?? 0) > SANDBOX_LIMITS.stdinChars) return errorResult(`stdin ต้องไม่เกิน ${SANDBOX_LIMITS.stdinChars} ตัวอักษร`);
   const timeout = AbortSignal.timeout(options.timeoutMs ?? 150000);
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
-  const response = await (options.fetch ?? fetch)(`${(options.baseUrl ?? "/api/sandbox").replace(/\/+$/, "")}.stream`, {
-    method: "POST", headers: { "content-type": "application/json", accept: "text/event-stream" }, signal,
-    body: JSON.stringify({ cmd: options.type === "python-safe" ? cmd : cmd.trim(), skill, workspace: options.workspace, type: options.type, stdin: options.stdin, allowDangerous: options.allowDangerous }),
+  const base = (options.baseUrl ?? "/api/sandbox").replace(/\/+$/, "");
+  const body = JSON.stringify({
+    cmd: options.type === "python-safe" ? cmd : cmd.trim(),
+    skill, workspace: options.workspace, type: options.type, stdin: options.stdin, allowDangerous: options.allowDangerous,
   });
+
+  // Prefer the streaming endpoint when the server exposes it. Some deployments
+  // only ship the canonical /api/sandbox route, so fall back to its JSON response
+  // instead of turning a valid sandbox into a false "not found" error.
+  let response = await (options.fetch ?? fetch)(`${base}.stream`, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "text/event-stream" },
+    signal,
+    body,
+  });
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (response.status === 404 || !contentType.includes("text/event-stream")) {
+    response = await (options.fetch ?? fetch)(base, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      signal,
+      body,
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      return errorResult(typeof data?.error === "string" ? data.error : `Sandbox API HTTP ${response.status}`);
+    }
+    const data = await response.json().catch(() => null);
+    const parsed = CommandResultSchema.safeParse(data);
+    if (parsed.success) {
+      if (parsed.data.steps) for (const step of parsed.data.steps) onEvent?.({ type: "status", status: step, message: step });
+      if (parsed.data.output) onEvent?.({ type: "output", stream: "stdout", text: parsed.data.output });
+      onEvent?.({ type: "complete", result: parsed.data });
+      return parsed.data;
+    }
+    return errorResult(typeof data?.error === "string" ? data.error : "Sandbox API ตอบข้อมูลไม่ถูกต้อง");
+  }
+
   if (!response.ok || !response.body) {
     const data = await response.json().catch(() => null);
     return errorResult(typeof data?.error === "string" ? data.error : `Sandbox Streaming HTTP ${response.status}`);
