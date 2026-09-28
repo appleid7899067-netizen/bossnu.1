@@ -1,0 +1,25 @@
+# Render Blueprint — deploy Sandbox Web in one click.
+#   Render dashboard → New + → Blueprint → pick this repo → apply.
+# RUNNER_TOKEN is generated per deploy; copy it into the web app's
+# SANDBOX_RUNNER_TOKEN so the app can call this service.
+services:
+  - type: web
+    name: sandbox-web
+    runtime: docker
+    dockerfilePath: ./sandbox-web/Dockerfile
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: RUNNER_TOKEN
+        generateValue: true
+      - key: SERVICE_NAME
+        value: sandbox-web
+      - key: ALLOW_ORIGIN
+        sync: false
+      - key: COMMAND_TIMEOUT_MS
+        value: "120000"
+      - key: MAX_ACTIVE_RUNS
+        value: "2"
+      - key: RATE_LIMIT_MAX
+        value: "30"

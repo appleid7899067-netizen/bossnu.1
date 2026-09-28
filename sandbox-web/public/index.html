@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sandbox Web — รันโค้ดบนเซิร์ฟเวอร์จริง</title>
+    <meta name="description" content="บริการแซนด์บ็อก standalone: ยิง API รัน bash / Node / Python / Python (Safe) / Go / Rust / Java / C++ พร้อม workspace ถาวรและ SSE live output" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23111'/%3E%3Cpath d='M9 11l5 5-5 5M17 21h7' stroke='%2359ffa4' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">▚</span>
+        <div>
+          <h1>Sandbox Web</h1>
+          <p class="tagline">ยิง API → รันจริงบนเซิร์ฟเวอร์ • workspace ถาวร • live output</p>
+        </div>
+      </div>
+      <div class="health" id="health" role="status" aria-live="polite">
+        <span class="dot" id="health-dot"></span>
+        <span id="health-text">กำลังตรวจสถานะ…</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel editor-panel" aria-label="คำสั่ง">
+        <div class="row">
+          <label class="field">
+            <span>Runtime</span>
+            <select id="language">
+              <option value="bash">Bash / Shell</option>
+              <option value="node">Node.js</option>
+              <option value="python">Python 3</option>
+              <option value="python-safe">Python (Safe)</option>
+              <option value="go">Go</option>
+              <option value="rust">Rust</option>
+              <option value="java">Java</option>
+              <option value="cpp">C++</option>
+            </select>
+          </label>
+          <label class="field grow">
+            <span>Workspace <em>(เว้นว่าง = ใช้ครั้งเดียวทิ้ง)</em></span>
+            <input id="workspace" type="text" placeholder="my_project" autocomplete="off" spellcheck="false" />
+          </label>
+        </div>
+
+        <label class="field grow">
+          <span id="command-label">คำสั่ง / โค้ด</span>
+          <textarea id="command" rows="12" spellcheck="false" placeholder="echo สวัสดีจากแซนด์บ็อก"></textarea>
+        </label>
+
+        <label class="field" id="stdin-field" hidden>
+          <span>stdin ของโปรแกรม (Python Safe)</span>
+          <textarea id="stdin" rows="3" spellcheck="false" placeholder="ข้อความที่ส่งเข้า input()"></textarea>
+        </label>
+
+        <label class="field">
+          <span>Bearer token <em>(RUNNER_TOKEN ของเซิร์ฟเวอร์ — เก็บในเครื่องคุณเท่านั้น)</em></span>
+          <input id="token" type="password" placeholder="วาง token เพื่อเริ่มรัน" autocomplete="off" spellcheck="false" />
+        </label>
+
+        <div class="actions">
+          <button id="run" class="primary" type="button">รัน ▶</button>
+          <button id="stop" type="button" disabled>หยุด</button>
+          <button id="clear" type="button">ล้างจอ</button>
+          <span class="spacer"></span>
+          <button id="copy-curl" type="button" class="ghost">คัดลอก curl</button>
+        </div>
+      </section>
+
+      <section class="panel output-panel" aria-label="ผลลัพธ์">
+        <div class="output-head">
+          <span id="status-pill" class="pill">idle</span>
+          <span id="meta" class="meta"></span>
+        </div>
+        <pre id="output" class="output" tabindex="0"></pre>
+        <details class="files" id="files-box" hidden>
+          <summary>ไฟล์ใน workspace (<span id="file-count">0</span>)</summary>
+          <ul id="files"></ul>
+        </details>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div>
+        <strong>API</strong>
+        <code>POST /execute</code> · <code>POST /execute/stream</code> (SSE) · <code>GET /health</code>
+        — ใส่ header <code>authorization: Bearer $RUNNER_TOKEN</code>
+      </div>
+      <div class="hint">
+        Workspace เดียวกันใช้ซ้ำได้ (ไฟล์อยู่ต่อ giữaคำสั่ง) • รันทีละคำสั่งต่อ workspace •
+        <span id="limits"></span>
+      </div>
+    </footer>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
