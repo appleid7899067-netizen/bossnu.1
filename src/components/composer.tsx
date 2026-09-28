@@ -16,16 +16,21 @@ import { ATTACHMENT_ACCEPT, formatBytes, readAttachments } from "@/lib/attachmen
 import { useDictation } from "@/lib/ai/use-dictation";
 import type { ChatAttachment } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import type { PuterModelOption } from "@/lib/ai/models";
 
 export type ToolAction = { id: string; label: string };
 
 export function Composer({
   value, onChange, onSubmit, onStop, placeholder, disabled, busy, extra,
+  selectedModel, modelOptions, onModelChange,
   contextualActions, onContextAction, voiceEnabled, onToggleVoice,
   toolActions, activeTool, onToolAction,
   attachments, onAttachments, inputRef, dictation = true,
 }: {
   value: string;
+  selectedModel?: string;
+  modelOptions?: PuterModelOption[];
+  onModelChange?: (model: string) => void;
   onChange: (next: string) => void;
   onSubmit: () => void;
   onStop?: () => void;
@@ -260,6 +265,24 @@ export function Composer({
             </div>
           ) : null}
           <div className="min-w-0">{extra}</div>
+          {modelOptions?.length && onModelChange ? (
+            <label className="min-w-0 max-w-[10rem] shrink">
+              <span className="sr-only">เลือกโมเดล AI</span>
+              <select
+                value={selectedModel ?? modelOptions[0].id}
+                onChange={(e) => onModelChange(e.target.value)}
+                disabled={busy}
+                title="เลือกโมเดล Puter"
+                className="h-9 max-w-full rounded-xl bg-clay px-2 text-[11px] font-medium text-muted outline-none transition-colors hover:text-fg focus:ring-1 focus:ring-primary disabled:opacity-50"
+              >
+                {modelOptions.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.label} · {model.role}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           {dictation && speech.supported ? (
             <button
               type="button"
