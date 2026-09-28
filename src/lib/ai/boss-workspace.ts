@@ -4,6 +4,8 @@ export { BOSS_WORKSPACE_DEFAULT_FILES, BOSS_WORKSPACE_TREE, formatWorkspaceConte
 
 const MAX_PATH = 300;
 const MAX_CONTENT = 200_000;
+const VERIFIED_SKILL_PREFIX = "skills/verified/";
+const PERSISTENT_SKILL_PREFIX = "project/skills/verified/";
 
 export type WorkspaceFile = {
   path: string;
@@ -18,6 +20,7 @@ export type WorkspaceMemory = {
   updatedAt: string;
 };
 
+/** Verified skills are logically exposed at skills/verified/* but are persisted under project/. */
 export function safePath(input: string): string {
   let path = input.trim().split(String.fromCharCode(92)).join("/");
   while (path.startsWith("/")) path = path.slice(1);
@@ -25,6 +28,7 @@ export function safePath(input: string): string {
   const parts = path.split("/");
   if (parts.some(part => !part || part === "." || part === "..")) throw new Error("Invalid workspace path");
   if (parts[0] === ".git") throw new Error("Workspace cannot write .git");
+  if (path.startsWith(VERIFIED_SKILL_PREFIX)) path = PERSISTENT_SKILL_PREFIX + path.slice(VERIFIED_SKILL_PREFIX.length);
   return path;
 }
 
@@ -36,8 +40,6 @@ export function safeContent(content: string): string {
 export async function ensureBossWorkspace(id: string, name = "Boss Workspace") {
   const workspaceId = safeWorkspaceId(id);
   const sql = await getSql();
-  // Defaults are seeded only when the workspace is first created. Re-adding
-  // them on every call would resurrect files the sandbox deliberately deleted.
   const created = await sql<{ id: string }>`
     INSERT INTO boss_workspaces (id, name)
     VALUES (${workspaceId}, ${name.slice(0, 120)})
@@ -111,7 +113,6 @@ export async function listProjectFiles(id: string, limit = 5000): Promise<Worksp
   `;
 }
 
-/** Move a file to a new path, keeping the row (rename detected in the sandbox). */
 export async function renameWorkspaceFile(id: string, from: string, to: string, content: string) {
   const workspaceId = safeWorkspaceId(id);
   const fromPath = safePath(from);
@@ -201,4 +202,3 @@ export async function updateWorkspaceTask(id: string, taskId: string, status: st
     WHERE id = ${taskId} AND workspace_id = ${workspaceId}
   `;
 }
-
