@@ -5,7 +5,9 @@ import type {
   Conversation,
   MemoryItem,
   PersonalitySettings,
+  QuickPrompt,
   SavedMap,
+  UiSettings,
 } from "./types";
 
 export const BACKUP_VERSION = 1;
@@ -17,6 +19,8 @@ export type BackupState = {
   memory: MemoryItem[];
   personality?: Partial<PersonalitySettings>;
   builderProject?: BuilderProject | null;
+  ui?: Partial<UiSettings>;
+  quickPrompts?: QuickPrompt[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -96,7 +100,14 @@ export function parseBackup(
     isRecord(data.builderProject) && Array.isArray(data.builderProject.files)
       ? (data.builderProject as BuilderProject)
       : null;
-  return { ok: true, state: { conversations, maps, memory, personality, builderProject } };
+  const ui = isRecord(data.ui) ? (data.ui as Partial<UiSettings>) : undefined;
+  const quickPrompts = Array.isArray(data.quickPrompts)
+    ? data.quickPrompts.filter(
+        (p): p is QuickPrompt =>
+          isRecord(p) && typeof p.id === "string" && typeof p.title === "string" && typeof p.prompt === "string",
+      )
+    : [];
+  return { ok: true, state: { conversations, maps, memory, personality, builderProject, ui, quickPrompts } };
 }
 
 /** Formats a conversation as a readable Markdown document. */

@@ -5,6 +5,22 @@ import appCss from "../styles.css?url";
 
 const APP_NAME = "Lumina";
 
+/**
+ * Applies the persisted appearance (theme / accent / font / motion) before the
+ * first paint so dark-mode users never see a light flash while React hydrates.
+ * Must stay tiny and dependency-free — it runs before hydration.
+ */
+const APPEARANCE_BOOT = `(function(){var d=document.documentElement;d.dataset.theme="dark";d.dataset.accent="violet";d.dataset.font="normal";d.dataset.motion="on";
+try{var s=JSON.parse(localStorage.getItem("bossnu-silelo-v1")||"{}").state||{};
+var ui=s.ui||{},p=s.personality||{};
+var theme=ui.theme||(p.darkMode===false?"light":"dark");
+if(theme==="system")theme=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
+d.dataset.theme=theme;d.style.colorScheme=theme;
+if(ui.accent)d.dataset.accent=ui.accent;
+if(ui.fontScale)d.dataset.font=ui.fontScale;
+if(ui.animations===false)d.dataset.motion="off";
+}catch(e){}})();`;
+
 export const Route = createRootRoute({
   head: () => ({
     meta: [
@@ -35,11 +51,12 @@ export const Route = createRootRoute({
     ],
   }),
   component: () => (
-    <html lang="en" className="antialiased" suppressHydrationWarning>
+    <html lang="en" className="antialiased" data-theme="dark" data-accent="violet" data-font="normal" data-motion="on" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body className="bg-bg text-fg font-sans">
+        <script dangerouslySetInnerHTML={{ __html: APPEARANCE_BOOT }} />
         <PreviewHostBridge />
         <AuthProvider>
           <Outlet />

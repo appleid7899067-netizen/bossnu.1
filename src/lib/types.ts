@@ -17,6 +17,13 @@ export type StudioImage = { id: string; prompt: string; url: string; aspect: str
 export type BuilderFile = { path: string; content: string; };
 export type BuilderProject = { id: string; title: string; description: string; entry: string; files: BuilderFile[]; updatedAt: number; };
 export type PersonalitySettings = { name: string; tone: string; actFirst: boolean; thaiFirst: boolean; warm: boolean; autoSandbox: boolean; darkMode: boolean; };
+/** Appearance preferences — theme, accent, density and motion, persisted with the rest of the app. */
+export type ThemeMode = "light" | "dark" | "system";
+export type AccentId = "blue" | "violet" | "rose" | "emerald" | "amber" | "sky";
+export type FontScale = "compact" | "normal" | "large";
+export type UiSettings = { theme: ThemeMode; accent: AccentId; fontScale: FontScale; animations: boolean };
+/** A saved reusable prompt shown in the composer's prompt library. */
+export type QuickPrompt = { id: string; title: string; prompt: string; createdAt: number; };
 export type AgentSkill = { id: string; name: string; description: string; enabled: boolean; };
 export type AgentProfile = { id: string; name: string; role: string; instructions: string; skills: string[]; createdAt: number; };
 export type MemoryItem = { id: string; content: string; createdAt: number; };

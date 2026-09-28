@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ClipboardEvent,
@@ -9,12 +10,12 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { ArrowUp, Check, FileText, Mic, Paperclip, Square, Sparkles, Volume2, VolumeX, Wrench, X } from "lucide-react";
+import { ArrowUp, BookMarked, Check, FileText, Mic, Paperclip, Search, Square, Sparkles, Volume2, VolumeX, Wrench, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ATTACHMENT_ACCEPT, formatBytes, readAttachments } from "@/lib/attachments";
 import { useDictation } from "@/lib/ai/use-dictation";
-import type { ChatAttachment } from "@/lib/types";
+import type { ChatAttachment, QuickPrompt } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { PuterModelOption } from "@/lib/ai/models";
 
@@ -25,7 +26,7 @@ export function Composer({
   selectedModel, modelOptions, onModelChange,
   contextualActions, onContextAction, voiceEnabled, onToggleVoice,
   toolActions, activeTool, onToolAction,
-  attachments, onAttachments, inputRef, dictation = true,
+  attachments, onAttachments, inputRef, dictation = true, quickPrompts, onInsertPrompt,
 }: {
   value: string;
   selectedModel?: string;
@@ -52,17 +53,31 @@ export function Composer({
   inputRef?: RefObject<HTMLTextAreaElement | null>;
   /** Show the speech-to-text microphone button when the browser supports it. */
   dictation?: boolean;
+  /** Saved prompt library entries; renders the library button when non-empty. */
+  quickPrompts?: QuickPrompt[];
+  /** Called with the prompt text picked from the library (appended to the draft). */
+  onInsertPrompt?: (prompt: string) => void;
 }) {
   const ownRef = useRef<HTMLTextAreaElement>(null);
   const ref = inputRef ?? ownRef;
   const fileRef = useRef<HTMLInputElement>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
+  const libraryRef = useRef<HTMLDivElement>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryQuery, setLibraryQuery] = useState("");
   const [dragging, setDragging] = useState(false);
   const dictationBase = useRef("");
   const canAttach = Boolean(onAttachments);
   const files = attachments ?? [];
   const hasContent = Boolean(value.trim()) || files.length > 0;
+
+  const filteredPrompts = useMemo(() => {
+    const q = libraryQuery.trim().toLowerCase();
+    const list = quickPrompts ?? [];
+    if (!q) return list;
+    return list.filter((p) => p.title.toLowerCase().includes(q) || p.prompt.toLowerCase().includes(q));
+  }, [quickPrompts, libraryQuery]);
 
   const speech = useDictation(
     (transcript) => onChange([dictationBase.current, transcript].filter(Boolean).join(dictationBase.current ? " " : "")),
@@ -89,6 +104,20 @@ export function Composer({
       document.removeEventListener("keydown", onKey);
     };
   }, [toolsOpen]);
+
+  useEffect(() => {
+    if (!libraryOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!libraryRef.current?.contains(event.target as Node)) setLibraryOpen(false);
+    };
+    const onKey = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") { setLibraryOpen(false); setLibraryQuery(""); } };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [libraryOpen]);
 
   function handleSubmit(e?: FormEvent) {
     e?.preventDefault();
@@ -245,7 +274,7 @@ export function Composer({
                 ) : null}
               </button>
               {toolsOpen ? (
-                <div role="menu" className="absolute bottom-12 left-0 z-30 w-72 overflow-hidden rounded-2xl border border-border bg-elevated p-1.5 shadow-2xl">
+                <div role="menu" className="anim-pop absolute bottom-12 left-0 z-30 w-72 overflow-hidden rounded-2xl border border-border bg-elevated p-1.5 shadow-2xl">
                   <p className="px-2.5 pt-1.5 pb-1 text-[0.7rem] font-medium tracking-[0.08em] text-subtle uppercase">เครื่องมือ</p>
                   {toolActions.map((tool) => (
                     <button
@@ -260,6 +289,60 @@ export function Composer({
                       {activeTool === tool.id ? <Check className="size-4 shrink-0 text-primary" /> : null}
                     </button>
                   ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {quickPrompts?.length && onInsertPrompt ? (
+            <div ref={libraryRef} className="relative shrink-0">
+              <button
+                type="button"
+                aria-label="คลังพรอมป์"
+                aria-haspopup="menu"
+                aria-expanded={libraryOpen}
+                title="คลังพรอมป์ที่บันทึกไว้"
+                onClick={() => { setLibraryOpen((open) => !open); setLibraryQuery(""); }}
+                className={cn(
+                  "grid size-10 place-items-center rounded-xl text-muted transition-colors hover:bg-hover hover:text-fg",
+                  libraryOpen && "bg-primary/10 text-primary",
+                )}
+              >
+                <BookMarked className="size-4" />
+              </button>
+              {libraryOpen ? (
+                <div role="menu" aria-label="คลังพรอมป์" className="anim-pop absolute bottom-12 left-0 z-30 w-80 overflow-hidden rounded-2xl border border-border bg-elevated p-1.5 shadow-2xl">
+                  <p className="px-2.5 pt-1.5 pb-1 text-[0.7rem] font-medium tracking-[0.08em] text-subtle uppercase">คลังพรอมป์ • {quickPrompts.length}</p>
+                  {quickPrompts.length > 4 ? (
+                    <label className="relative mx-1 mb-1 block">
+                      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-subtle" aria-hidden="true" />
+                      <input
+                        autoFocus
+                        type="search"
+                        value={libraryQuery}
+                        onChange={(e) => setLibraryQuery(e.target.value)}
+                        placeholder="ค้นหาพรอมป์…"
+                        aria-label="ค้นหาพรอมป์"
+                        className="h-9 w-full rounded-xl bg-clay pr-2 pl-8 text-sm outline-none placeholder:text-subtle focus:ring-1 focus:ring-primary/40"
+                      />
+                    </label>
+                  ) : null}
+                  <div className="max-h-72 overflow-y-auto">
+                    {filteredPrompts.length === 0 ? (
+                      <p className="px-2.5 py-4 text-center text-xs text-subtle">ไม่พบพรอมป์ที่ตรงกับ “{libraryQuery.trim()}”</p>
+                    ) : filteredPrompts.map((prompt) => (
+                      <button
+                        key={prompt.id}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { onInsertPrompt(prompt.prompt); setLibraryOpen(false); setLibraryQuery(""); ref.current?.focus(); }}
+                        className="w-full rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-hover"
+                      >
+                        <span className="block truncate text-sm font-medium text-fg">{prompt.title}</span>
+                        <span className="mt-0.5 block line-clamp-1 text-xs text-muted">{prompt.prompt}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="border-t border-border px-2.5 py-1.5 text-[10px] text-subtle">เพิ่ม/แก้ไขพรอมป์ได้ที่ ตั้งค่า → คลังพรอมป์</p>
                 </div>
               ) : null}
             </div>
@@ -315,7 +398,18 @@ export function Composer({
                 <Square className="size-3.5 fill-current" />
               </Button>
             ) : (
-              <Button type="submit" size="icon" variant="primary" aria-label="ส่ง" disabled={disabled || !hasContent} className="size-11 rounded-full">
+              <Button
+                type="submit"
+                size="icon"
+                variant="primary"
+                aria-label="ส่ง"
+                disabled={disabled || !hasContent}
+                className={cn(
+                  "accent-gradient size-11 rounded-full border-0 text-primary-fg shadow-lg transition-all duration-200",
+                  "enabled:hover:scale-105 enabled:active:scale-95",
+                  hasContent && "glow-breathe",
+                )}
+              >
                 <ArrowUp className="size-5" strokeWidth={2.4} />
               </Button>
             )}
