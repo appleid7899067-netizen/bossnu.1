@@ -183,8 +183,12 @@ export async function runAgentLoop(opts: {
       }
     };
 
+    const environmentRule = count === 0 && !opts.priorResult
+      ? "Environment-first: if this task depends on runtime, dependencies, files, tools, versions, ports, or configuration, inspect the real environment with one narrow read-only command before making changes. Never print secrets."
+      : "Environment state is already observed for this task; use the latest real result as evidence and adapt only when needed.";
     const agentContext = [
-      "Agent Core: CowAgent-style operating loop (Plan → Act → Run → Observe → Verify → Fix → Answer).",
+      "Agent Core: CowAgent-style operating loop (Inspect Environment → Plan → Act → Run → Observe → Verify → Fix → Answer).",
+      environmentRule,
       workspaceContext,
       "Goal: " + goal.slice(0, 1000),
       "Active skills: " + (selectedSkills.map(skill => skill.name).join(", ") || "General"),
