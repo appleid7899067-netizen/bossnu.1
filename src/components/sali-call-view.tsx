@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Phone, PhoneOff, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { streamChat } from "@/lib/ai/stream";
-import { finishVoice, speakRealtime, stopVoice } from "@/lib/ai/voice";
+import { finishVoice, speakNow, speakRealtime, stopVoice } from "@/lib/ai/voice";
 import type { ChatMessage } from "@/lib/types";
 
 type CallMessage = { id: string; text: string; role: "user" | "assistant" };
@@ -91,11 +91,20 @@ export function SaliCallView({ history, onClose, onSaveMessage }: {
         messages: prior,
         mode: "instant",
         onEvent: (event) => {
-          if (event.type === "text") { reply += event.text; speakRealtime(event.text); }
+          if (event.type === "text") {
+            reply += event.text;
+            // Keep streaming voice for responsive playback.
+            speakRealtime(event.text);
+          }
           if (event.type === "done") finishVoice();
         },
       });
-      if (reply.trim()) addMessage("assistant", reply);
+      if (reply.trim()) {
+        addMessage("assistant", reply);
+        // Mobile speech engines can drop tiny streamed chunks. Flush the
+        // complete final answer as a reliable fallback if synthesis is idle.
+        await speakNow(reply);
+      }
       setStatus("สลี่ฟังอยู่ค่ะ พูดได้เลย");
     } catch {
       stopVoice();
@@ -120,12 +129,7 @@ export function SaliCallView({ history, onClose, onSaveMessage }: {
     addMessage("assistant", greeting);
     await new Promise((resolve) => setTimeout(resolve, 250));
     setSpeaking(true);
-    await new Promise<void>((resolve) => {
-      const utterance = new SpeechSynthesisUtterance(greeting);
-      utterance.lang = "th-TH"; utterance.rate = 1; utterance.pitch = 1.3; utterance.volume = 1;
-      utterance.onend = () => resolve(); utterance.onerror = () => resolve();
-      window.speechSynthesis.speak(utterance);
-    });
+    await speakNow(greeting);
     setSpeaking(false); setStatus("สลี่ฟังอยู่ค่ะ พูดได้เลย"); startRecognition();
   }
 
