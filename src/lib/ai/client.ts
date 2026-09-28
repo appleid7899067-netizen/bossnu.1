@@ -3,6 +3,63 @@ import type { MindMapData } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
 import { getPuterModel } from "./models";
 
+
+
+type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+
+const CONTEXT_CHAR_BUDGET = 48_000;
+const CONTEXT_RECENT_MESSAGES = 18;
+const RETRY_DELAYS_MS = [350, 800, 1600];
+
+function compactMessage(message: ChatMessage, maxChars = 1_200) {
+  const content = message.content.replace(/\\s+/g, " ").trim();
+  return content.length > maxChars ? content.slice(0, maxChars) + "…" : content;
+}
+
+/** Keep the system prompt and the newest turns intact while compressing older turns.
+ * This prevents long mobile sessions from eventually sending the entire transcript.
+ */
+export function manageChatContext(messages: ChatMessage[], budget = CONTEXT_CHAR_BUDGET): ChatMessage[] {
+  if (messages.length <= CONTEXT_RECENT_MESSAGES) return messages;
+  const recent = messages.slice(-CONTEXT_RECENT_MESSAGES);
+  const older = messages.slice(0, -CONTEXT_RECENT_MESSAGES);
+  const digest = older.map((message, index) =>
+    `[${index + 1}] ${message.role}: ${compactMessage(message)}`,
+  ).join("\\n");
+  const digestMessage: ChatMessage = {
+    role: "user",
+    content: `CONTEXT DIGEST (older conversation, compressed for context safety):\\n${digest.slice(0, 9_000)}`,
+  };
+  const result = [digestMessage, ...recent];
+  let total = result.reduce((sum, message) => sum + message.content.length, 0);
+  while (result.length > 2 && total > budget) {
+    const index = result.length - CONTEXT_RECENT_MESSAGES - 1;
+    if (index < 0) break;
+    total -= result[index].content.length;
+    result.splice(index, 1);
+  }
+  return result;
+}
+
+function isRetryablePuterError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /(timeout|timed out|network|fetch|502|503|504|429|rate limit|temporar|overloaded|gateway|connection reset|failed to fetch)/i.test(message);
+}
+
+async function withPuterRetry<T>(operation: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts - 1 || !isRetryablePuterError(error)) throw error;
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS_MS[attempt] ?? RETRY_DELAYS_MS.at(-1)!));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
 const MIND_SCHEMA_HINT = `
 Return ONLY valid JSON with this shape:
 {"topic":"string","summary":"string","branches":[{"id":"string","label":"string","tone":"sage|ink|clay|sky|sand","children":[{"id":"string","label":"string","note":"string"}]}]}
@@ -86,12 +143,12 @@ export async function generateAppBuilder(input: { request: string; project: impo
       "\nCurrent project: " + input.project.title + "\nExisting files:" + existing +
       "\nUser instruction: " + request +
       "\nIf this is an iteration, preserve useful existing behavior and improve it. Return complete replacement files, not patches.";
-    const response = await puter.ai.chat(prompt, {
+    const response = await withPuterRetry(() => puter.ai.chat(prompt, {
       model: "gpt-5.6-luna",
       temperature: 0.35,
       max_tokens: 9000,
       normalize: true,
-    });
+    }));
     const raw = String((response as { message?: { content?: unknown } }).message?.content ?? response);
     const clean = raw.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
     const parsed = JSON.parse(clean) as import("@/lib/types").BuilderProject;
