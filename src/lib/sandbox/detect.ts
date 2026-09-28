@@ -92,6 +92,20 @@ export function detectSandboxInput(input: string): SandboxDetection {
     } catch { /* intentionally ignored */ }
   }
 
+  // Code-only payloads are execution intent even without words like "run".
+  if (/^\s*\`{3,}[\\s\\S]*\`{3,}\s*$/.test(value)) {
+    return { runtime: "node", label: "Code", code: value, confidence: "high", webPreview: false, dangerous: false };
+  }
+  if (/^(?:print\\s*\\(|def\\s+\\w+\\s*\\(|class\\s+\\w+\\s*[:(]|import\\s+\\w+|from\\s+\\w+\\s+import\\s+)/m.test(value)) {
+    return { runtime: "python", label: "Python Code", code: value, confidence: "high", webPreview: false, dangerous: false };
+  }
+  if (/^(?:#!\\/usr\\/bin\\/env\\s+(?:bash|sh)|set\\s+-[eux]+|echo\\s+|cd\\s+[^\\n]+\\n|cat\\s+>)/m.test(value)) {
+    return withRisk({ runtime: "bash", label: "Shell Code", command: value, confidence: "high", webPreview: false });
+  }
+  if (/^(?:const|let|var|function|class|interface|type)\\s+/m.test(value) || /(?:console\\.log|document\\.|window\\.)/.test(value)) {
+    return { runtime: "node", label: "JavaScript / TypeScript Code", code: value, confidence: "high", webPreview: false, dangerous: false };
+  }
+
   const command = commandDetection(value);
   if (command) return command;
 
@@ -106,4 +120,14 @@ export function detectSandboxInput(input: string): SandboxDetection {
   }
 
   return { runtime: "unknown", label: "คำสั่งทั่วไป", command: value, confidence: "low", webPreview: false, dangerous: false };
+}
+
+
+export function hasExplicitExecutionIntent(input: string): boolean {
+  return /(?:^|\s)(?:รัน|run|execute|ทดสอบ|test|debug|ดีบัก|สร้าง|create|แก้(?:ไข)?|แก้โค้ด|ติดตั้ง|install|deploy|build|compile|ตรวจระบบ|ตรวจจริง|เช็กระบบ|เช็คระบบ|เปิดเว็บ|start|serve|commit|push|แก้ปัญหา|ซ่อม|repair)(?:\s|$)/iu.test(input.normalize("NFKC"));
+}
+
+export function shouldExecuteSandboxInput(input: string, detection = detectSandboxInput(input)): boolean {
+  if (hasExplicitExecutionIntent(input)) return true;
+  return detection.confidence === "high" && (Boolean(detection.command) || Boolean(detection.code));
 }
