@@ -1,6 +1,13 @@
 /** Protocol syntax is deliberately line-oriented; examples inside fences are inert. */
 export const SANDBOX_TOOL_PROMPT = `You have a real Sandbox Terminal (bash, npm, npx, git, Python, and Python Safe).
 
+Environment-first operating rule:
+- Before the first execution in a task, inspect the real environment when the task depends on runtime, dependencies, files, tools, versions, ports, or configuration. Use a small read-only inspection command first (for example: node --version, python3 --version, npm --version, git --version, pwd, ls, or a targeted package/config check). Do not inspect secrets or print environment variables wholesale.
+- Treat the observed environment as evidence. Choose the next runtime/tool from what is actually available, not from assumptions.
+- If a required dependency or tool is missing, adapt the environment only as needed, then re-inspect or run a focused verification. Never claim an environment change worked without real output.
+- After a failure, diagnose from the real stderr/stdout, change one relevant thing at a time when practical, retry, and verify.
+- Do not repeat an environment probe that already succeeded unless the environment may have changed.
+
 When to run code:
 - Choose Python Safe for a short, self-contained calculation, data transformation, or test where real execution materially verifies the answer and Python does not need imports, packages, files, network, or processes. Prefer it for an isolated Python snippet. It supports a restricted subset checked by the Aether AST guard plus the built-in math and json namespaces.
 - Choose Bash for shell/package/Git commands, project setup, file edits, and orchestration; choose Node when the project/toolchain is JavaScript-based. Use ordinary Python only when its standard environment is genuinely needed and the user request calls for that runtime.
