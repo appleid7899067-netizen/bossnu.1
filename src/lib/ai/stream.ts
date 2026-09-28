@@ -24,6 +24,42 @@ export async function ensurePuterSignedIn() {
   return puter;
 }
 
+const CONTEXT_CHAR_BUDGET = 48_000;
+const CONTEXT_RECENT_MESSAGES = 18;
+const RETRY_DELAYS_MS = [350, 800, 1600];
+
+function compactMessage(content: string, maxChars = 1_200) {
+  const clean = content.replace(/\s+/g, " ").trim();
+  return clean.length > maxChars ? clean.slice(0, maxChars) + "…" : clean;
+}
+
+export function manageStreamContext(messages: { role: "user" | "assistant"; content: string }[], budget = CONTEXT_CHAR_BUDGET) {
+  if (messages.length <= CONTEXT_RECENT_MESSAGES) return messages;
+  const recent = messages.slice(-CONTEXT_RECENT_MESSAGES);
+  const older = messages.slice(0, -CONTEXT_RECENT_MESSAGES);
+  const digest = older.map((message, index) => `[${index + 1}] ${message.role}: ${compactMessage(message.content)}`).join("\n");
+  const result = [
+    { role: "user" as const, content: `CONTEXT DIGEST (older conversation, compressed):\n${digest.slice(0, 9_000)}` },
+    ...recent,
+  ];
+  let total = result.reduce((sum, message) => sum + message.content.length, 0);
+  while (result.length > 2 && total > budget) {
+    const index = result.length - CONTEXT_RECENT_MESSAGES - 1;
+    if (index < 0) break;
+    total -= result[index].content.length;
+    result.splice(index, 1);
+  }
+  return result;
+}
+
+function isRetryablePuterError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /(timeout|timed out|network|fetch|502|503|504|429|rate limit|temporar|overloaded|gateway|connection reset|failed to fetch)/i.test(message);
+}
+
+async function waitForRetry(attempt: number) {
+  await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS_MS[attempt] ?? 1600));
+}
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
@@ -99,8 +135,13 @@ export async function streamChat(opts: {
       opts.tools ? SANDBOX_TOOL_PROMPT : "โหมดสนทนาปกติ: ตอบด้วย Puter อย่างเดียว ห้ามสร้างหรือเรียก Sandbox, terminal หรือ tool execution",
     ].filter(Boolean).join("\n");
 
-    const response = await puter.ai.chat(
-      [{ role: "system", content: system }, ...opts.messages],
+    const contextMessages = manageStreamContext(opts.messages);
+    let response: Awaited<ReturnType<typeof puter.ai.chat>>;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        response = await puter.ai.chat(
+          [{ role: "system", content: system }, ...contextMessages],
       {
         model: selectedModel,
         stream: true,
@@ -108,8 +149,16 @@ export async function streamChat(opts: {
         max_tokens: opts.mode === "think" ? 2200 : 1400,
         reasoning_effort: opts.mode === "think" ? "medium" : "low",
         normalize: true,
-      },
-    );
+        );
+        lastError = undefined;
+        break;
+      } catch (error) {
+        lastError = error;
+        if (attempt === 2 || !isRetryablePuterError(error)) throw error;
+        await waitForRetry(attempt);
+      }
+    }
+    if (!response!) throw (lastError instanceof Error ? lastError : new Error(String(lastError ?? "Puter request failed.")));
 
     let activeBlock: number | null = null;
     let activeKind: "thinking" | "text" | "tool" | null = null;
