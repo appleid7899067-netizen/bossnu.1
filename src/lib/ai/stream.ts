@@ -78,7 +78,7 @@ export async function streamChat(opts: {
       opts.latestUser ?? [...opts.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     const settings = useAppStore.getState();
     const selectedModel = getPuterModel(opts.model ?? settings.selectedModel).id;
-    const activeSkills = settings.agentSkills.filter((s) => s.enabled || s.id === "sandbox-terminal").map((s) => s.name).join(", ");
+    const activeSkills = settings.agentSkills.filter((s) => s.enabled && (opts.tools || s.id !== "sandbox-terminal")).map((s) => s.name).join(", ");
     const memories = settings.memory.slice(0, 12).map((m) => `- ${m.content}`).join("\n");
     const agent = settings.agentProfiles[0];
     const learnedSkills = settings.learnedSkills.slice(0, 30).map((s) => `- ${s.name} [${s.runtime}] result: ${s.result} | command: ${s.pattern} | evidence: ${s.evidence.slice(0, 240)} | uses: ${s.uses}`).join("\n");
@@ -96,7 +96,7 @@ export async function streamChat(opts: {
       learnedSkills ? `ทักษะจากโค้ดที่เคยทดสอบผ่าน:\n${learnedSkills}` : "ยังไม่มีทักษะโค้ดที่ทดสอบผ่าน",
       "ห้ามอ้างว่าทำสิ่งที่ยังไม่ได้ทำจริง",
       buildSkillContext(latestUser),
-      SANDBOX_TOOL_PROMPT,
+      opts.tools ? SANDBOX_TOOL_PROMPT : "โหมดสนทนาปกติ: ตอบด้วย Puter อย่างเดียว ห้ามสร้างหรือเรียก Sandbox, terminal หรือ tool execution",
     ].filter(Boolean).join("\n");
 
     const response = await puter.ai.chat(
