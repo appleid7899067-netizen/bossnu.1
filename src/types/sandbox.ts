@@ -221,6 +221,7 @@ export const SkillsListResponseSchema = z.object({
     /** Where the runner URL came from. */
     source: z.enum(["env", "default"]),
     runtimes: z.array(z.string()),
+    tokenConfigured: z.boolean().optional(),
   }),
 });
 export type SkillsListResponse = z.infer<typeof SkillsListResponseSchema>;
