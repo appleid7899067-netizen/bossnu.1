@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import type { AgentProfile, AgentSkill, BuilderProject, ChatAttachment, ChatMessage, ChatMode, Conversation, CommandHistoryItem, LearnedSkill, MemoryItem, PersonalitySettings, SavedMap, StudioImage } from "@/lib/types";
 import { titleFromPrompt, uid } from "@/lib/utils";
 import { BACKUP_VERSION, parseBackup } from "@/lib/backup";
+import { DEFAULT_PUTER_MODEL } from "@/lib/ai/models";
 
 export { conversationToMarkdown } from "@/lib/backup";
 
@@ -22,7 +23,7 @@ const defaultAgent:AgentProfile={id:"slii",name:"สลี่",role:"Primary Age
 const defaultPersonality:PersonalitySettings={name:"สลี่",tone:"น่ารัก อ่อนโยน เป็นกันเอง ขี้อ้อนเล็กน้อย แต่ทำงานจริงและกระชับ",actFirst:true,thaiFirst:true,warm:true,autoSandbox:true,darkMode:true};
 
 type AppState={
-conversations:Conversation[]; commandHistory:CommandHistoryItem[]; activeChatId:string|null; maps:SavedMap[]; activeMapId:string|null; images:StudioImage[]; hydrated:boolean;
+conversations:Conversation[]; commandHistory:CommandHistoryItem[]; selectedModel:string; activeChatId:string|null; maps:SavedMap[]; activeMapId:string|null; images:StudioImage[]; hydrated:boolean;
 builderProject:BuilderProject|null; personality:PersonalitySettings; agentSkills:AgentSkill[]; agentProfiles:AgentProfile[]; memory:MemoryItem[]; learnedSkills:LearnedSkill[];
 setHydrated:()=>void; newChat:(mode?:ChatMode)=>string; setActiveChat:(id:string|null)=>void; setChatMode:(id:string,mode:ChatMode)=>void;
 addUserMessage:(chatId:string,content:string,attachments?:ChatAttachment[])=>string; renameChat:(id:string,title:string)=>void; togglePinChat:(id:string)=>void; truncateFrom:(chatId:string,messageId:string)=>void; setBuilderProject:(project:BuilderProject|null)=>void; importBackup:(data:unknown)=>{ok:true;chats:number}|{ok:false;error:string}; resetAll:()=>void; addCommandHistory:(item:Omit<CommandHistoryItem,"id"|"createdAt">)=>string; updateCommandHistory:(id:string,status:CommandHistoryItem["status"])=>void; startAssistant:(chatId:string)=>string; patchAssistant:(chatId:string,messageId:string,patch:Partial<Pick<ChatMessage,"content"|"thinking"|"activities">>)=>void; removeEmptyAssistant:(chatId:string,messageId:string)=>void; deleteMessage:(chatId:string,messageId:string)=>void; deleteChat:(id:string)=>void;
@@ -31,8 +32,8 @@ updatePersonality:(patch:Partial<PersonalitySettings>)=>void; toggleAgentSkill:(
 };
 
 export const useAppStore=create<AppState>()(persist((set)=>({
-conversations:[],commandHistory:[],activeChatId:null,maps:[],activeMapId:null,images:[],builderProject:null,hydrated:false,personality:defaultPersonality,agentSkills:defaultSkills,agentProfiles:[defaultAgent],memory:[],learnedSkills:[],
-setHydrated:()=>set({hydrated:true}),
+conversations:[],commandHistory:[],selectedModel:DEFAULT_PUTER_MODEL,activeChatId:null,maps:[],activeMapId:null,images:[],builderProject:null,hydrated:false,personality:defaultPersonality,agentSkills:defaultSkills,agentProfiles:[defaultAgent],memory:[],learnedSkills:[],
+setHydrated:()=>set({hydrated:true}),setSelectedModel:(model:string)=>set({selectedModel:model}),
 newChat:(mode="instant")=>{const id=uid("chat");const next:Conversation={id,title:"แชตใหม่",mode,messages:[],updatedAt:Date.now()};set(s=>({conversations:[next,...s.conversations].slice(0,MAX_CHATS),activeChatId:id}));return id;},
 setActiveChat:id=>set({activeChatId:id}),setChatMode:(id,mode)=>set(s=>({conversations:s.conversations.map(c=>c.id===id?{...c,mode}:c)})),
 addUserMessage:(chatId,content,attachments)=>{const messageId=uid("msg");set(s=>({conversations:s.conversations.map(c=>{if(c.id!==chatId)return c;const messages=[...c.messages,{id:messageId,role:"user" as const,content,...(attachments?.length?{attachments}:{}),createdAt:Date.now()}].slice(-MAX_MESSAGES);return {...c,title:c.messages.length===0?titleFromPrompt(content||attachments?.[0]?.name||""):c.title,messages,updatedAt:Date.now()};})}));return messageId;},
@@ -63,7 +64,7 @@ importBackup:data=>{
   });
   return {ok:true,chats:parsed.state.conversations.length};
 },
-resetAll:()=>set({conversations:[],commandHistory:[],activeChatId:null,maps:[],activeMapId:null,images:[],builderProject:null,memory:[],learnedSkills:[],personality:defaultPersonality,agentSkills:defaultSkills,agentProfiles:[defaultAgent]}),
+resetAll:()=>set({conversations:[],commandHistory:[],selectedModel:DEFAULT_PUTER_MODEL,activeChatId:null,maps:[],activeMapId:null,images:[],builderProject:null,memory:[],learnedSkills:[],personality:defaultPersonality,agentSkills:defaultSkills,agentProfiles:[defaultAgent]}),
 deleteChat:id=>set(s=>({conversations:s.conversations.filter(c=>c.id!==id),activeChatId:s.activeChatId===id?null:s.activeChatId})),
 addMap:map=>set(s=>({maps:[map,...s.maps].slice(0,MAX_MAPS),activeMapId:map.id})),setActiveMap:id=>set({activeMapId:id}),deleteMap:id=>set(s=>({maps:s.maps.filter(m=>m.id!==id),activeMapId:s.activeMapId===id?null:s.activeMapId})),
 addImage:image=>set(s=>({images:[image,...s.images].slice(0,MAX_IMAGES)})),deleteImage:id=>set(s=>({images:s.images.filter(img=>img.id!==id)})),
@@ -76,7 +77,7 @@ saveLearnedSkill:skill=>set(s=>{
   return {learnedSkills:[{...skill,id:uid("skill"),createdAt:Date.now(),uses:1,lastTestedAt:Date.now()},...s.learnedSkills].slice(0,200)};
 }),
 useLearnedSkill:id=>set(s=>({learnedSkills:s.learnedSkills.map(x=>x.id===id?{...x,uses:x.uses+1}:x)})),
-}),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({conversations:s.conversations,builderProject:s.builderProject,commandHistory:s.commandHistory,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory,learnedSkills:s.learnedSkills}),merge:(persisted,current)=>{const p=(persisted??{}) as Partial<AppState>;return {...current,...p,agentSkills:[...(p.agentSkills??current.agentSkills),...defaultSkills.filter(d=>!(p.agentSkills??current.agentSkills).some(s=>s.id===d.id))],personality:{...current.personality,...(p.personality??{})}};}}));
+}),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({selectedModel:s.selectedModel,conversations:s.conversations,builderProject:s.builderProject,commandHistory:s.commandHistory,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory,learnedSkills:s.learnedSkills}),merge:(persisted,current)=>{const p=(persisted??{}) as Partial<AppState>;return {...current,...p,selectedModel:p.selectedModel??current.selectedModel,agentSkills:[...(p.agentSkills??current.agentSkills),...defaultSkills.filter(d=>!(p.agentSkills??current.agentSkills).some(s=>s.id===d.id))],personality:{...current.personality,...(p.personality??{})}};}}));
 
 export function getConversation(id:string|null){if(!id)return undefined;return useAppStore.getState().conversations.find(c=>c.id===id);}
 
