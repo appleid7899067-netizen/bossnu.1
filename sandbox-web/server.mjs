@@ -59,6 +59,16 @@ const DEV_SESSION_TTL_MS = Number(process.env.DEV_SESSION_TTL_MS || 30 * 60 * 10
 const GUARDED_PYTHON = process.env.GUARDED_PYTHON || join(HERE, "lib", "guarded", "run_guarded.py");
 const PUBLIC_DIR = join(HERE, "public");
 
+/**
+ * Opt-in convenience for hosted demos: when `CONSOLE_DEMO_TOKEN` is set — and
+ * only when it equals the token `/execute*` actually checks — the served
+ * console HTML gets a small boot shim that pre-fills the Bearer field, so a
+ * visitor can run code without being handed a secret out of band. It stays off
+ * by default; a real deployment leaves it unset and keeps the token private.
+ */
+const CONSOLE_DEMO_TOKEN = (process.env.CONSOLE_DEMO_TOKEN || "").trim();
+const DEMO_TOKEN = CONSOLE_DEMO_TOKEN && CONSOLE_DEMO_TOKEN === RUNNER_TOKEN ? CONSOLE_DEMO_TOKEN : "";
+
 const bound = (value, low, high) => Math.min(high, Math.max(low, value));
 const TIMEOUT_MS = bound(Number(process.env.COMMAND_TIMEOUT_MS || 120_000), 1000, 300_000);
 const DEV_TIMEOUT_MS = bound(Number(process.env.DEV_TIMEOUT_MS || 180_000), 1000, 300_000);
@@ -177,6 +187,10 @@ function executionEnv(cwd) {
     npm_config_update_notifier: "false",
     npm_config_progress: "false",
     npm_config_loglevel: "error",
+    // npm otherwise drops its cache and `_logs/*.log` debug files inside the
+    // workspace, where the snapshot picks them up and the console's file tree
+    // shows them as if they were the user's project files.
+    npm_config_cache: join(tmpdir(), "sandbox-web-npm-cache"),
   };
 }
 
@@ -587,7 +601,18 @@ async function serveStatic(req, res, pathname) {
   // Never escape public/ — normalize() alone still allows ../ traversal.
   if (target !== PUBLIC_DIR && !target.startsWith(PUBLIC_DIR + "/")) return send(res, 403, { error: "forbidden" });
   if (!existsSync(target)) return send(res, 404, { error: "not_found" });
-  const body = await readFile(target);
+  let body = await readFile(target);
+  if (target === join(PUBLIC_DIR, "index.html") && DEMO_TOKEN) {
+    // `<` is escaped so a token containing `</script>` cannot close the shim.
+    const shim = `<script>window.__SANDBOX_DEMO_TOKEN__ = ${JSON.stringify(DEMO_TOKEN).replace(/</g, "\\u003c")};</script>\n    `;
+    const html = body.toString("utf8");
+    const at = html.indexOf('<script type="module"');
+    // Fail loudly rather than serve a console whose demo token silently never
+    // arrives because the markup moved.
+    if (at < 0) return send(res, 500, { error: "demo_token_injection_failed" });
+    // String.slice keeps the shim ahead of the module tag, so js/app.js can read it.
+    body = Buffer.from(html.slice(0, at) + shim + html.slice(at), "utf8");
+  }
   res.writeHead(200, { "content-type": MIME[extname(target)] || "application/octet-stream", "cache-control": "no-cache", ...corsHeaders() });
   res.end(body);
 }
@@ -678,3 +703,40 @@ server.listen(PORT, HOST, () => {
   console.log(`[${SERVICE_NAME}] auth: ${RUNNER_TOKEN ? "bearer token required" : "DISABLED (ALLOW_NO_AUTH)"}`);
   console.log(`[${SERVICE_NAME}] workspaces: ${WORKSPACE_ROOT} (ttl ${Math.round(WORKSPACE_TTL_MS / 60000)}m) • timeout ${TIMEOUT_MS}ms • max ${MAX_ACTIVE_RUNS} runs • ${RATE_LIMIT_MAX} req/${Math.round(RATE_LIMIT_WINDOW_MS / 1000)}s per IP`);
 });
+
+// ---------------------------------------------------------------------------
+// Shutdown
+// ---------------------------------------------------------------------------
+
+/**
+ * Dev-server sessions are spawned detached (their own process group) so one
+ * crashing `npm run dev` cannot take the service down. The trade-off is that
+ * they do not receive the signal the service is killed with — without this
+ * block a restart leaves every dev server alive, still bound to its port, so
+ * the next one to pick that port dies with EADDRINUSE.
+ */
+function reapSessions(signal = "SIGKILL") {
+  for (const session of sessions.values()) {
+    if (session.exited) continue;
+    try { process.kill(-session.child.pid, signal); } catch { /* already gone */ }
+  }
+}
+
+let shuttingDown = false;
+async function shutdown(reason) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[${SERVICE_NAME}] ${reason} — stopping ${sessions.size} dev session(s)`);
+  // Let the children close their own listeners first; SIGKILL follows on exit.
+  reapSessions("SIGTERM");
+  server.close();
+  // Do not hang on a kept-alive connection while a supervisor waits for us.
+  await new Promise((resolve) => setTimeout(resolve, 1500).unref());
+  process.exit(0);
+}
+
+for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(signal, () => shutdown(`${signal} received`));
+
+// Last resort for exits we did not route through shutdown(). Nothing async runs
+// here, which is why the kill is synchronous.
+process.on("exit", () => reapSessions());

@@ -38,7 +38,7 @@
 
 | ตัวแปร                      | ค่าเริ่มต้น                                                            | ความหมาย                                                             |
 | --------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `SANDBOX_RUNNER_URL`        | `VITE_SANDBOX_RUNNER_URL` → `https://bossnu1.onrender.com` | URL ของ Sandbox Runner                                               |
+| `SANDBOX_RUNNER_URL`        | `VITE_SANDBOX_RUNNER_URL` → `https://bossnu1-bash-runner.onrender.com` | URL ของ Sandbox Runner                                               |
 | `SANDBOX_RUNNER_TOKEN`      | (ไม่มี)                                                                | Bearer token ที่ต้องตรงกับ `RUNNER_TOKEN` ของ Runner v6 — ไม่มีค่านี้ `/execute` จะได้ 401 |
 | `SANDBOX_RUNNER_TIMEOUT_MS` | `60000`                                                                | เวลารอ runner สูงสุดต่อคำสั่ง                                        |
 | `SANDBOX_ALLOW_ORIGIN`      | `*`                                                                    | ค่า `Access-Control-Allow-Origin` (ตั้งเป็น origin ของคุณเพื่อจำกัด) |

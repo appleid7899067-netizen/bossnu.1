@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +10,7 @@ const SERVER = fileURLToPath(new URL("../server.mjs", import.meta.url));
 const TOKEN = "test-token-abc123";
 
 /** Boot the real server on an ephemeral port and wait for its startup line. */
-async function startServer(t, extraEnv = {}) {
+async function startServerProcess(t, extraEnv = {}) {
   const root = await mkdtemp(join(tmpdir(), "sandbox-web-test-"));
   const child = spawn(process.execPath, [SERVER], {
     env: { ...process.env, PORT: "0", HOST: "127.0.0.1", WORKSPACE_ROOT: root, RUNNER_TOKEN: TOKEN, COMMAND_TIMEOUT_MS: "3000", ...extraEnv },
@@ -24,8 +24,21 @@ async function startServer(t, extraEnv = {}) {
       if (match) { clearTimeout(timer); resolvePromise(match[1]); }
     });
   });
-  t.after(async () => { child.kill("SIGKILL"); await rm(root, { recursive: true, force: true }); });
-  return `http://127.0.0.1:${port}`;
+  t.after(async () => {
+    // SIGTERM is the path a supervisor actually uses; escalate only if ignored.
+    child.kill("SIGTERM");
+    const exited = await new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 5000);
+      child.once("exit", () => { clearTimeout(timer); resolve(true); });
+    });
+    if (!exited) child.kill("SIGKILL");
+    await rm(root, { recursive: true, force: true });
+  });
+  return { base: `http://127.0.0.1:${port}`, child, root };
+}
+
+async function startServer(t, extraEnv = {}) {
+  return (await startServerProcess(t, extraEnv)).base;
 }
 
 const events = (text) =>
@@ -286,4 +299,79 @@ test("a dev server started from a subdirectory gets a working preview", async (t
   const preview = await fetch(base + dev.previewPath);
   assert.equal(preview.status, 200);
   assert.match(await preview.text(), /preview-ok/);
+
+  // The `npm install` this path runs must not litter the workspace: the console
+  // renders the snapshot as a file tree, so npm's own cache/logs would show up
+  // as project files. The lockfile it writes is legitimate project state.
+  assert.deepEqual(dev.workspaceSnapshot.paths.sort(), [
+    "project/site/package-lock.json",
+    "project/site/package.json",
+    "project/site/server.mjs",
+  ]);
+});
+
+test("CONSOLE_DEMO_TOKEN pre-fills the console token, and only when it matches", async (t) => {
+  // Off by default: a plain boot must not leak the token into the served page.
+  const plain = await startServer(t);
+  assert.doesNotMatch(await (await fetch(`${plain}/`)).text(), /__SANDBOX_DEMO_TOKEN__/);
+
+  // Set to a token /execute* would reject → still no shim (it would be useless
+  // and would only train visitors to trust a wrong credential).
+  const wrong = await startServer(t, { CONSOLE_DEMO_TOKEN: "not-the-runner-token" });
+  assert.doesNotMatch(await (await fetch(`${wrong}/`)).text(), /__SANDBOX_DEMO_TOKEN__/);
+
+  // Set to the real token → the console page carries it for the boot shim.
+  const demo = await startServer(t, { CONSOLE_DEMO_TOKEN: TOKEN });
+  const html = await (await fetch(`${demo}/`)).text();
+  assert.match(html, /window\.__SANDBOX_DEMO_TOKEN__ = "test-token-abc123";/);
+  // The shim must land before the module that reads it.
+  assert.ok(
+    html.indexOf("__SANDBOX_DEMO_TOKEN__") < html.indexOf('<script type="module"'),
+    "the shim must run before js/app.js",
+  );
+  // Only the shell carries the value — the served app.js stays byte-identical
+  // to the file on disk, so the token cannot leak through any other asset.
+  const servedJs = await (await fetch(`${demo}/js/app.js`)).text();
+  assert.doesNotMatch(servedJs, /test-token-abc123/);
+  assert.equal(servedJs, await readFile(fileURLToPath(new URL("../public/js/app.js", import.meta.url)), "utf8"));
+
+  // And the injected value actually authenticates.
+  const ran = await fetch(`${demo}/execute`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
+    body: JSON.stringify({ language: "bash", command: "echo demo-ok", workspace: `demo-${Date.now().toString(36)}` }),
+  });
+  assert.equal((await ran.json()).stdout, "demo-ok\n");
+});
+
+test("killing the service also kills the dev servers it started", async (t) => {
+  const { base, child } = await startServerProcess(t, { DEV_TIMEOUT_MS: "60000" });
+  const workspace = `console-shutdown-${Date.now().toString(36)}`;
+  const port = 5800 + (Date.now() % 200);
+  const setup = await runStream(base, {
+    language: "bash", workspace, snapshot: 1,
+    command: `mkdir -p project/site && printf '%s' '{ "name": "site", "private": true, "type": "module", "scripts": { "dev": "node server.mjs" } }' > project/site/package.json && printf '%s' 'import http from "node:http"; http.createServer((q, s) => { s.writeHead(200); s.end("up"); }).listen(${port}, "0.0.0.0", () => console.log("Local: http://localhost:${port}/"));' > project/site/server.mjs`,
+  });
+  assert.equal(setup.status, "success", setup.stderr);
+
+  const dev = await runStream(base, { language: "node", command: "cd project/site && npm run dev", workspace, snapshot: 1 });
+  assert.equal(dev.status, "running", `${dev.stderr || dev.stdout}`);
+  assert.equal(dev.port, port);
+  assert.equal((await fetch(base + dev.previewPath)).status, 200, "the preview must work before shutdown");
+
+  // A supervisor stops the service with SIGTERM. The dev server was spawned
+  // detached, so it never sees that signal — the service has to reap it, or it
+  // keeps the port and the next server to choose it dies with EADDRINUSE.
+  child.kill("SIGTERM");
+  await new Promise((resolve) => child.once("exit", resolve));
+
+  const deadline = Date.now() + 15000;
+  for (;;) {
+    let released = false;
+    try { await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(300) }); }
+    catch { released = true; }
+    if (released) break;
+    assert.ok(Date.now() < deadline, `the dev server still owns port ${port} after the service exited`);
+    await new Promise((r) => setTimeout(r, 100));
+  }
 });
