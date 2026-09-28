@@ -266,7 +266,7 @@ export function Composer({
           ) : null}
           <div className="min-w-0">{extra}</div>
           {modelOptions?.length && onModelChange ? (
-            <label className="hidden min-w-0 max-w-[12rem] shrink sm:block">
+            <label className="min-w-0 max-w-[10rem] shrink">
               <span className="sr-only">เลือกโมเดล AI</span>
               <select
                 value={selectedModel ?? modelOptions[0].id}
