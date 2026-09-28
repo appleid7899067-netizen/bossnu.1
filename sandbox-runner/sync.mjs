@@ -128,5 +128,31 @@ export async function reconcileSeed({ dir, fresh, files, base }) {
       else { await rm(target, { force: true }); report.deleted.push(path); }
     } else report.conflicts.push(path);
   }
+  // Verified skills are persisted in Neon under project/skills/verified.
+  // Mirror them to the legacy logical path so existing sandbox checks and tools
+  // can keep using skills/verified/... without making that path the source of truth.
+  await mirrorVerifiedSkills(dir);
   return report;
+}
+
+async function mirrorVerifiedSkills(dir) {
+  const sourceRoot = join(dir, "project", "skills", "verified");
+  const targetRoot = join(dir, "skills", "verified");
+  const sourceExists = await lstat(sourceRoot).catch(() => null);
+  if (!sourceExists?.isDirectory()) return;
+
+  async function walk(source, relative) {
+    const entries = await readdir(source, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      const sourcePath = join(source, entry.name);
+      const relativePath = relative ? join(relative, entry.name) : entry.name;
+      const targetPath = join(targetRoot, relativePath);
+      const content = await readFile(sourcePath, "utf8");
+      await mkdir(dirname(targetPath), { recursive: true });
+      await writeFile(targetPath, content, "utf8");
+    }
+  }
+
+  await walk(sourceRoot, "");
 }
