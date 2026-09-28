@@ -158,6 +158,21 @@ export async function runAgentLoop(opts: {
     if (status === "verified" || status === "answered") core.complete();
     else if (status !== "aborted") core.fail();
     if (workspace && status !== "aborted") {
+      const outcome = status === "verified" || status === "answered" ? "success" : "failure";
+      const reasons = lastVerdict?.reasons?.slice(0, 4).join(" | ") || "no verification error recorded";
+      const learningKey = `learning:${core.task.id}`;
+      const learningValue = [
+        `Outcome: ${outcome}`,
+        `Goal: ${goal.slice(0, 500)}`,
+        `Runs: ${count}/${max}`,
+        `Verification rejections: ${rejections}`,
+        `Last verdict: ${lastVerdict?.passed ? "passed" : lastVerdict ? "failed" : "not-run"}`,
+        `Evidence: ${reasons}`,
+        outcome === "success"
+          ? "Lesson: this run reached the required completion gate. Reuse the verified approach only after checking the current project state."
+          : "Lesson: this run did not reach the completion gate. Treat the recorded evidence as a warning and change the approach before retrying.",
+      ].join("\n");
+      await safely(() => workspace.remember(learningKey, learningValue, "run"), undefined);
       await safely(() => workspace.updateTask(core.task.id, status === "verified" || status === "answered" ? "done" : "failed", core.task.attempts), undefined);
     }
     return { status, runs: count, rejections, lastVerdict };
@@ -193,6 +208,8 @@ export async function runAgentLoop(opts: {
       core.context(goal),
       `Run budget: ${Math.max(0, max - count)} of ${max} sandbox runs left.`,
       "Rule: use tools when needed, observe their real output, fix failures, and do not claim completion before verification.",
+      "Learning rule: previous workspace memories are experience, not truth. Reuse successful approaches only after checking current evidence; when a previous attempt failed, deliberately change the approach instead of repeating the same action.",
+      "Never report a task as complete merely because a command was issued. Completion requires the evidence gate for tool-based work.",
       requireWorkspace ? "Verification requires: exit 0 AND workspaceSync.verified AND workspaceSync.complete (Neon read-back matches the sandbox)." : "",
     ].filter(Boolean).join("\n");
 
