@@ -10,7 +10,7 @@ const SERVER = fileURLToPath(new URL("../server.mjs", import.meta.url));
 const TOKEN = "test-token-abc123";
 
 /** Boot the real server on an ephemeral port and wait for its startup line. */
-async function startServer(t, extraEnv = {}) {
+async function startServerProcess(t, extraEnv = {}) {
   const root = await mkdtemp(join(tmpdir(), "sandbox-web-test-"));
   const child = spawn(process.execPath, [SERVER], {
     env: { ...process.env, PORT: "0", HOST: "127.0.0.1", WORKSPACE_ROOT: root, RUNNER_TOKEN: TOKEN, COMMAND_TIMEOUT_MS: "3000", ...extraEnv },
@@ -24,8 +24,21 @@ async function startServer(t, extraEnv = {}) {
       if (match) { clearTimeout(timer); resolvePromise(match[1]); }
     });
   });
-  t.after(async () => { child.kill("SIGKILL"); await rm(root, { recursive: true, force: true }); });
-  return `http://127.0.0.1:${port}`;
+  t.after(async () => {
+    // SIGTERM is the path a supervisor actually uses; escalate only if ignored.
+    child.kill("SIGTERM");
+    const exited = await new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 5000);
+      child.once("exit", () => { clearTimeout(timer); resolve(true); });
+    });
+    if (!exited) child.kill("SIGKILL");
+    await rm(root, { recursive: true, force: true });
+  });
+  return { base: `http://127.0.0.1:${port}`, child, root };
+}
+
+async function startServer(t, extraEnv = {}) {
+  return (await startServerProcess(t, extraEnv)).base;
 }
 
 const events = (text) =>
@@ -329,4 +342,36 @@ test("CONSOLE_DEMO_TOKEN pre-fills the console token, and only when it matches",
     body: JSON.stringify({ language: "bash", command: "echo demo-ok", workspace: `demo-${Date.now().toString(36)}` }),
   });
   assert.equal((await ran.json()).stdout, "demo-ok\n");
+});
+
+test("killing the service also kills the dev servers it started", async (t) => {
+  const { base, child } = await startServerProcess(t, { DEV_TIMEOUT_MS: "60000" });
+  const workspace = `console-shutdown-${Date.now().toString(36)}`;
+  const port = 5800 + (Date.now() % 200);
+  const setup = await runStream(base, {
+    language: "bash", workspace, snapshot: 1,
+    command: `mkdir -p project/site && printf '%s' '{ "name": "site", "private": true, "type": "module", "scripts": { "dev": "node server.mjs" } }' > project/site/package.json && printf '%s' 'import http from "node:http"; http.createServer((q, s) => { s.writeHead(200); s.end("up"); }).listen(${port}, "0.0.0.0", () => console.log("Local: http://localhost:${port}/"));' > project/site/server.mjs`,
+  });
+  assert.equal(setup.status, "success", setup.stderr);
+
+  const dev = await runStream(base, { language: "node", command: "cd project/site && npm run dev", workspace, snapshot: 1 });
+  assert.equal(dev.status, "running", `${dev.stderr || dev.stdout}`);
+  assert.equal(dev.port, port);
+  assert.equal((await fetch(base + dev.previewPath)).status, 200, "the preview must work before shutdown");
+
+  // A supervisor stops the service with SIGTERM. The dev server was spawned
+  // detached, so it never sees that signal — the service has to reap it, or it
+  // keeps the port and the next server to choose it dies with EADDRINUSE.
+  child.kill("SIGTERM");
+  await new Promise((resolve) => child.once("exit", resolve));
+
+  const deadline = Date.now() + 15000;
+  for (;;) {
+    let released = false;
+    try { await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(300) }); }
+    catch { released = true; }
+    if (released) break;
+    assert.ok(Date.now() < deadline, `the dev server still owns port ${port} after the service exited`);
+    await new Promise((r) => setTimeout(r, 100));
+  }
 });

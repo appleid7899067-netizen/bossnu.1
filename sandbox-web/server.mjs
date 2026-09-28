@@ -703,3 +703,40 @@ server.listen(PORT, HOST, () => {
   console.log(`[${SERVICE_NAME}] auth: ${RUNNER_TOKEN ? "bearer token required" : "DISABLED (ALLOW_NO_AUTH)"}`);
   console.log(`[${SERVICE_NAME}] workspaces: ${WORKSPACE_ROOT} (ttl ${Math.round(WORKSPACE_TTL_MS / 60000)}m) • timeout ${TIMEOUT_MS}ms • max ${MAX_ACTIVE_RUNS} runs • ${RATE_LIMIT_MAX} req/${Math.round(RATE_LIMIT_WINDOW_MS / 1000)}s per IP`);
 });
+
+// ---------------------------------------------------------------------------
+// Shutdown
+// ---------------------------------------------------------------------------
+
+/**
+ * Dev-server sessions are spawned detached (their own process group) so one
+ * crashing `npm run dev` cannot take the service down. The trade-off is that
+ * they do not receive the signal the service is killed with — without this
+ * block a restart leaves every dev server alive, still bound to its port, so
+ * the next one to pick that port dies with EADDRINUSE.
+ */
+function reapSessions(signal = "SIGKILL") {
+  for (const session of sessions.values()) {
+    if (session.exited) continue;
+    try { process.kill(-session.child.pid, signal); } catch { /* already gone */ }
+  }
+}
+
+let shuttingDown = false;
+async function shutdown(reason) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[${SERVICE_NAME}] ${reason} — stopping ${sessions.size} dev session(s)`);
+  // Let the children close their own listeners first; SIGKILL follows on exit.
+  reapSessions("SIGTERM");
+  server.close();
+  // Do not hang on a kept-alive connection while a supervisor waits for us.
+  await new Promise((resolve) => setTimeout(resolve, 1500).unref());
+  process.exit(0);
+}
+
+for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(signal, () => shutdown(`${signal} received`));
+
+// Last resort for exits we did not route through shutdown(). Nothing async runs
+// here, which is why the kill is synchronous.
+process.on("exit", () => reapSessions());
