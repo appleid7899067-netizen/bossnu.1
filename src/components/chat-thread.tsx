@@ -22,6 +22,7 @@ export function ChatThread({
   onDeleteMessage,
   onEditMessage,
   onRegenerate,
+  onContextAction,
   busy = false,
   sandboxRun,
 }: {
