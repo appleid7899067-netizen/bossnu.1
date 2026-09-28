@@ -1,11 +1,11 @@
 # Sandbox Web
 
-บริการแซนด์บ็อก **ตัวเดียวจบ** ที่ deploy ขึ้นเน็ตได้ทันที: มีทั้งเว็บให้กดรันเอง
+บริการแซนด์บ็อก **ตัวเดียวจบ** ที่ deploy ขึ้นเน็ตได้ทันที: มีทั้งคอนโซลให้กดรันเอง
 และ API ให้แอปอื่นยิงเข้ามา — ไม่มี dependency เลย (`node server.mjs` เพียว ๆ)
 ทำให้ cold start เร็วมากบนโฮสต์ฟรี
 
 ```
-GET  /                     → เว็บ playground (public/)
+GET  /                     → คอนโซล "สนามหลวง" (public/)
 GET  /health               → เวอร์ชัน, runtimes ที่เครื่องนี้มีจริง, สถานะ auth (public)
 POST /execute              → รันคำสั่ง, ตอบ JSON            (ต้องมี bearer token)
 POST /execute/stream       → รันคำสั่ง, ตอบ SSE live output  (ต้องมี bearer token)
@@ -15,12 +15,38 @@ GET  /preview/<session>/…  → proxy ไป `npm run dev` ที่รัน�
 Wire contract เหมือน Sandbox Runner v6 ทุก字段 — แอปที่ตั้ง `SANDBOX_RUNNER_URL`
 กับ `SANDBOX_RUNNER_TOKEN` อยู่แล้ว ชี้มาที่ service นี้ได้เลยโดยไม่ต้องแก้โค้ด
 
+## คอนโซล "สนามหลวง" (`/`)
+
+หน้าเว็บที่เสิร์ฟจาก `public/` เป็นคอนโซลเต็มจอ ไม่ใช่ฟอร์มรันทีละคำสั่ง — และ
+**ไม่เพิ่ม endpoint ใด ๆ** ทุกอย่างวิ่งผ่าน `/health` กับ `/execute/stream` ตัวเดิม
+
+| ส่วน | ทำอะไรได้ |
+|---|---|
+| แท็บเซสชัน | หลาย workspace พร้อมกัน แต่ละแท็บมีโค้ด + ประวัติคำสั่งของตัวเอง เก็บใน `localStorage` |
+| เทอร์มินัล | scrollback ต่อเนื่อง, prompt ด้านล่าง, `↑`/`↓` เรียกคำสั่งเก่า, `Ctrl/Cmd+C` หยุด |
+| ตัวแก้ไขโค้ด | เลขบรรทัด, `Tab` = ย่อหน้า, `Ctrl/Cmd+Enter` = รัน, คลิกไฟล์ในต้นไม้เพื่อเปิด |
+| ต้นไม้ไฟล์ | อ่านจาก `workspaceSnapshot` หลังทุกการรัน (รวมเนื้อหาไฟล์ด้วย) |
+| บันทึกไฟล์ | ส่ง `workspaceFiles` + `workspaceBase` เป็นการ merge แบบ three-way |
+| ตัวอย่างเว็บ | iframe ชี้ไปที่ `/preview/<session>/` เมื่อรัน dev server |
+
+การบันทึกใช้ merge สามทาง: เซิร์ฟเวอร์จะเขียนก็ต่อเมื่อไฟล์บนดิสก์ยังตรงกับ hash
+ตอนเปิดเท่านั้น ถ้ามีใครแก้ไฟล์นั้นก่อนจะได้ `workspaceSeed.conflicts` และดิสก์ไม่ถูกทับ
+(ส่งแค่ `workspaceFiles` เฉย ๆ จะไม่เขียน เพราะ seed เปล่า ๆ เติมเฉพาะไฟล์ที่ยังไม่มี)
+
+### dev server
+
+ปุ่ม **dev server** (หรือพิมพ์เอง) ส่ง `npm run dev` — และเพราะ cwd ของคำสั่งคือ
+root ของ workspace ขณะที่ไฟล์โปรเจกต์อยู่ใต้ `project/` เซิร์ฟเวอร์จึงรองรับ
+`cd <subdir> && npm run dev` ด้วย โดย `<subdir>` ต้องเป็น path ปลอดภัย
+(ห้าม absolute, ห้าม `..`) แล้วจะ `npm install` + รัน dev server ในโฟลเดอร์นั้น
+และตอบ `sessionId` / `port` / `previewPath` กลับมาให้คอนโซลเปิด iframe
+
 ## รันในเครื่อง
 
 ```bash
 cd sandbox-web
 RUNNER_TOKEN=dev-token npm run dev      # http://localhost:8788
-npm test                                # 11 tests, รันเซิร์ฟเวอร์จริง
+npm test                                # 15 tests, รันเซิร์ฟเวอร์จริง
 ```
 
 ## Deploy ขึ้น Render (Blueprint คลิกเดียว)

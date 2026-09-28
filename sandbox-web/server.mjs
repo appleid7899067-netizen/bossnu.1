@@ -3,7 +3,7 @@
  *
  * One process, no npm install, no framework:
  *
- *   GET  /                     → web playground (public/)
+ *   GET  /                     → "สนามหลวง" console (public/)
  *   GET  /health               → version, runtimes, sessions, auth state (public)
  *   POST /execute              → run a command, JSON result      (bearer token)
  *   POST /execute/stream       → run a command, SSE live output  (bearer token)
@@ -411,6 +411,23 @@ async function proxyPreview(req, res, sessionId, rest) {
 // /execute (JSON) and /execute/stream (SSE)
 // ---------------------------------------------------------------------------
 
+/**
+ * Recognises a dev-server command and resolves the directory it should run in.
+ *
+ * The runner executes with the workspace root as cwd while the synced tree
+ * lives in `project/`, so `cd project && npm run dev` is the normal way to
+ * start an app here — a bare `^npm run dev` test would miss every one of them.
+ * The subdirectory is validated strictly because it becomes a spawn cwd.
+ */
+function devRunPlan(command, dir) {
+  const match = /^\s*(?:cd\s+("([^"]+)"|'([^']+)'|([^\s&;|]+))\s*(?:&&|;)\s*)?npm\s+run\s+dev\b/i.exec(String(command || ""));
+  if (!match) return null;
+  const sub = (match[2] || match[3] || match[4] || "").trim();
+  if (!sub || sub === ".") return dir;
+  if (sub.startsWith("/") || sub.includes("..") || !/^[A-Za-z0-9._/-]+$/.test(sub) || sub.length > 200) return null;
+  return join(dir, sub);
+}
+
 async function execute(body, signal) {
   const language = String(body.language || "bash").toLowerCase();
   const command = commandText(body, language);
@@ -423,12 +440,13 @@ async function execute(body, signal) {
   let keep = false;
   try {
     const seed = await seedWorkspace(workspace, body);
-    if ((language === "node" || language === "javascript") && /^npm\s+run\s+dev\b/i.test(command)) {
-      const install = await spawnProcess("npm", ["install", "--no-audit", "--no-fund"], dir, DEV_TIMEOUT_MS, signal);
+    const devDir = (language === "node" || language === "javascript") ? devRunPlan(command, dir) : null;
+    if (devDir) {
+      const install = await spawnProcess("npm", ["install", "--no-audit", "--no-fund"], devDir, DEV_TIMEOUT_MS, signal);
       if (install.exitCode !== 0) {
         return { status: "error", stdout: install.stdout, stderr: install.stderr, exitCode: install.exitCode, ...(await workspaceResult(dir, seed, body)) };
       }
-      const session = startPersistent("npm", ["run", "dev", "--", "--host", "0.0.0.0"], dir);
+      const session = startPersistent("npm", ["run", "dev", "--", "--host", "0.0.0.0"], devDir);
       keep = true;
       await new Promise((r) => setTimeout(r, 2200));
       return {
@@ -486,14 +504,15 @@ async function executeStream(body, res) {
     }
     sse(res, { type: "status", status: "running", message: `กำลังรัน (${language})` });
 
-    if ((language === "node" || language === "javascript") && /^npm\s+run\s+dev\b/i.test(command)) {
-      const install = await spawnProcess("npm", ["install", "--no-audit", "--no-fund"], dir, DEV_TIMEOUT_MS);
+    const devDir = (language === "node" || language === "javascript") ? devRunPlan(command, dir) : null;
+    if (devDir) {
+      const install = await spawnProcess("npm", ["install", "--no-audit", "--no-fund"], devDir, DEV_TIMEOUT_MS);
       if (install.exitCode !== 0) {
         sse(res, { type: "output", stream: "stderr", text: install.stderr || install.stdout });
         sse(res, { type: "complete", result: { success: false, status: "error", type: language, runtime: language, command, stdout: install.stdout, stderr: install.stderr, exitCode: install.exitCode, durationMs: Date.now() - started, ...(await workspaceResult(dir, seed, body)) } });
         return;
       }
-      const session = startPersistent("npm", ["run", "dev", "--", "--host", "0.0.0.0"], dir);
+      const session = startPersistent("npm", ["run", "dev", "--", "--host", "0.0.0.0"], devDir);
       keep = true;
       await new Promise((r) => setTimeout(r, 2200));
       for (const [stream, text] of [["stdout", session.stdout()], ["stderr", session.stderr()]]) {
