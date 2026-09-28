@@ -739,7 +739,12 @@ els.previewClose.addEventListener("click", () => {
 });
 
 // Boot
-els.token.value = localStorage.getItem(STORE.token) || "";
+// A hosted demo can ship its token in the served page (see CONSOLE_DEMO_TOKEN);
+// it only fills an empty field, so anything the visitor typed still wins.
+els.token.value =
+  localStorage.getItem(STORE.token) ||
+  (typeof window.__SANDBOX_DEMO_TOKEN__ === "string" ? window.__SANDBOX_DEMO_TOKEN__ : "") ||
+  "";
 if (!restore()) { sessions = [makeSession(1)]; activeId = sessions[0].id; }
 renderRuntimeOptions();
 renderTabs();

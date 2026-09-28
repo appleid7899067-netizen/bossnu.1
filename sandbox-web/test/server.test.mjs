@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -286,4 +286,38 @@ test("a dev server started from a subdirectory gets a working preview", async (t
   const preview = await fetch(base + dev.previewPath);
   assert.equal(preview.status, 200);
   assert.match(await preview.text(), /preview-ok/);
+});
+
+test("CONSOLE_DEMO_TOKEN pre-fills the console token, and only when it matches", async (t) => {
+  // Off by default: a plain boot must not leak the token into the served page.
+  const plain = await startServer(t);
+  assert.doesNotMatch(await (await fetch(`${plain}/`)).text(), /__SANDBOX_DEMO_TOKEN__/);
+
+  // Set to a token /execute* would reject → still no shim (it would be useless
+  // and would only train visitors to trust a wrong credential).
+  const wrong = await startServer(t, { CONSOLE_DEMO_TOKEN: "not-the-runner-token" });
+  assert.doesNotMatch(await (await fetch(`${wrong}/`)).text(), /__SANDBOX_DEMO_TOKEN__/);
+
+  // Set to the real token → the console page carries it for the boot shim.
+  const demo = await startServer(t, { CONSOLE_DEMO_TOKEN: TOKEN });
+  const html = await (await fetch(`${demo}/`)).text();
+  assert.match(html, /window\.__SANDBOX_DEMO_TOKEN__ = "test-token-abc123";/);
+  // The shim must land before the module that reads it.
+  assert.ok(
+    html.indexOf("__SANDBOX_DEMO_TOKEN__") < html.indexOf('<script type="module"'),
+    "the shim must run before js/app.js",
+  );
+  // Only the shell carries the value — the served app.js stays byte-identical
+  // to the file on disk, so the token cannot leak through any other asset.
+  const servedJs = await (await fetch(`${demo}/js/app.js`)).text();
+  assert.doesNotMatch(servedJs, /test-token-abc123/);
+  assert.equal(servedJs, await readFile(fileURLToPath(new URL("../public/js/app.js", import.meta.url)), "utf8"));
+
+  // And the injected value actually authenticates.
+  const ran = await fetch(`${demo}/execute`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
+    body: JSON.stringify({ language: "bash", command: "echo demo-ok", workspace: `demo-${Date.now().toString(36)}` }),
+  });
+  assert.equal((await ran.json()).stdout, "demo-ok\n");
 });

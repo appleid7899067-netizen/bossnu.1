@@ -59,6 +59,16 @@ const DEV_SESSION_TTL_MS = Number(process.env.DEV_SESSION_TTL_MS || 30 * 60 * 10
 const GUARDED_PYTHON = process.env.GUARDED_PYTHON || join(HERE, "lib", "guarded", "run_guarded.py");
 const PUBLIC_DIR = join(HERE, "public");
 
+/**
+ * Opt-in convenience for hosted demos: when `CONSOLE_DEMO_TOKEN` is set — and
+ * only when it equals the token `/execute*` actually checks — the served
+ * console HTML gets a small boot shim that pre-fills the Bearer field, so a
+ * visitor can run code without being handed a secret out of band. It stays off
+ * by default; a real deployment leaves it unset and keeps the token private.
+ */
+const CONSOLE_DEMO_TOKEN = (process.env.CONSOLE_DEMO_TOKEN || "").trim();
+const DEMO_TOKEN = CONSOLE_DEMO_TOKEN && CONSOLE_DEMO_TOKEN === RUNNER_TOKEN ? CONSOLE_DEMO_TOKEN : "";
+
 const bound = (value, low, high) => Math.min(high, Math.max(low, value));
 const TIMEOUT_MS = bound(Number(process.env.COMMAND_TIMEOUT_MS || 120_000), 1000, 300_000);
 const DEV_TIMEOUT_MS = bound(Number(process.env.DEV_TIMEOUT_MS || 180_000), 1000, 300_000);
@@ -587,7 +597,18 @@ async function serveStatic(req, res, pathname) {
   // Never escape public/ — normalize() alone still allows ../ traversal.
   if (target !== PUBLIC_DIR && !target.startsWith(PUBLIC_DIR + "/")) return send(res, 403, { error: "forbidden" });
   if (!existsSync(target)) return send(res, 404, { error: "not_found" });
-  const body = await readFile(target);
+  let body = await readFile(target);
+  if (target === join(PUBLIC_DIR, "index.html") && DEMO_TOKEN) {
+    // `<` is escaped so a token containing `</script>` cannot close the shim.
+    const shim = `<script>window.__SANDBOX_DEMO_TOKEN__ = ${JSON.stringify(DEMO_TOKEN).replace(/</g, "\\u003c")};</script>\n    `;
+    const html = body.toString("utf8");
+    const at = html.indexOf('<script type="module"');
+    // Fail loudly rather than serve a console whose demo token silently never
+    // arrives because the markup moved.
+    if (at < 0) return send(res, 500, { error: "demo_token_injection_failed" });
+    // String.slice keeps the shim ahead of the module tag, so js/app.js can read it.
+    body = Buffer.from(html.slice(0, at) + shim + html.slice(at), "utf8");
+  }
   res.writeHead(200, { "content-type": MIME[extname(target)] || "application/octet-stream", "cache-control": "no-cache", ...corsHeaders() });
   res.end(body);
 }

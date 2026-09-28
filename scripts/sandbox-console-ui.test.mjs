@@ -16,10 +16,10 @@ import { JSDOM, VirtualConsole } from "jsdom";
 const SERVER = fileURLToPath(new URL("../sandbox-web/server.mjs", import.meta.url));
 const TOKEN = "ui-test-token";
 
-async function startServer(t) {
+async function startServer(t, extraEnv = {}) {
   const root = await mkdtemp(join(tmpdir(), "console-ui-"));
   const child = spawn(process.execPath, [SERVER], {
-    env: { ...process.env, PORT: "0", HOST: "127.0.0.1", WORKSPACE_ROOT: root, RUNNER_TOKEN: TOKEN, COMMAND_TIMEOUT_MS: "20000" },
+    env: { ...process.env, PORT: "0", HOST: "127.0.0.1", WORKSPACE_ROOT: root, RUNNER_TOKEN: TOKEN, COMMAND_TIMEOUT_MS: "20000", ...extraEnv },
     stdio: ["ignore", "pipe", "pipe"],
   });
   const port = await new Promise((resolve, reject) => {
@@ -225,4 +225,24 @@ test("running without a token is refused in the UI before any request", async (t
   await waitFor(() => /ยังไม่ได้ใส่ Bearer token/.test(text(window)), "token warning");
   assert.equal(doc.getElementById("status-pill").textContent, "error");
   assert.doesNotMatch(text(window), /should-not-run/);
+});
+
+test("a hosted demo token pre-fills the field, so the first run needs no typing", async (t) => {
+  const base = await startServer(t, { CONSOLE_DEMO_TOKEN: TOKEN });
+  const { window, errors } = await loadConsole(t, base);
+  const doc = window.document;
+
+  // The shim in the served page fills the field during boot; nothing was typed
+  // and nothing was stored in localStorage beforehand.
+  assert.equal(doc.getElementById("token").value, TOKEN);
+  assert.equal(window.localStorage.getItem("sandbox-web.token"), null);
+
+  doc.getElementById("workspace").value = "ui-demo-token";
+  doc.getElementById("command").value = "echo เดโมรันได้ทันที";
+  doc.getElementById("run").click();
+
+  await waitFor(() => doc.getElementById("status-pill").textContent === "success", "the demo run to finish");
+  assert.match(text(window), /เดโมรันได้ทันที/);
+  assert.match(doc.getElementById("meta").textContent, /exit 0/);
+  assert.deepEqual(errors, [], `console errors: ${errors.join("; ")}`);
 });
