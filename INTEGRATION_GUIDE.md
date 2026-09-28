@@ -39,16 +39,18 @@
 | ตัวแปร                      | ค่าเริ่มต้น                                                            | ความหมาย                                                             |
 | --------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | `SANDBOX_RUNNER_URL`        | `VITE_SANDBOX_RUNNER_URL` → `https://bossnu1-bash-runner.onrender.com` | URL ของ Sandbox Runner                                               |
+| `SANDBOX_RUNNER_TOKEN`      | (ไม่มี)                                                                | Bearer token ที่ต้องตรงกับ `RUNNER_TOKEN` ของ Runner v6 — ไม่มีค่านี้ `/execute` จะได้ 401 |
 | `SANDBOX_RUNNER_TIMEOUT_MS` | `60000`                                                                | เวลารอ runner สูงสุดต่อคำสั่ง                                        |
 | `SANDBOX_ALLOW_ORIGIN`      | `*`                                                                    | ค่า `Access-Control-Allow-Origin` (ตั้งเป็น origin ของคุณเพื่อจำกัด) |
 
 - ใน workspace: `VITE_SANDBOX_RUNNER_URL` มาจาก `.grok/app-env.json` อยู่แล้ว (ผ่าน `scripts/with-app-env.mjs`)
 - บน Vercel/Render: ตั้ง `SANDBOX_RUNNER_URL` ใน project env (ไม่ต้องสร้าง `.env`)
+- `SANDBOX_RUNNER_TOKEN` เป็นความลับฝั่ง server เท่านั้น (ไม่มี prefix `VITE_`) — เบราว์เซอร์เรียกเฉพาะ `/api/sandbox*` บน origin เดียวกัน
 - ทดสอบกับ runner ในเครื่อง:
 
 ```bash
-PORT=8787 node sandbox-runner/server.mjs          # terminal 1
-SANDBOX_RUNNER_URL=http://127.0.0.1:8787 npm run dev   # terminal 2
+RUNNER_TOKEN=dev-token PORT=8787 node sandbox-runner/server.mjs                    # terminal 1
+SANDBOX_RUNNER_URL=http://127.0.0.1:8787 SANDBOX_RUNNER_TOKEN=dev-token npm run dev # terminal 2
 ```
 
 ### 2.2 รันแอป

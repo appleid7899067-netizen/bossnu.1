@@ -6,21 +6,16 @@ import { describeEvidence } from "@/lib/workspace/snapshot";
 import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
 import {
   CommandRequestSchema,
-  DEFAULT_SANDBOX_RUNNER_URL,
   isRunnerRuntime,
   type CommandType,
   type SkillContent,
 } from "@/types/sandbox";
+import { runnerAuthHeaders, runnerConfig } from "@/lib/sandbox/runner-config.server";
 
 const MAX_BODY_BYTES = 256 * 1024;
 
 function runnerUrl() {
-  return (
-    process.env.SANDBOX_RUNNER_URL?.trim() ||
-    process.env.VITE_SANDBOX_RUNNER_URL?.trim() ||
-    (import.meta.env.VITE_SANDBOX_RUNNER_URL as string | undefined)?.trim() ||
-    DEFAULT_SANDBOX_RUNNER_URL
-  ).replace(/\/+$/, "");
+  return runnerConfig().url;
 }
 function corsHeaders(): Record<string,string> {
   return {
@@ -100,7 +95,7 @@ async function handle(request: Request): Promise<Response> {
         }
         const response = await fetch(runner + "/execute/stream", {
           method: "POST",
-          headers: { "content-type": "application/json", accept: "text/event-stream" },
+          headers: { "content-type": "application/json", accept: "text/event-stream", ...runnerAuthHeaders() },
           body: runnerBody({ language: runtime, command, stdin, workspace, seed }),
           signal: AbortSignal.any([request.signal, abort.signal, AbortSignal.timeout(Number(process.env.SANDBOX_RUNNER_TIMEOUT_MS) || 140000)]),
         });
@@ -114,7 +109,7 @@ async function handle(request: Request): Promise<Response> {
             close(); return;
           }
           const legacy = await fetch(runner + "/execute", {
-            method: "POST", headers: { "content-type": "application/json" },
+            method: "POST", headers: { "content-type": "application/json", ...runnerAuthHeaders() },
             body: runnerBody({ language: runtime, command, stdin, workspace, seed }),
             signal: AbortSignal.any([request.signal, abort.signal, AbortSignal.timeout(140000)]),
           });
@@ -131,8 +126,14 @@ async function handle(request: Request): Promise<Response> {
         }
         if (!response.ok || !response.body) {
           const data = await response.json().catch(() => null);
-          send({ type: "error", error: data?.error || `Sandbox Runner HTTP ${response.status}` });
-          send({ type: "complete", result: { success:false, status:"error", type:runtime, runtime, command, error:data?.error || `Runner HTTP ${response.status}`, durationMs:Date.now()-started } });
+          // Same auth guidance as the JSON route: a v6 runner answers 401 when
+          // the app's SANDBOX_RUNNER_TOKEN is missing or mismatched.
+          const authRejected = response.status === 401 || response.status === 403;
+          const error = authRejected
+            ? "Sandbox Runner ปฏิเสธการยืนยันตัวตน — ตั้ง SANDBOX_RUNNER_TOKEN ให้ตรงกับ RUNNER_TOKEN ของ Runner"
+            : data?.error || `Sandbox Runner HTTP ${response.status}`;
+          send({ type: "error", error });
+          send({ type: "complete", result: { success:false, status:"error", type:runtime, runtime, command, error, durationMs:Date.now()-started } });
           close(); return;
         }
         const reader = response.body.getReader();

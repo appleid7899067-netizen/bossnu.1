@@ -25,7 +25,6 @@ import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
 import { listSkills, loadSkill, suggestSkills } from "@/lib/sandbox/skills.server";
 import {
   CommandRequestSchema,
-  DEFAULT_SANDBOX_RUNNER_URL,
   RUNNER_RUNTIMES,
   SANDBOX_LIMITS,
   isRunnerRuntime,
@@ -36,26 +35,9 @@ import {
   type SkillContent,
   type SkillsListResponse,
 } from "@/types/sandbox";
+import { runnerAuthHeaders, runnerConfig } from "@/lib/sandbox/runner-config.server";
 
 const MAX_BODY_BYTES = 256 * 1024;
-const DEFAULT_RUNNER_TIMEOUT_MS = 140_000;
-
-// ---------------------------------------------------------------------------
-// Runner configuration
-// ---------------------------------------------------------------------------
-
-function runnerConfig(): { url: string; source: "env" | "default"; timeoutMs: number } {
-  const fromEnv =
-    process.env.SANDBOX_RUNNER_URL?.trim() ||
-    process.env.VITE_SANDBOX_RUNNER_URL?.trim() ||
-    (import.meta.env.VITE_SANDBOX_RUNNER_URL as string | undefined)?.trim();
-  const timeout = Number(process.env.SANDBOX_RUNNER_TIMEOUT_MS);
-  return {
-    url: (fromEnv || DEFAULT_SANDBOX_RUNNER_URL).replace(/\/+$/, ""),
-    source: fromEnv ? "env" : "default",
-    timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : DEFAULT_RUNNER_TIMEOUT_MS,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Response helpers
@@ -201,7 +183,7 @@ async function runOnRunner(
   try {
     response = await fetch(`${runner.url}/execute`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...runnerAuthHeaders() },
       body: runnerBody({ language: runtime, command, stdin, workspace, seed }),
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(runner.timeoutMs)]) : AbortSignal.timeout(runner.timeoutMs),
     });
@@ -231,8 +213,12 @@ async function runOnRunner(
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
     steps.push(`Runner ปฏิเสธคำสั่ง (HTTP ${response.status})`);
+    // v6 runners require `Authorization: Bearer $RUNNER_TOKEN`; a bare
+    // "unauthorized" tells the operator nothing about which side is missing it.
+    const authRejected = response.status === 401 || response.status === 403;
+    if (authRejected) steps.push("Runner ปฏิเสธการยืนยันตัวตน — ตรวจ SANDBOX_RUNNER_TOKEN ฝั่งเว็บและ RUNNER_TOKEN ฝั่ง Runner");
     return {
-      httpStatus: response.status === 400 ? 400 : 502,
+      httpStatus: response.status === 400 ? 400 : authRejected ? 401 : 502,
       result: {
         success: false,
         status: "error",
@@ -240,8 +226,9 @@ async function runOnRunner(
         runtime,
         label,
         command,
-        error:
-          typeof data.error === "string" ? data.error : `Runner ตอบกลับ HTTP ${response.status}`,
+        error: authRejected
+          ? "Sandbox Runner ปฏิเสธการยืนยันตัวตน — ตั้ง SANDBOX_RUNNER_TOKEN ให้ตรงกับ RUNNER_TOKEN ของ Runner"
+          : typeof data.error === "string" ? data.error : `Runner ตอบกลับ HTTP ${response.status}`,
         durationMs: Date.now() - started,
         steps,
       },
@@ -391,7 +378,12 @@ async function handleGet(request: Request): Promise<Response> {
     success: true,
     count: skills.length,
     skills,
-    runner: { configured: true, source: runner.source, runtimes: [...RUNNER_RUNTIMES] },
+    runner: {
+      configured: true,
+      source: runner.source,
+      runtimes: [...RUNNER_RUNTIMES],
+      tokenConfigured: runner.tokenConfigured,
+    },
   };
   return json(body);
 }

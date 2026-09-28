@@ -1,3 +1,11 @@
+/**
+ * Legacy browser-side helper that calls the runner directly.
+ *
+ * Kept for reference only — nothing imports it. Sandbox Runner v6 requires
+ * `Authorization: Bearer $RUNNER_TOKEN` on `/execute`, and that secret must not
+ * ship to the browser, so new code goes through same-origin `/api/sandbox`
+ * (`src/lib/sandbox-client.ts`), which the server routes proxy with the token.
+ */
 import type { SandboxDetection } from "@/lib/sandbox/detect";
 
 export type SandboxExecutionResult = {
