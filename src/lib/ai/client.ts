@@ -1,5 +1,7 @@
 import { ensurePuterSignedIn } from "@/lib/ai/stream";
 import type { MindMapData } from "@/lib/types";
+import { useAppStore } from "@/lib/store";
+import { getPuterModel } from "./models";
 
 const MIND_SCHEMA_HINT = `
 Return ONLY valid JSON with this shape:
@@ -16,7 +18,7 @@ export async function generateMindMap(input: { topic: string }) {
     const response = await puter.ai.chat(
       `Create a useful mind map for: ${topic}\n\n${MIND_SCHEMA_HINT}`,
       {
-        model: "gpt-5.6-luna",
+        model: getPuterModel(useAppStore.getState().selectedModel).id,
         temperature: 0.4,
         max_tokens: 1800,
         normalize: true,

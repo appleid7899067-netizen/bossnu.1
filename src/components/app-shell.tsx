@@ -31,6 +31,7 @@ import { cn, uid } from "@/lib/utils";
 import { detectSandboxInput } from "@/lib/sandbox/detect";
 import { sandboxClient } from "@/lib/sandbox-client";
 import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
+import { PUTER_MODELS } from "@/lib/ai/models";
 
 export function AppShell({ search }: { search: Search }) {
   const navigate = useNavigate();
@@ -216,7 +217,7 @@ export function AppShell({ search }: { search: Search }) {
         onSkillSaved: (path, saved) => pushActivity({ kind: "skill", path, status: saved ? "saved" : "failed" }),
         model: async (messages, onText) => {
           let failure = "";
-          await streamChat({ messages, mode: chatMode, signal: ac.signal, tools, latestUser: content,
+          await streamChat({ messages, mode: chatMode, signal: ac.signal, tools, latestUser: content, model: store.selectedModel,
             onEvent: event => {
               if (ac.signal.aborted) return;
               if (event.type === "text") onText(event.text);
@@ -528,6 +529,9 @@ export function AppShell({ search }: { search: Search }) {
             {view === "settings" ? null : <div className="mx-auto w-full max-w-[1400px] px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
               <Composer
                 value={draft}
+                selectedModel={store.selectedModel}
+                modelOptions={PUTER_MODELS}
+                onModelChange={store.setSelectedModel}
                 onChange={setDraft}
                 onSubmit={() => void send(draft, activeChat?.id, undefined, false, attachments)}
                 attachments={attachments}
