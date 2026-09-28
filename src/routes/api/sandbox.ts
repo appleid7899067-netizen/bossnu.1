@@ -201,7 +201,14 @@ async function runOnRunner(
   try {
     response = await fetch(`${runner.url}/execute`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(process.env.SANDBOX_RUNNER_TOKEN?.trim()
+          ? { authorization: `Bearer ${process.env.SANDBOX_RUNNER_TOKEN.trim()}` }
+          : process.env.RUNNER_TOKEN?.trim()
+            ? { authorization: `Bearer ${process.env.RUNNER_TOKEN.trim()}` }
+            : {}),
+      },
       body: runnerBody({ language: runtime, command, stdin, workspace, seed }),
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(runner.timeoutMs)]) : AbortSignal.timeout(runner.timeoutMs),
     });
