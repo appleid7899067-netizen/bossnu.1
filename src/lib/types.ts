@@ -1,4 +1,5 @@
 export type ChatMode = "instant" | "think";
+export type AiModelId = string;
 export type AppView = "chat" | "maps" | "studio" | "builder" | "settings";
 export type ChatAttachment = { name: string; size: number; content: string; };
 export type ChatActivity =
