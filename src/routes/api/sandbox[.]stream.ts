@@ -1,28 +1,27 @@
-import { runnerHeaders, runnerHttpError } from "@/lib/sandbox/runner-auth.server";
 import { executeJudge0, usesJudge0 } from "@/lib/sandbox/judge0.server";
+import { runnerHttpError } from "@/lib/sandbox/runner-auth.server";
 import { loadSkill } from "@/lib/sandbox/skills.server";
 import { createFileRoute } from "@tanstack/react-router";
-import { PYTHON_SAFE_RUNNER_ERROR, runnerSupportsPythonSafe } from "@/lib/sandbox/runner-capabilities";
+import {
+  PYTHON_SAFE_RUNNER_ERROR,
+  RUNNER_NOT_READY_ERROR,
+  probeRunnerHealth,
+} from "@/lib/sandbox/runner-capabilities";
 import { loadSeed, publicRunnerResult, runnerBody, syncRunnerResult, type WorkspaceSeed } from "@/lib/workspace/sync.server";
 import { describeEvidence } from "@/lib/workspace/snapshot";
 import { assessSandboxRisk, detectSandboxInput } from "@/lib/sandbox/detect";
 import {
   CommandRequestSchema,
-  DEFAULT_SANDBOX_RUNNER_URL,
   isRunnerRuntime,
   type CommandType,
   type SkillContent,
 } from "@/types/sandbox";
+import { runnerAuthHeaders, runnerConfig } from "@/lib/sandbox/runner-config.server";
 
 const MAX_BODY_BYTES = 256 * 1024;
 
 function runnerUrl() {
-  return (
-    process.env.SANDBOX_RUNNER_URL?.trim() ||
-    process.env.VITE_SANDBOX_RUNNER_URL?.trim() ||
-    (import.meta.env.VITE_SANDBOX_RUNNER_URL as string | undefined)?.trim() ||
-    DEFAULT_SANDBOX_RUNNER_URL
-  ).replace(/\/+$/, "");
+  return runnerConfig().url;
 }
 function corsHeaders(): Record<string,string> {
   return {
@@ -69,8 +68,14 @@ async function handle(request: Request): Promise<Response> {
     attachedSkill = loaded.skill;
   }
   const runner = runnerUrl();
-  if (!usesJudge0() && runtime === "python-safe" && !(await runnerSupportsPythonSafe(runner, request.signal))) {
-    return Response.json({ error: PYTHON_SAFE_RUNNER_ERROR }, { status: 503, headers: corsHeaders() });
+  if (!usesJudge0() && runtime === "python-safe") {
+    const health = await probeRunnerHealth(runner, request.signal);
+    if (!health.ok) {
+      return Response.json(
+        { error: health.reason === "legacy" ? PYTHON_SAFE_RUNNER_ERROR : RUNNER_NOT_READY_ERROR },
+        { status: 503, headers: corsHeaders() },
+      );
+    }
   }
   const encoder = new TextEncoder();
   const abort = new AbortController();
@@ -112,7 +117,7 @@ async function handle(request: Request): Promise<Response> {
         }
         const response = await fetch(runner + "/execute/stream", {
           method: "POST",
-          headers: runnerHeaders({ accept: "text/event-stream" }),
+          headers: { "content-type": "application/json", accept: "text/event-stream", ...runnerAuthHeaders() },
           redirect: "error",
           body: runnerBody({ language: runtime, command, stdin, workspace, seed }),
           signal: AbortSignal.any([request.signal, abort.signal, AbortSignal.timeout(Number(process.env.SANDBOX_RUNNER_TIMEOUT_MS) || 140000)]),
@@ -127,7 +132,7 @@ async function handle(request: Request): Promise<Response> {
             close(); return;
           }
           const legacy = await fetch(runner + "/execute", {
-            method: "POST", headers: runnerHeaders(), redirect: "error",
+            method: "POST", headers: { "content-type": "application/json", ...runnerAuthHeaders() }, redirect: "error",
             body: runnerBody({ language: runtime, command, stdin, workspace, seed }),
             signal: AbortSignal.any([request.signal, abort.signal, AbortSignal.timeout(140000)]),
           });
@@ -143,9 +148,26 @@ async function handle(request: Request): Promise<Response> {
           close(); return;
         }
         if (!response.ok || !response.body) {
-          const data = await response.json().catch(() => null);
-          send({ type: "error", error: runnerHttpError(response.status, data?.error) });
-          send({ type: "complete", result: { success:false, status:"error", type:runtime, runtime, command, error:runnerHttpError(response.status, data?.error), durationMs:Date.now()-started } });
+          const rawText = await response.text();
+          let data: { error?: string } | null = null;
+          try { data = rawText ? (JSON.parse(rawText) as { error?: string }) : null; } catch { data = null; }
+          // Same auth guidance as the JSON route: a v6 runner answers 401 when
+          // the app's SANDBOX_RUNNER_TOKEN is missing or mismatched.
+          const authRejected = response.status === 401 || response.status === 403;
+          const error = authRejected
+            ? "Sandbox Runner ปฏิเสธการยืนยันตัวตน — ตั้ง SANDBOX_RUNNER_TOKEN ให้ตรงกับ RUNNER_TOKEN ของ Runner"
+            : data?.error || (rawText.trimStart().startsWith("<") ? RUNNER_NOT_READY_ERROR : `Sandbox Runner HTTP ${response.status}`);
+          send({ type: "error", error });
+          send({ type: "complete", result: { success:false, status:"error", type:runtime, runtime, command, error, durationMs:Date.now()-started } });
+          close(); return;
+        }
+        // A platform interstitial (Render's "Application loading" HTML while the
+        // service cold-starts) answers 200 with text/html; parsing it as SSE
+        // would just end the stream silently.
+        if (!/text\/event-stream/i.test(response.headers.get("content-type") || "")) {
+          const error = RUNNER_NOT_READY_ERROR;
+          send({ type: "error", error });
+          send({ type: "complete", result: { success:false, status:"error", type:runtime, runtime, command, error, durationMs:Date.now()-started } });
           close(); return;
         }
         const reader = response.body.getReader();

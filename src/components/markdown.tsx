@@ -245,7 +245,7 @@ export function Markdown({
   // table or code fence to a richer element mid-stream can confuse hydration
   // and DOM reconciliation in mobile browsers.
   if (live) {
-    return <div className={cn("assistant-prose min-w-0 max-w-full whitespace-pre-wrap break-words text-[14px] leading-[1.75] tracking-[-0.01em] [overflow-wrap:anywhere]", className)}>{cleanedText}</div>;
+    return <div className={cn("assistant-prose min-w-0 max-w-full whitespace-pre-wrap break-words text-[13px] leading-[1.7] tracking-[-0.01em] [overflow-wrap:anywhere]", className)}>{cleanedText}</div>;
   }
   const parts = splitFences(cleanedText);
   const webParts = parts.filter((part) => part.type === "code" && isWebLang(part.lang));

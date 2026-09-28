@@ -169,7 +169,7 @@ function MessageBubble({
               <Trash2 className="size-3.5" />
             </button>
           </div>
-          <div className="min-w-0 rounded-[20px] rounded-br-md bg-elevated px-3.5 py-2.5 text-[13px] leading-[1.5] shadow-[var(--shadow-border)]">
+          <div className="min-w-0 rounded-[20px] rounded-br-md bg-elevated px-3.5 py-2.5 text-[12px] leading-[1.5] shadow-[var(--shadow-border)]">
             {message.attachments?.length ? (
               <ul className="mb-2 flex flex-wrap gap-1.5">
                 {message.attachments.map((file, index) => (
@@ -193,7 +193,7 @@ function MessageBubble({
   return (
     <div className="lumina-rise group flex gap-3 sm:gap-4">
       <LuminaMark className="mt-0.5 size-7 shrink-0 text-primary" />
-      <div className="min-w-0 max-w-[1080px] flex-1 break-words text-[14px] leading-[1.65] [overflow-wrap:anywhere] sm:text-[13px] sm:leading-[1.55]">
+      <div className="min-w-0 max-w-[1080px] flex-1 break-words text-[13px] leading-[1.6] [overflow-wrap:anywhere] sm:text-[12.5px] sm:leading-[1.55]">
         {message.activities?.length ? <ActivityFeed activities={message.activities} live={live} /> : null}
         {message.thinking ? <ThinkingBlock text={message.thinking} live={live && !message.content} /> : null}
         {empty ? (

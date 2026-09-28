@@ -222,6 +222,11 @@ export const SkillsListResponseSchema = z.object({
     /** Where the runner URL came from. */
     source: z.enum(["env", "default"]),
     runtimes: z.array(z.string()),
+    /**
+     * Whether the app has a `SANDBOX_RUNNER_TOKEN` to authenticate with.
+     * Optional so older server builds still parse.
+     */
+    tokenConfigured: z.boolean().optional(),
   }),
 });
 export type SkillsListResponse = z.infer<typeof SkillsListResponseSchema>;

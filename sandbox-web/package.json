@@ -1,0 +1,15 @@
+{
+  "name": "sandbox-web",
+  "version": "6.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone sandbox execution service: web playground + /execute and /execute/stream API with persistent workspaces.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "RUNNER_TOKEN=dev-token PORT=8788 node server.mjs",
+    "test": "node --test 'test/**/*.test.mjs'"
+  }
+}

@@ -1,13 +1,14 @@
+import { runnerAuthHeaders } from "./runner-config.server.ts";
+
 /** Server-only credentials: never expose RUNNER_TOKEN through VITE_* or the browser. */
 export function runnerHeaders(
   extra: Record<string, string> = {},
   env: NodeJS.ProcessEnv = process.env,
 ): Record<string, string> {
-  const token = env.SANDBOX_RUNNER_TOKEN?.trim() || env.RUNNER_TOKEN?.trim();
   return {
     "content-type": "application/json",
     ...extra,
-    ...(token ? { authorization: `Bearer ${token}` } : {}),
+    ...runnerAuthHeaders(env),
   };
 }
 
