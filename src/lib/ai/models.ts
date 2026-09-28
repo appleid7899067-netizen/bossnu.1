@@ -46,6 +46,21 @@ export const PUTER_MODELS: PuterModelOption[] = [
   { id: "minimax-m3", label: "MiniMax M3", provider: "MiniMax", role: "balanced" },
   { id: "minimax-m2.5", label: "MiniMax M2.5", provider: "MiniMax", role: "balanced" },
   { id: "step-3.7-flash", label: "Step 3.7 Flash", provider: "StepFun", role: "fast" },
+  { id: "deepseek/deepseek-v4.1-flash:free", label: "DeepSeek V4.1 Flash • FREE", provider: "DeepSeek", role: "fast" },
+  { id: "deepseek/deepseek-v4-flash-0731", label: "DeepSeek V4 Flash (0731)", provider: "DeepSeek", role: "fast" },
+  { id: "deepseek/deepseek-v4-flash", label: "DeepSeek V4 Flash", provider: "DeepSeek", role: "fast" },
+  { id: "deepseek/deepseek-v4-pro-0813", label: "DeepSeek V4 Pro (0813)", provider: "DeepSeek", role: "reasoning" },
+  { id: "deepseek/deepseek-v4-pro", label: "DeepSeek V4 Pro", provider: "DeepSeek", role: "reasoning" },
+  { id: "deepseek/deepseek-v3.2", label: "DeepSeek V3.2", provider: "DeepSeek", role: "reasoning" },
+  { id: "qwen/qwen3.8-27b-abliterated-cyber:free", label: "Qwen3.8 27B Abliterated Cyber • FREE", provider: "Qwen", role: "balanced" },
+  { id: "qwen/qwen3.8-max", label: "Qwen3.8 Max", provider: "Qwen", role: "reasoning" },
+  { id: "qwen/qwen3.8-27b", label: "Qwen3.8 27B", provider: "Qwen", role: "balanced" },
+  { id: "qwen/qwen3.8-flash", label: "Qwen3.8 Flash", provider: "Qwen", role: "fast" },
+  { id: "qwen/qwen3.6-flash", label: "Qwen3.6 Flash", provider: "Qwen", role: "fast" },
+  { id: "qwen/qwen3.5-flash", label: "Qwen3.5 Flash", provider: "Qwen", role: "fast" },
+  { id: "qwen/qwen3.7-max", label: "Qwen3.7 Max", provider: "Qwen", role: "reasoning" },
+  { id: "qwen/qwen3-coder-next", label: "Qwen3 Coder Next", provider: "Qwen", role: "coding" },
+  { id: "qwen/qwen3-vl-flash", label: "Qwen3-VL Flash", provider: "Qwen", role: "fast" },
 ];
 
 export const DEFAULT_PUTER_MODEL = "gpt-5.6-luna";
