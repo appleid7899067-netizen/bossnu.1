@@ -38,7 +38,7 @@
 
 | ตัวแปร                      | ค่าเริ่มต้น                                                            | ความหมาย                                                             |
 | --------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `SANDBOX_RUNNER_URL`        | `VITE_SANDBOX_RUNNER_URL` → `https://bossnu1-bash-runner.onrender.com` | URL ของ Sandbox Runner                                               |
+| `SANDBOX_RUNNER_URL`        | `VITE_SANDBOX_RUNNER_URL` → `https://bossnu1.onrender.com` | URL ของ Sandbox Runner                                               |
 | `SANDBOX_RUNNER_TIMEOUT_MS` | `60000`                                                                | เวลารอ runner สูงสุดต่อคำสั่ง                                        |
 | `SANDBOX_ALLOW_ORIGIN`      | `*`                                                                    | ค่า `Access-Control-Allow-Origin` (ตั้งเป็น origin ของคุณเพื่อจำกัด) |
 
@@ -329,3 +329,105 @@ limits. Redeploy the runner with its updated Dockerfile (Git/curl/Python include
 Settings playground uses the same app API rather than external Runlet requests;
 Java/C++ still need a runner image containing those compilers. Puter login is
 required for real model-driven chat; automated E2E uses a deterministic fixture.
+
+## Judge0 backend (optional)
+
+The default remains the existing Sandbox Runner. To switch the app to a **patched,
+self-hosted Judge0 CE** service, configure these **server-side** environment variables
+in the web application's hosting settings, then redeploy/restart the web app:
+
+```text
+SANDBOX_PROVIDER=judge0
+JUDGE0_CE_ENDPOINT=https://YOUR-JUDGE0-SERVICE
+JUDGE0_AUTH_TOKEN=<set privately in hosting settings if required>
+JUDGE0_AUTH_USER=<optional X-Auth-User value>
+JUDGE0_TIMEOUT_MS=120000
+```
+
+Do not put tokens in `VITE_*`, Git, chat, or browser code. `JUDGE0_CE_ENDPOINT` is the base
+URL, not `/submissions`. It must be reachable from the app server; WSL localhost
+is not reachable from Render/Vercel. `SANDBOX_RUNNER_URL` is **not** used in Judge0
+mode. Set `SANDBOX_PROVIDER=runner` to switch back. No Judge0 URL is assumed or
+provisioned by this integration. This adapter calls HTTP directly, not a Judge0 SDK.
+`JUDGE0_CE_ENDPOINT` takes precedence over the legacy `JUDGE0_URL`; a blank preferred
+value falls back to the legacy value. Both names work.
+
+For RapidAPI, use the endpoint and server-side key from your subscribed API:
+
+```text
+SANDBOX_PROVIDER=judge0
+JUDGE0_CE_ENDPOINT=https://judge0-ce.p.rapidapi.com
+JUDGE0_RAPID_API_KEY=<set privately in hosting settings>
+```
+
+The adapter sends `X-RapidAPI-Key` and `X-RapidAPI-Host` on submission and polling
+requests, only to HTTPS `*.p.rapidapi.com` endpoints. It does not forward self-hosted
+`X-Auth-*` credentials there or RapidAPI keys to self-hosted services. Confirm current
+pricing and request quotas with RapidAPI; submission polling also makes API requests.
+
+For a self-hosted service on the **same server/network namespace as the app**, the
+endpoint can be `http://localhost:2358`. Across containers use the service hostname;
+across machines use a reachable private address or protected HTTPS endpoint. A WSL
+localhost or LAN address is not automatically reachable from a hosted app. Restart or
+redeploy after changing environment variables.
+
+The Sali Sandbox screen reads the selected provider from `/api/sandbox`, switches
+its examples to raw source, removes Auto, and omits workspace IDs in Judge0 mode.
+Select Python and enter `print(2 + 2)` (not `python3 -c ...`), or Node and enter
+`console.log(2 + 2)` (not `node -e ...`). An optional stdin field supplies program
+input. Java source should declare `class Main`.
+
+Both existing endpoints accept raw source with an explicit runtime:
+
+```json
+{"type":"python","cmd":"name = input()\nprint('Hello ' + name)","stdin":"World"}
+```
+
+- `POST /api/sandbox` returns the existing command-result JSON shape.
+- `POST /api/sandbox.stream` sends queued/running SSE status while polling and
+  emits stdout/stderr **after completion**, not true live Judge0 output.
+- HTML/CSS/JS iframe previews and JSON validation remain local to the app.
+- Judge0 rejects persistent `workspace`, Python Safe/Aether, and Auto. It does not
+  replace project-building agents, package installation workflows, workspace sync,
+  or persistent web-server previews. These workflows still need the original Runner.
+- Submission POST is never automatically retried (avoids duplicate execution).
+  Cancellation stops waiting; already submitted jobs may finish under Judge0 limits.
+- Source, stdin and output use Judge0 base64 encoding, including Unicode and compiler
+  diagnostics. HTTP failures are not reported as successful code execution.
+- Default CE language IDs: Bash 46, C++ 54, Go 60, Java 62, Node 63, Python 71,
+  Rust 73. Check your service's `/languages`; override server variables such as
+  `JUDGE0_LANGUAGE_PYTHON=71` or `JUDGE0_LANGUAGE_NODE=63` if needed.
+- App requests CPU 5s, wall time 10s, 128000 KB memory, 1024 KB file size and
+  disabled networking. Enforce these restrictions on Judge0 itself too; API flags
+  do not substitute for host hardening, authentication, isolation or quotas.
+- Keep Judge0 private/authenticated and put access controls and rate limits in front
+  of the app's execution endpoints before public deployment. The existing app's
+  preview configuration is not a tenant security boundary. Do not deploy 1.13.1;
+  use a release patched for the known vulnerabilities.
+
+Validation: `node --experimental-strip-types --test scripts/judge0.test.mjs` uses
+mocked upstream responses (no external execution, no credentials required).
+
+## Runner authentication (required by Runner v6)
+
+The Runner denies `/execute` and `/execute/stream` unless a Bearer token matches
+its **server-side** `RUNNER_TOKEN`. The app now sends this on JSON, SSE, and legacy
+fallback requests. Health responding does **not** mean execution is authorized.
+
+- On the **Runner service**, configure `RUNNER_TOKEN` privately.
+- On the **web app service**, configure `SANDBOX_RUNNER_TOKEN` with the same value.
+  `RUNNER_TOKEN` is also accepted on the web app as a compatibility fallback.
+- Never use `VITE_` for either token, send it through browser code, or put it in Git.
+- Restart/redeploy both services after updating their environment settings.
+- This service-to-service credential does not authenticate app visitors. Keep the
+  web app execution endpoints behind access controls before exposing them publicly.
+
+A 401/403 now explains this credential mismatch instead of showing only
+`unauthorized`. Network/TLS failures are a separate problem, not fixed by changing
+variable names. Judge0 credentials are separate and never sent to the Runner.
+
+Real-execution verification (not mocks): after building, run
+`node scripts/sandbox-production-e2e.mjs`. It temporarily starts an authenticated,
+loopback-only Runner and the production app, runs Bash/Node/Python/Python Safe and
+SSE through the app, verifies the real client parser, then stops both. It creates
+random in-memory credentials and uses temporary workspaces. It does not test Render.

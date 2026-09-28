@@ -1,4 +1,6 @@
 import { readdirSync } from "node:fs";
+import { cp, mkdir } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
@@ -176,6 +178,18 @@ export default defineConfig(({ command, isPreview }) => ({
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.
             serverDir: "./server",
+            // PGLite resolves its .data/.wasm files relative to its module. Keep
+            // the package intact instead of relocating JS into Nitro's _libs/.
+            rollupConfig: { external: ["@electric-sql/pglite"] },
+            hooks: {
+              async compiled(nitro) {
+                // Explicit copy: Nitro's Vite build does not trace the assets
+                // of this external dynamic import into the deployment bundle.
+                const target = join(nitro.options.output.serverDir, "node_modules/@electric-sql/pglite");
+                await mkdir(target, { recursive: true });
+                await cp(fileURLToPath(new URL("../", import.meta.resolve("@electric-sql/pglite"))), target, { recursive: true });
+              },
+            },
           }),
         ]
       : []),

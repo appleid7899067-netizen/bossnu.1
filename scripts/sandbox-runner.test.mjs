@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+import { runnerHeaders } from "../src/lib/sandbox/runner-auth.server.ts";
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -7,8 +9,10 @@ import { join } from 'node:path';
 
 test('real runner: persistence, SSE, runtimes, validation, timeout and cancellation', { timeout: 30000 }, async t => {
   const root = await mkdtemp(join(tmpdir(), 'runner-test-'));
+  const token = randomBytes(32).toString("hex");
+  const authHeaders = runnerHeaders({}, { SANDBOX_RUNNER_TOKEN: token });
   const runner = spawn(process.execPath, ['sandbox-runner/server.mjs'], {
-    env: { ...process.env, PORT: '0', WORKSPACE_ROOT: root, WORKSPACE_REPO: '', COMMAND_TIMEOUT_MS: '2000' },
+    env: { ...process.env, HOST: '127.0.0.1', RUNNER_TOKEN: token, PORT: '0', WORKSPACE_ROOT: root, WORKSPACE_REPO: '', COMMAND_TIMEOUT_MS: '2000' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   t.after(async () => { runner.kill(); await rm(root, { recursive: true, force: true }); });
@@ -20,14 +24,21 @@ test('real runner: persistence, SSE, runtimes, validation, timeout and cancellat
   const base = `http://127.0.0.1:${port}`;
   const health = await (await fetch(base + "/health")).json();
   assert.ok(health.runtimes.includes("python-safe")); assert.equal(health.version, 6);
+  // Authentication must stay enforced; fixing the caller must not weaken the runner.
+  for (const path of ['/execute', '/execute/stream']) {
+    for (const headers of [{ 'content-type': 'application/json' }, runnerHeaders({}, { RUNNER_TOKEN: 'wrong-token' })]) {
+      const denied = await fetch(base + path, { method: 'POST', headers, body: JSON.stringify({ command: 'printf should-not-run' }) });
+      assert.equal(denied.status, 401);
+    }
+  }
   // Preserve main's universal-shell contract: language is an optional label.
   for (const language of [undefined, 'javascript', 'custom-toolchain']) {
-    const response = await fetch(base + '/execute', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ command: 'printf universal', language }) });
+    const response = await fetch(base + '/execute', { method: 'POST', headers: authHeaders, body: JSON.stringify({ command: 'printf universal', language }) });
     const result = await response.json();
     assert.equal(result.status, 'success'); assert.equal(result.stdout, 'universal');
   }
 
-  const post = (path, command, workspace, signal, language = 'bash', stdin) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language, command, stdin, workspace }), signal });
+  const post = (path, command, workspace, signal, language = 'bash', stdin) => fetch(base + path, { method: 'POST', headers: authHeaders, body: JSON.stringify({ language, command, stdin, workspace }), signal });
   const execute = async (command, workspace = 'chat_a', language = 'bash', stdin) => (await post('/execute', command, workspace, undefined, language, stdin)).json();
   assert.equal((await execute('printf persistent > note.txt')).status, 'success');
   assert.equal((await execute('cat note.txt')).stdout, 'persistent');

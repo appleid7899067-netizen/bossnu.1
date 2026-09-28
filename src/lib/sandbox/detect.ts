@@ -83,7 +83,7 @@ export function detectSandboxInput(input: string): SandboxDetection {
     return { runtime: "html", label: "HTML / Web", code: value, confidence: "high", webPreview: true, dangerous: false };
   }
   if (/^(?:const|let|var|function|class)\s+/m.test(value) || /(?:document|window)\.[A-Za-z_$]/.test(value)) {
-    return { runtime: "javascript", label: "JavaScript", code: value, confidence: "medium", webPreview: true, dangerous: false };
+    return { runtime: "javascript", label: "JavaScript", code: value, confidence: "high", webPreview: true, dangerous: false };
   }
   if (/^[{[]/.test(value)) {
     try {
@@ -118,6 +118,8 @@ export function detectSandboxInput(input: string): SandboxDetection {
 
 
 export function hasExplicitExecutionIntent(input: string): boolean {
+  // Thai execution verbs commonly attach directly to their object without a space.
+  if (/(?:^|\s)(?:รัน|ทดสอบ|ดีบัก|แก้โค้ด|แก้ปัญหา|ติดตั้ง|ตรวจระบบ|ตรวจจริง|เช็กระบบ|เช็คระบบ|เปิดเว็บ|ซ่อม)/u.test(input.normalize("NFKC"))) return true;
   return /(?:^|\s)(?:รัน|run|execute|ทดสอบ|test|debug|ดีบัก|แก้โค้ด|แก้ปัญหา|ติดตั้ง|install|deploy|build|compile|ตรวจระบบ|ตรวจจริง|เช็กระบบ|เช็คระบบ|เปิดเว็บ|start|serve|commit|push|ซ่อม|repair)(?:\s|$)/iu.test(input.normalize("NFKC")) ||
     /(?:^|\s)(?:สร้าง|create)\s+(?:แอป|เว็บ|เว็บไซต์|โค้ด|ไฟล์|โปรเจกต์|โปรเจ็ค|app|website|web|code|file|project)\b/iu.test(input.normalize("NFKC"));
 }

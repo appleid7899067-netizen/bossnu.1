@@ -23,7 +23,7 @@ test("Python Safe streaming preserves source bytes and sends stdin separately", 
     stdin: "input\n",
     fetch: async (_input, init) => {
       sent = JSON.parse(String(init?.body));
-      return new Response(responseText);
+      return new Response(responseText, { headers: { "content-type": "text/event-stream" } });
     },
   });
   assert.deepEqual(received, safeResult);
@@ -65,4 +65,34 @@ test("reader is cancelled after terminal completion", async () => {
   let cancelled = false;
   const body = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: "complete", result })}\n\n`)); }, cancel() { cancelled = true; } });
   await consumeSandboxStream(body); assert.equal(cancelled, true);
+});
+
+
+test("502 or unexpected HTML never resubmits a possibly executed command", async () => {
+  for (const status of [200, 401, 429, 502, 504]) {
+    let calls = 0;
+    const value = await streamSandboxCommand("echo once", undefined, undefined, {
+      fetch: async () => { calls++; return new Response("<html>loading</html>", { status }); },
+    });
+    assert.equal(calls, 1);
+    assert.equal(value.success, false);
+  }
+});
+test("JSON returned by streaming route is consumed without rerunning", async () => {
+  let calls = 0;
+  const value = await streamSandboxCommand("echo once", undefined, undefined, {
+    fetch: async () => { calls++; return Response.json(result); },
+  });
+  assert.equal(calls, 1);
+  assert.deepEqual(value, result);
+});
+test("only absent streaming endpoints fall back to JSON once", async () => {
+  for (const status of [404, 405]) {
+    const urls: string[] = [];
+    const value = await streamSandboxCommand("echo once", undefined, undefined, {
+      fetch: async (url) => { urls.push(String(url)); return urls.length === 1 ? new Response(null, { status }) : Response.json(result); },
+    });
+    assert.deepEqual(urls, ["/api/sandbox.stream", "/api/sandbox"]);
+    assert.deepEqual(value, result);
+  }
 });

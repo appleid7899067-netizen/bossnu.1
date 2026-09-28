@@ -42,7 +42,7 @@ export type ExecuteOptions = {
   skill?: string;
   /** Runtime hint; omit for auto-detection. */
   type?: CommandType;
-  /** Program stdin (Python Safe only). */
+  /** Program stdin (Python Safe or Judge0). */
   stdin?: string;
   signal?: AbortSignal;
   /** Explicit approval from the user for a command classified as dangerous. */
@@ -208,6 +208,7 @@ export function useSandbox(options: UseSandboxOptions = {}) {
     [baseUrl, timeoutMs, fetchImpl],
   );
 
+  const [provider, setProvider] = useState<"runner" | "judge0">("runner");
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [skillsLoading, setSkillsLoading] = useState(false);
   const [skillsError, setSkillsError] = useState<string | null>(null);
@@ -223,6 +224,7 @@ export function useSandbox(options: UseSandboxOptions = {}) {
     try {
       const list = await client.getSkills();
       setSkills(list.skills);
+      setProvider(list.runner.provider ?? "runner");
       return list;
     } catch (err) {
       setSkillsError(err instanceof Error ? err.message : "โหลดสกิลไม่สำเร็จ");
@@ -320,6 +322,7 @@ export function useSandbox(options: UseSandboxOptions = {}) {
 
   return {
     client,
+    provider,
     skills,
     skillsLoading,
     skillsError,

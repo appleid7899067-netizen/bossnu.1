@@ -3,3 +3,7 @@ node_modules/
 .github_repo
 .env
 .env.*
+
+# Generated deployment output (never commit new build artifacts).
+.output/
+.vercel/output/

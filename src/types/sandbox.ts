@@ -13,13 +13,13 @@ import { z } from "zod";
 export const SANDBOX_API_PATH = "/api/sandbox";
 
 /** Runner used when neither SANDBOX_RUNNER_URL nor VITE_SANDBOX_RUNNER_URL is set. */
-export const DEFAULT_SANDBOX_RUNNER_URL = "https://bossnu1-bash-runner.onrender.com";
+export const DEFAULT_SANDBOX_RUNNER_URL = "https://bossnu1.onrender.com";
 
 /** Hard limits shared by client validation and the server route. */
 export const SANDBOX_LIMITS = {
   /** Max characters accepted in `cmd` (also the runner's script/source limit). */
   commandChars: 32_000,
-  /** Max characters of optional stdin passed to Python Safe programs. */
+  /** Max characters of optional stdin passed to Python Safe or Judge0 programs. */
   stdinChars: 32_000,
   /** Max characters of combined stdout/stderr echoed back to the browser. */
   outputChars: 64_000,
@@ -217,6 +217,7 @@ export const SkillsListResponseSchema = z.object({
   count: z.number().int().nonnegative(),
   skills: z.array(SkillInfoSchema),
   runner: z.object({
+    provider: z.enum(["runner", "judge0"]).optional(),
     configured: z.boolean(),
     /** Where the runner URL came from. */
     source: z.enum(["env", "default"]),
@@ -233,7 +234,7 @@ export const CommandRequestSchema = z
   .object({
     /** Command line or raw script/source; kept untrimmed for Python Safe. */
     cmd: z.string().min(1).max(SANDBOX_LIMITS.commandChars).optional(),
-    /** Program stdin (Python Safe only). */
+    /** Program stdin (Python Safe or Judge0). */
     stdin: z.string().max(SANDBOX_LIMITS.stdinChars).optional(),
     /** Grok skill to load (alone) or to attach to the run. */
     skill: skillIdSchema.optional(),

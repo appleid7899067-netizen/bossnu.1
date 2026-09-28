@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SandboxRouteImport } from './routes/sandbox'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiSandboxRouteImport } from './routes/api/sandbox'
 import { Route as ApiSandboxDotstreamRouteImport } from './routes/api/sandbox[.]stream'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const SandboxRoute = SandboxRouteImport.update({
   id: '/sandbox',
   path: '/sandbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSandboxRoute = ApiSandboxRouteImport.update({
@@ -44,6 +50,7 @@ const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/sandbox': typeof SandboxRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/sandbox': typeof ApiSandboxRoute
   '/api/sandbox.stream': typeof ApiSandboxDotstreamRoute
   '/api/workspace': typeof ApiWorkspaceRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sandbox': typeof SandboxRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/sandbox': typeof ApiSandboxRoute
   '/api/sandbox.stream': typeof ApiSandboxDotstreamRoute
   '/api/workspace': typeof ApiWorkspaceRoute
@@ -59,6 +67,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/sandbox': typeof SandboxRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/sandbox': typeof ApiSandboxRoute
   '/api/sandbox.stream': typeof ApiSandboxDotstreamRoute
   '/api/workspace': typeof ApiWorkspaceRoute
@@ -66,14 +75,25 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/sandbox' | '/api/sandbox' | '/api/sandbox.stream' | '/api/workspace'
+    | '/'
+    | '/sandbox'
+    | '/api/health'
+    | '/api/sandbox'
+    | '/api/sandbox.stream'
+    | '/api/workspace'
   fileRoutesByTo: FileRoutesByTo
   to:
-    '/' | '/sandbox' | '/api/sandbox' | '/api/sandbox.stream' | '/api/workspace'
+    | '/'
+    | '/sandbox'
+    | '/api/health'
+    | '/api/sandbox'
+    | '/api/sandbox.stream'
+    | '/api/workspace'
   id:
     | '__root__'
     | '/'
     | '/sandbox'
+    | '/api/health'
     | '/api/sandbox'
     | '/api/sandbox.stream'
     | '/api/workspace'
@@ -82,6 +102,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SandboxRoute: typeof SandboxRoute
+  ApiHealthRoute: typeof ApiHealthRoute
   ApiSandboxRoute: typeof ApiSandboxRoute
   ApiSandboxDotstreamRoute: typeof ApiSandboxDotstreamRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
@@ -101,6 +122,13 @@ declare module '@tanstack/react-router' {
       path: '/sandbox'
       fullPath: '/sandbox'
       preLoaderRoute: typeof SandboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sandbox': {
@@ -130,6 +158,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SandboxRoute: SandboxRoute,
+  ApiHealthRoute: ApiHealthRoute,
   ApiSandboxRoute: ApiSandboxRoute,
   ApiSandboxDotstreamRoute: ApiSandboxDotstreamRoute,
   ApiWorkspaceRoute: ApiWorkspaceRoute,

@@ -81,6 +81,7 @@ export function SaliAgent({
   leading?: ReactNode;
 }) {
   const sandbox = useSandbox();
+  const judge0 = sandbox.provider === "judge0";
   const [workspace] = useState(() => {
     const key = "boss_workspace_id";
     const existing = window.localStorage.getItem(key);
@@ -93,11 +94,16 @@ export function SaliAgent({
   const runLock = useRef(false);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [draft, setDraft] = useState("");
+  const [programInput, setProgramInput] = useState("");
   const [typeHint, setTypeHint] = useState<CommandType>("auto");
   const [activeSkill, setActiveSkill] = useState<SkillInfo | null>(null);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const bootRef = useRef(false);
+
+  useEffect(() => {
+    if (judge0) setTypeHint(current => current === "auto" ? "python" : current);
+  }, [judge0]);
 
   const skillById = useMemo(() => new Map(sandbox.skills.map((s) => [s.id, s])), [sandbox.skills]);
 
@@ -162,7 +168,7 @@ export function SaliAgent({
         onStatusChange: steps => setLive(current => current ? { ...current, steps } : current),
         onOutputChange: output => setLive(current => current ? { ...current, output } : current),
       });
-      const options = { skill: activeSkill?.id, workspace, type: type === "auto" ? undefined : type, allowDangerous: risk.dangerous };
+      const options = { stdin: judge0 ? programInput : undefined, skill: activeSkill?.id, workspace: judge0 ? undefined : workspace, type: type === "auto" ? undefined : type, allowDangerous: risk.dangerous };
       const result = streaming
         ? await sandbox.executeStream(command, { ...options, onEvent: event => collector.handle(event) })
         : await sandbox.execute(command, options);
@@ -214,7 +220,7 @@ export function SaliAgent({
                 sandbox.skillsError ? "bg-rose-500" : "bg-emerald-500",
               )}
             />
-            {sandbox.skillsError ? "API ไม่พร้อม" : `API พร้อม • ${sandbox.skills.length} สกิล`}
+            {sandbox.skillsError ? "API ไม่พร้อม" : `โหลดแล้ว ${sandbox.skills.length} สกิล • ยังไม่ยืนยันบริการรัน`}
           </span>
           <Button
             variant="ghost"
@@ -290,6 +296,7 @@ export function SaliAgent({
             <div className="mx-auto flex w-full max-w-[880px] flex-col gap-4 px-4 py-5 sm:px-6">
               {empty ? (
                 <EmptyState
+                  judge0={judge0}
                   skills={sandbox.skills.slice(0, 6)}
                   onExample={(ex) => void runCommand(ex.cmd, ex.type ?? "auto")}
                   onSkill={(skill) => void openSkill(skill)}
@@ -364,7 +371,7 @@ export function SaliAgent({
             <div className="mx-auto w-full max-w-[880px]">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <div className="flex rounded-lg bg-elevated p-0.5">
-                  {TYPE_OPTIONS.map((opt) => (
+                  {(judge0 ? [...TYPE_OPTIONS.filter(opt => opt.id !== "auto"), ...(["go", "rust", "java", "cpp"] as const).map(id => ({ id, label: id }))] : TYPE_OPTIONS).map((opt) => (
                     <button
                       key={opt.id}
                       type="button"
@@ -397,13 +404,21 @@ export function SaliAgent({
                 )}
               </div>
 
+              {judge0 && (
+                <label className="mb-2 block text-xs text-muted">
+                  stdin (ข้อมูลเข้าโปรแกรม ไม่บังคับ)
+                  <textarea value={programInput} onChange={e => setProgramInput(e.target.value)}
+                    maxLength={32000} rows={2} className="mt-1 block w-full rounded-lg bg-elevated p-2 font-mono text-fg"
+                    placeholder="ข้อมูลที่โปรแกรมอ่านผ่าน input() หรือ stdin" />
+                </label>
+              )}
               <div className="flex items-end gap-2 rounded-2xl bg-elevated p-2 shadow-[var(--shadow-border)] focus-within:shadow-[0_0_0_2px_var(--color-primary)]">
                 <textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={onKeyDown}
                   rows={1}
-                  placeholder="พิมพ์คำสั่ง เช่น npm --version, python3 -c ..., หรือวาง HTML"
+                  placeholder={judge0 ? "Judge0: เลือกภาษาแล้ววางซอร์สโค้ด เช่น print(2 + 2) — ไม่มี Workspace / Live Preview" : "พิมพ์คำสั่ง เช่น npm --version, python3 -c ..., หรือวาง HTML"}
                   className="max-h-40 min-h-[40px] flex-1 resize-none bg-transparent px-2 py-2 font-mono text-[13px] leading-[1.5] outline-none placeholder:font-sans placeholder:text-subtle"
                   style={{
                     height: `${Math.min(160, 24 + 20 * Math.max(1, draft.split("\n").length))}px`,
@@ -530,11 +545,13 @@ function SkillsPanel({
 }
 
 function EmptyState({
+  judge0 = false,
   skills,
   onExample,
   onSkill,
 }: {
   skills: SkillInfo[];
+  judge0?: boolean;
   onExample: (example: (typeof EXAMPLES)[number]) => void;
   onSkill: (skill: SkillInfo) => void;
 }) {
@@ -547,11 +564,14 @@ function EmptyState({
         สลี่พร้อมรันให้ค่ะ
       </h2>
       <p className="mt-1.5 max-w-[34rem] text-[13px] leading-relaxed text-muted">
-        พิมพ์คำสั่ง Node / Python / Bash เพื่อรันในแซนด์บ็อกจริง วาง HTML เพื่อดู Live Preview ทันที
-        หรือเลือก Grok Skill เพื่อโหลดคู่มือมาใช้ประกอบงาน
+        {judge0 ? "Judge0: เลือกภาษาแล้วส่งซอร์สโค้ด แสดงผลเมื่อรันเสร็จ ไม่มี Workspace ถาวรหรือ Live Preview ของเซิร์ฟเวอร์" : "พิมพ์คำสั่ง Node / Python / Bash เพื่อรันในแซนด์บ็อกจริง วาง HTML เพื่อดู Live Preview ทันที หรือเลือก Grok Skill เพื่อโหลดคู่มือมาใช้ประกอบงาน"}
       </p>
       <div className="mt-6 grid w-full max-w-[640px] grid-cols-1 gap-2 sm:grid-cols-2">
-        {EXAMPLES.map((ex) => (
+        {(judge0 ? [
+          { label: "Node: 2 + 2", cmd: "console.log(2 + 2)", type: "node" as const },
+          { label: "Python: 2 + 2", cmd: "print(2 + 2)", type: "python" as const },
+          EXAMPLES[2], EXAMPLES[3],
+        ] : EXAMPLES).map((ex) => (
           <button
             key={ex.label}
             type="button"

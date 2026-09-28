@@ -11,7 +11,7 @@ export type SandboxExecutionResult = {
   durationMs?: number;
 };
 
-const DEFAULT_SANDBOX_RUNNER_URL = "https://bossnu1-bash-runner.onrender.com";
+const DEFAULT_SANDBOX_RUNNER_URL = "https://bossnu1.onrender.com";
 const runner = (import.meta.env.VITE_SANDBOX_RUNNER_URL || DEFAULT_SANDBOX_RUNNER_URL).replace(/\/$/, "");
 
 export async function executeSandbox(detection: SandboxDetection): Promise<SandboxExecutionResult> {

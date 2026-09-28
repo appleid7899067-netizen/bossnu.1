@@ -98,9 +98,8 @@ export async function streamSandboxCommand(
     skill, workspace: options.workspace, type: options.type, stdin: options.stdin, allowDangerous: options.allowDangerous,
   });
 
-  // Prefer the streaming endpoint when the server exposes it. Some deployments
-  // only ship the canonical /api/sandbox route, so fall back to its JSON response
-  // instead of turning a valid sandbox into a false "not found" error.
+  // Retry only if the streaming route is absent. A 5xx, wrong MIME type or
+  // JSON response may occur AFTER execution: retrying could run the command twice.
   let response = await (options.fetch ?? fetch)(`${base}.stream`, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "text/event-stream" },
@@ -108,14 +107,18 @@ export async function streamSandboxCommand(
     body,
   });
 
-  const contentType = response.headers.get("content-type") ?? "";
-  if (response.status === 404 || !contentType.includes("text/event-stream")) {
+  if (response.status === 404 || response.status === 405) {
+    await response.body?.cancel();
     response = await (options.fetch ?? fetch)(base, {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json" },
       signal,
       body,
     });
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("text/event-stream")) {
     if (!response.ok) {
       const data = await response.json().catch(() => null);
       return errorResult(typeof data?.error === "string" ? data.error : `Sandbox API HTTP ${response.status}`);
