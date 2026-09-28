@@ -47,6 +47,10 @@ root ของ workspace ขณะที่ไฟล์โปรเจกต์�
 cd sandbox-web
 RUNNER_TOKEN=dev-token npm run dev      # http://localhost:8788
 npm test                                # 15 tests, รันเซิร์ฟเวอร์จริง
+
+# เทสต์ฝั่ง UI (โหลด index.html + js/app.js จริงลงใน jsdom แล้วคลิก)
+# อยู่ที่ root ของ repo เพราะต้องใช้ devDependency
+cd .. && node --test scripts/sandbox-console-ui.test.mjs
 ```
 
 ## Deploy ขึ้น Render (Blueprint คลิกเดียว)
