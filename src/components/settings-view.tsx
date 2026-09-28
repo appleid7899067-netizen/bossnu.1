@@ -75,6 +75,41 @@ export function SettingsView() {
     window.setTimeout(() => setSaved(false), 900);
   };
 
+  const rememberSaliSettings = async () => {
+    const p = store.personality;
+    const content = [
+      `ชื่อผู้ช่วย: ${p.name}`,
+      `โทนเสียง: ${p.tone}`,
+      `ลงมือทำก่อนอธิบาย: ${p.actFirst ? "เปิด" : "ปิด"}`,
+      `ภาษาไทยเป็นหลัก: ${p.thaiFirst ? "เปิด" : "ปิด"}`,
+      `ตอบน่ารักแบบสลี่: ${p.warm ? "เปิด" : "ปิด"}`,
+      `โหมดดาร์ก: ${p.darkMode ? "เปิด" : "ปิด"}`,
+    ].join(" • ");
+    store.addMemory(`[ตั้งค่าสลี่] ${content}`);
+    try {
+      const workspaceId = localStorage.getItem("bossnu-workspace-id") || (() => {
+        const id = `sali-${crypto.randomUUID()}`;
+        localStorage.setItem("bossnu-workspace-id", id);
+        return id;
+      })();
+      const response = await fetch("/api/workspace", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          workspaceId,
+          action: "remember",
+          key: "sali-settings",
+          value: content,
+          source: "settings",
+        }),
+      });
+      if (!response.ok) throw new Error("memory sync failed");
+      toast.success("สลี่บันทึกเข้าความจำแล้ว ✓");
+    } catch {
+      toast.error("บันทึกความจำในเครื่องแล้ว แต่ซิงก์ Neon ยังไม่สำเร็จ");
+    }
+  };
+
   const runSandbox = async () => {
     setSandboxBusy(true);
     setSandboxOutput("กำลังเปิด sandbox และรันโค้ด…");
@@ -158,7 +193,7 @@ printf %s ${quote(sandboxInput)} > stdin.txt
       </div>
 
       {tab==="personality" ? <div className="grid gap-4 md:grid-cols-2">
-        <Panel title="บุคลิคหลัก" icon={Sparkles}><label className="block text-sm text-muted">ชื่อผู้ช่วย<input value={store.personality.name} onChange={e=>save({name:e.target.value})} className="mt-1 w-full rounded-xl bg-clay px-3 py-2.5 outline-none"/></label><label className="mt-3 block text-sm text-muted">โทนเสียง<textarea value={store.personality.tone} onChange={e=>save({tone:e.target.value})} rows={4} className="mt-1 w-full resize-none rounded-xl bg-clay px-3 py-2.5 outline-none"/></label></Panel>
+        <Panel title="บุคลิคหลัก" icon={Sparkles}><label className="block text-sm text-muted">ชื่อผู้ช่วย<input value={store.personality.name} onChange={e=>save({name:e.target.value})} className="mt-1 w-full rounded-xl bg-clay px-3 py-2.5 outline-none"/></label><label className="mt-3 block text-sm text-muted">โทนเสียง<textarea value={store.personality.tone} onChange={e=>save({tone:e.target.value})} rows={4} className="mt-1 w-full resize-none rounded-xl bg-clay px-3 py-2.5 outline-none"/></label><Button className="mt-3 w-full" onClick={() => void rememberSaliSettings()}><Brain className="size-4"/>บันทึกเข้าความจำสลี่</Button></Panel>
         <Panel title="พฤติกรรม" icon={UserRound}><Toggle label="ลงมือทำก่อนอธิบาย" value={store.personality.actFirst} onChange={v=>save({actFirst:v})}/><Toggle label="พูดภาษาไทยเป็นหลัก" value={store.personality.thaiFirst} onChange={v=>save({thaiFirst:v})}/><Toggle label="ตอบน่ารักแบบสลี่" value={store.personality.warm} onChange={v=>save({warm:v})}/><Toggle label="โหมดดาร์ก" value={store.personality.darkMode} onChange={v=>save({darkMode:v})}/></Panel>
       </div> : null}
 
@@ -170,7 +205,7 @@ printf %s ${quote(sandboxInput)} > stdin.txt
         <div className="mb-4 rounded-2xl border border-primary/20 bg-primary/5 p-4"><p className="text-sm font-semibold">ตัวแทนที่ดีควรมีอะไรบ้าง?</p><p className="mt-2 text-xs leading-relaxed text-muted">บทบาทที่ชัดเจน • คำสั่งการทำงาน • สกิลที่อนุญาต • การตรวจผลลัพธ์ • ขอบเขตความปลอดภัย และรูปแบบคำตอบ</p><div className="mt-3 grid gap-2 text-xs text-muted sm:grid-cols-2"><span>✓ รับเป้าหมายและวางแผน</span><span>✓ ลงมือทำตามสกิล</span><span>✓ ตรวจสอบก่อนรายงาน</span><span>✓ ขออนุญาตงานเสี่ยง</span></div></div>
         <div className="grid gap-3 md:grid-cols-2">{store.agentProfiles.map(agent=><div key={agent.id} className="rounded-2xl bg-clay p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0 flex-1"><input value={agent.name} onChange={e=>store.updateAgentProfile(agent.id,{name:e.target.value})} className="w-full bg-transparent font-semibold outline-none"/><input value={agent.role} onChange={e=>store.updateAgentProfile(agent.id,{role:e.target.value})} className="mt-1 w-full bg-transparent text-xs text-muted outline-none" placeholder="บทบาท เช่น Coding Agent"/></div><button type="button" onClick={()=>store.deleteAgentProfile(agent.id)} className="text-subtle hover:text-fg"><Trash2 className="size-4"/></button></div><textarea value={agent.instructions} onChange={e=>store.updateAgentProfile(agent.id,{instructions:e.target.value})} rows={4} className="mt-3 w-full resize-none rounded-xl bg-bg/50 p-3 text-sm text-muted outline-none" placeholder="เขียน system instructions ของตัวแทน..."/><p className="mt-2 text-[11px] text-subtle">สกิลที่เปิดใช้: {agent.skills.length ? agent.skills.join(", ") : "ยังไม่ได้เลือก"}</p><div className="mt-3 flex flex-wrap gap-1.5">{skills.map(skill=><button key={skill.id} type="button" onClick={()=>store.updateAgentProfile(agent.id,{skills:agent.skills.includes(skill.id)?agent.skills.filter(id=>id!==skill.id):[...agent.skills,skill.id]})} className={cn("rounded-full px-2.5 py-1 text-[11px]",agent.skills.includes(skill.id)?"bg-fg text-bg":"bg-elevated text-muted")}>{skill.name}</button>)}</div></div>)}</div><div className="mt-4 flex gap-2"><input value={newAgent} onChange={e=>setNewAgent(e.target.value)} placeholder="ชื่อตัวแทนใหม่" className="min-w-0 flex-1 rounded-xl bg-clay px-3 py-2.5 outline-none"/><Button onClick={()=>{if(newAgent.trim()){store.addAgentProfile({id:crypto.randomUUID(),name:newAgent.trim(),role:"Custom Agent",instructions:"รับเป้าหมาย วางแผน ลงมือทำ ตรวจผล และสรุปสั้น ๆ หากพบงานอันตรายให้ขออนุญาตก่อน",skills:skills.filter(x=>x.enabled).map(x=>x.id),createdAt:Date.now()});setNewAgent("")}}}><Plus className="size-4"/>เพิ่ม</Button></div></Panel> : null}
 
-      {tab==="memory" ? <Panel title="สมองความจำ" icon={Brain}><div className="mb-4 rounded-xl bg-clay p-3 text-sm text-muted">ความจำชุดนี้เก็บในเครื่องและถูกใช้เป็นบริบทของสลี่ในการสนทนาครั้งต่อไป</div><div className="space-y-2">{store.memory.map(item=><div key={item.id} className="flex items-start gap-3 rounded-xl bg-clay p-3"><div className="min-w-0 flex-1"><p className="text-sm">{item.content}</p><p className="mt-1 text-[11px] text-subtle">{new Date(item.createdAt).toLocaleString("th-TH")}</p></div><button type="button" onClick={()=>store.deleteMemory(item.id)} className="text-subtle hover:text-fg"><Trash2 className="size-4"/></button></div>)}</div><div className="mt-4 flex gap-2"><input value={newMemory} onChange={e=>setNewMemory(e.target.value)} placeholder="เช่น ชอบ UI แบบกว้างและเรียบ" className="min-w-0 flex-1 rounded-xl bg-clay px-3 py-2.5 outline-none"/><Button onClick={()=>{if(newMemory.trim()){store.addMemory(newMemory.trim());setNewMemory("")}}}><Plus className="size-4"/>จำ</Button></div></Panel> : null}
+      {tab==="memory" ? <Panel title="สมองความจำ" icon={Brain}><div className="mb-4 rounded-xl bg-clay p-3 text-sm text-muted">ความจำจะแสดงทันทีหลังบันทึก และส่งเข้า Neon Workspace เพื่อให้สลี่เรียกใช้ต่อได้</div><div className="space-y-2">{store.memory.map(item=><div key={item.id} className="flex items-start gap-3 rounded-xl bg-clay p-3"><div className="min-w-0 flex-1"><p className="text-sm">{item.content}</p><p className="mt-1 text-[11px] text-subtle">{new Date(item.createdAt).toLocaleString("th-TH")}</p></div><button type="button" onClick={()=>store.deleteMemory(item.id)} className="text-subtle hover:text-fg"><Trash2 className="size-4"/></button></div>)}</div><div className="mt-4 flex gap-2"><input value={newMemory} onChange={e=>setNewMemory(e.target.value)} placeholder="เช่น ชอบ UI แบบกว้างและเรียบ" className="min-w-0 flex-1 rounded-xl bg-clay px-3 py-2.5 outline-none"/><Button onClick={()=>{if(newMemory.trim()){store.addMemory(newMemory.trim());setNewMemory("")}}}><Plus className="size-4"/>จำ</Button></div></Panel> : null}
 
       {tab==="profiles" ? <Panel title="แฟ้มโปรไฟล์ตัวแทน" icon={FolderOpen}><div className="grid gap-3 md:grid-cols-2">{store.agentProfiles.map(agent=><div key={agent.id} className="rounded-2xl bg-clay p-4"><div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-elevated"><Bot className="size-5"/></div><div><p className="font-medium">{agent.name}</p><p className="text-xs text-muted">{agent.role}</p></div></div><div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted"><span>สกิล {agent.skills.length}</span><span>สร้าง {new Date(agent.createdAt).toLocaleDateString("th-TH")}</span></div><div className="mt-3 rounded-xl bg-bg/50 p-3 text-xs leading-relaxed text-muted">{agent.instructions}</div></div>)}</div></Panel> : null}
 
