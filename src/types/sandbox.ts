@@ -13,7 +13,7 @@ import { z } from "zod";
 export const SANDBOX_API_PATH = "/api/sandbox";
 
 /** Runner used when neither SANDBOX_RUNNER_URL nor VITE_SANDBOX_RUNNER_URL is set. */
-export const DEFAULT_SANDBOX_RUNNER_URL = "https://bossnu1.onrender.com";
+export const DEFAULT_SANDBOX_RUNNER_URL = "https://bossnu1-bash-runner.onrender.com";
 
 /** Hard limits shared by client validation and the server route. */
 export const SANDBOX_LIMITS = {

@@ -1,6 +1,6 @@
 {
   "VITE_AUTH_ENABLED": "false",
-  "VITE_SANDBOX_RUNNER_URL": "https://bossnu1.onrender.com",
+  "VITE_SANDBOX_RUNNER_URL": "https://bossnu1-bash-runner.onrender.com",
   "deploy": {
     "database": false
   }
