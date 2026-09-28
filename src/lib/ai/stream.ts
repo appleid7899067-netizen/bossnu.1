@@ -142,13 +142,14 @@ export async function streamChat(opts: {
       try {
         response = await puter.ai.chat(
           [{ role: "system", content: system }, ...contextMessages],
-      {
-        model: selectedModel,
+          {
+            model: selectedModel,
         stream: true,
         temperature: opts.mode === "think" ? 0.6 : 0.7,
         max_tokens: opts.mode === "think" ? 2200 : 1400,
         reasoning_effort: opts.mode === "think" ? "medium" : "low",
-        normalize: true,
+            normalize: true,
+          },
         );
         lastError = undefined;
         break;
