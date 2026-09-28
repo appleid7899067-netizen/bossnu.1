@@ -187,6 +187,10 @@ function executionEnv(cwd) {
     npm_config_update_notifier: "false",
     npm_config_progress: "false",
     npm_config_loglevel: "error",
+    // npm otherwise drops its cache and `_logs/*.log` debug files inside the
+    // workspace, where the snapshot picks them up and the console's file tree
+    // shows them as if they were the user's project files.
+    npm_config_cache: join(tmpdir(), "sandbox-web-npm-cache"),
   };
 }
 

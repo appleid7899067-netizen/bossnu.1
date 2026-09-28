@@ -286,6 +286,15 @@ test("a dev server started from a subdirectory gets a working preview", async (t
   const preview = await fetch(base + dev.previewPath);
   assert.equal(preview.status, 200);
   assert.match(await preview.text(), /preview-ok/);
+
+  // The `npm install` this path runs must not litter the workspace: the console
+  // renders the snapshot as a file tree, so npm's own cache/logs would show up
+  // as project files. The lockfile it writes is legitimate project state.
+  assert.deepEqual(dev.workspaceSnapshot.paths.sort(), [
+    "project/site/package-lock.json",
+    "project/site/package.json",
+    "project/site/server.mjs",
+  ]);
 });
 
 test("CONSOLE_DEMO_TOKEN pre-fills the console token, and only when it matches", async (t) => {
