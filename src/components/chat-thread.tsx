@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowRightLeft, Check, CircleCheck, CircleX, Copy, FileDiff, FilePlus2, FileText, LoaderCircle, Pencil, RefreshCw, Sparkles, Terminal, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowRightLeft, Check, CircleCheck, CircleX, Copy, FileDiff, FilePlus2, FileText, LoaderCircle, Pencil, RefreshCw, Sparkles, Terminal, Trash2, Volume2 } from "lucide-react";
 import { formatBytes } from "@/lib/attachments";
 import { Markdown } from "@/components/markdown";
 import type { ChatActivity, ChatMessage } from "@/lib/types";
 import { LuminaMark } from "@/components/lumina-mark";
+import { speakNow, stopVoice } from "@/lib/ai/voice";
 
 export type SandboxRunView = {
   runtime: string;
@@ -31,6 +32,7 @@ export function ChatThread({
   onEditMessage?: (id: string, content: string) => void;
   /** Re-ask the last user message. */
   onRegenerate?: () => void;
+  onContextAction?: (action: string) => void;
   busy?: boolean;
   sandboxRun?: SandboxRunView | null;
 }) {
@@ -71,6 +73,7 @@ export function ChatThread({
             onDelete={() => onDeleteMessage?.(m.id)}
             onEdit={onEditMessage ? (content) => onEditMessage(m.id, content) : undefined}
             onRegenerate={onRegenerate}
+            onContextAction={onContextAction}
           />
         ))}
         {sandboxRun?.previewHtml ? <SandboxHtmlPreview html={sandboxRun.previewHtml} /> : null}
@@ -99,6 +102,7 @@ function MessageBubble({
   onDelete,
   onEdit,
   onRegenerate,
+  onContextAction,
 }: {
   message: ChatMessage;
   live: boolean;
@@ -107,6 +111,7 @@ function MessageBubble({
   onDelete: () => void;
   onEdit?: (content: string) => void;
   onRegenerate?: () => void;
+  onContextAction?: (action: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
@@ -209,6 +214,8 @@ function MessageBubble({
           <div className="mt-2 flex items-center gap-1">
             <time className="mr-1 inline-flex h-8 items-center rounded-lg px-1 text-[10px] tabular-nums text-subtle opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100">{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
             <CopyLine text={message.content} />
+            <ListenLine text={message.content} />
+            {isLast && onContextAction ? <ContextualReplyActions text={message.content} onAction={onContextAction} /> : null}
             {isLast && onRegenerate ? (
               <button
                 type="button"
@@ -357,6 +364,70 @@ function CopyLine({ text }: { text: string }) {
       {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
       {copied ? "คัดลอกแล้ว" : "คัดลอก"}
     </button>
+  );
+}
+
+function ListenLine({ text }: { text: string }) {
+  const [speaking, setSpeaking] = useState(false);
+  return (
+    <button type="button"
+      className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-fg disabled:opacity-40"
+      onClick={async () => {
+        if (speaking) { stopVoice(); setSpeaking(false); return; }
+        setSpeaking(true);
+        try { await speakNow(text); } finally { setSpeaking(false); }
+      }}
+      aria-label={speaking ? "หยุดเสียง" : "ฟังคำตอบ"} title={speaking ? "หยุดเสียง" : "ฟังคำตอบ"}
+    >
+      <Volume2 className="size-3.5" />
+      {speaking ? "กำลังอ่าน" : "ฟัง"}
+    </button>
+  );
+}
+
+function getContextualReplyActions(text: string): string[] {
+  const q = text.toLowerCase();
+  const actions: string[] = [];
+  const add = (label: string) => { if (!actions.includes(label)) actions.push(label); };
+  if (/html|css|javascript|typescript|react|next\.js|โค้ด|code|component|function|api|json/.test(q)) {
+    add("ดูโค้ดส่วนนี้"); add("แก้ต่อจากคำตอบ"); add("ทดสอบโค้ด");
+  }
+  if (/error|bug|บั๊ก|ผิดพลาด|exception|ล้มเหลว|แก้ไข/.test(q)) {
+    add("วิเคราะห์ Error ต่อ"); add("แก้แล้วตรวจสอบ"); add("ดู Log");
+  }
+  if (/สูตร|อาหาร|เมนู|ทำกิน|วัตถุดิบ|recipe|food|calorie|แคลอรี/.test(q)) {
+    add("ขอสูตรแบบละเอียด"); add("คำนวณปริมาณให้"); add("แนะนำเมนูอื่น");
+  }
+  if (/งาน|ประชุม|โปรเจกต์|project|task|แผนงาน|เอกสาร|report|รายงาน|อีเมล/.test(q)) {
+    add("สรุปให้เป็นรายการ"); add("จัดลำดับงานต่อ"); add("ลงมือทำต่อ");
+  }
+  if (/github|repo|commit|branch|pull request|\bpr\b|render|deploy|deployment/.test(q)) {
+    add("ตรวจ Repo ต่อ"); add("แก้ไฟล์ต่อ"); add("ตรวจ Deploy");
+  }
+  if (/วิเคราะห์|ข้อมูล|ตาราง|csv|excel|กราฟ|สถิติ|data|analysis/.test(q)) {
+    add("สรุปข้อมูลให้"); add("ทำเป็นตาราง"); add("วิเคราะห์ต่อ");
+  }
+  if (/สรุป|อธิบาย|หมายถึง|คืออะไร|รายละเอียด|เปรียบเทียบ|ข้อดี|ข้อเสีย|compare|explain/.test(q)) {
+    add("ขยายรายละเอียด"); add("สรุปสั้นๆ");
+  }
+  if (!actions.length && text.trim()) {
+    add("ขยายรายละเอียด"); add("สรุปคำตอบ"); add("ลงมือทำต่อ");
+  }
+  return actions.slice(0, 4);
+}
+
+function ContextualReplyActions({ text, onAction }: { text: string; onAction: (action: string) => void }) {
+  const actions = getContextualReplyActions(text);
+  if (!actions.length) return null;
+  return (
+    <div className="mt-2 flex w-full flex-wrap gap-1.5">
+      {actions.map((action) => (
+        <button key={action} type="button" onClick={() => onAction(action)}
+          className="inline-flex h-8 items-center rounded-full border border-border/70 bg-elevated/60 px-3 text-[11px] font-medium text-muted transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-fg">
+          {action}
+        </button>
+      ))}
+    </div>
   );
 }
 
