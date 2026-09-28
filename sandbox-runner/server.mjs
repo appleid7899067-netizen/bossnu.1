@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { writeFile } from "node:fs/promises";
 import { reconcileSeed, snapshotWorkspace, SNAPSHOT_VERSION } from "./sync.mjs";
 
 const PORT = Number(process.env.PORT || 8787);
@@ -13,12 +14,25 @@ const MAX_PYTHON_SAFE_INPUT = 32_000;
 // Seeds carry the workspace's project files from Neon, so the body limit is generous.
 const MAX_BODY = Number(process.env.MAX_BODY_BYTES) || 16 * 1024 * 1024;
 const RUNNER_VERSION = 6;
-const RUNNER_RUNTIMES = ["node", "python", "python-safe", "bash", "go", "rust", "java", "cpp"];
+const RUNNER_RUNTIMES = ["node", "javascript", "python", "python-safe", "bash", "go", "rust", "java", "cpp"];
 const MAX_OUTPUT = 64 * 1024;
 const TIMEOUT_MS = Math.min(300000, Math.max(1000, Number(process.env.COMMAND_TIMEOUT_MS || process.env.SANDBOX_TIMEOUT_MS) || 120000));
 const DEV_TIMEOUT_MS = Math.min(300000, Math.max(1000, Number(process.env.SANDBOX_DEV_TIMEOUT_MS) || 180000));
 const WORKSPACE_REPO = process.env.WORKSPACE_REPO || "";
 const sessions = new Map();
+const RUNNER_TOKEN = process.env.RUNNER_TOKEN || "";
+const MAX_ACTIVE_RUNS = Math.max(1, Number(process.env.MAX_ACTIVE_RUNS || 2));
+let activeRuns = 0;
+function authorized(req) {
+  if (!RUNNER_TOKEN) return false;
+  const header = req.headers.authorization || "";
+  return header === `Bearer ${RUNNER_TOKEN}`;
+}
+function acquireRunSlot() {
+  if (activeRuns >= MAX_ACTIVE_RUNS) throw new Error("runner_busy");
+  activeRuns += 1;
+  return () => { activeRuns = Math.max(0, activeRuns - 1); };
+}
 
 // Workspaces persist on this runner's disk only; they are not security boundaries.
 const workspaceRoot = process.env.WORKSPACE_ROOT || join(tmpdir(), "bossnu-workspaces");
@@ -199,25 +213,40 @@ function pythonProgramInput(body, language) {
   if (value.length > MAX_PYTHON_SAFE_INPUT) throw new Error("stdin_too_large");
   return value;
 }
-function spawnExecution(language, command, stdin, cwd) {
-  if (language === "python-safe") {
+async function spawnExecution(language, command, stdin, cwd) {
+  const raw = language === "javascript" ? "node" : language;
+  const specs = {
+    node: { file: "main.mjs", command: "node", args: ["main.mjs"] },
+    python: { file: "main.py", command: "python3", args: ["main.py"] },
+    go: { file: "main.go", command: "go", args: ["run", "main.go"] },
+    rust: { file: "main.rs", command: "sh", args: ["-c", "rustc main.rs -o main_bin && ./main_bin"] },
+    java: { file: "Main.java", command: "java", args: ["Main.java"] },
+    cpp: { file: "main.cpp", command: "sh", args: ["-c", "g++ -std=c++20 main.cpp -O2 -o main_bin && ./main_bin"] },
+  };
+  if (raw === "python-safe") {
     const child = spawn("python3", ["-I", "-S", "-u", GUARDED_PYTHON], {
-      cwd,
-      env: executionEnv(cwd),
-      detached: true,
+      cwd, env: executionEnv(cwd), detached: true,
       stdio: ["pipe", "pipe", "pipe", "pipe"],
     });
-    // fd 0 carries raw Python source to run_guarded.py. fd 3 carries the
-    // program's own stdin so it never has to be mixed with the source.
     child.stdin.end(command, "utf8");
     child.stdio[3].end(stdin, "utf8");
     return child;
   }
+  const spec = specs[raw];
+  if (spec) {
+    await writeFile(join(cwd, spec.file), command, "utf8");
+    const child = spawn(spec.command, spec.args, {
+      cwd, env: executionEnv(cwd), detached: true,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    child.stdin.end(stdin, "utf8");
+    return child;
+  }
   const child = spawn("bash", ["-c", command], {
-    cwd, env: executionEnv(cwd),
-    detached: true, stdio: ["pipe", "pipe", "pipe"],
+    cwd, env: executionEnv(cwd), detached: true,
+    stdio: ["pipe", "pipe", "pipe"],
   });
-  child.stdin.end();
+  child.stdin.end(stdin, "utf8");
   return child;
 }
 async function executeStream(body, res) {
@@ -270,7 +299,7 @@ async function executeStream(body, res) {
       sse(res, { type: "complete", result });
       return; // ended by the caller after the workspace lock is released
     }
-    const child = spawnExecution(language, command, stdin, dir);
+    const child = await spawnExecution(language, command, stdin, dir);
     const cancel = () => { try { process.kill(-child.pid, "SIGKILL"); } catch { /* intentionally ignored */ } };
     let stdout = "", stderr = "", timedOut = false;
     res.on("close", cancel);
@@ -367,12 +396,19 @@ const server = http.createServer(async (req, res) => {
     return proxyPreview(req, res, parts[1], parts.slice(2).join("/"));
   }
   if (req.method === "POST" && req.url === "/execute/stream") {
+    if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
+    let releaseSlot;
+    try { releaseSlot = acquireRunSlot(); } catch (error) { return send(res, 429, { error: error.message }); }
+    res.on("close", () => releaseSlot());
     // executeStream releases the workspace in its own finally; the response is
     // ended only afterwards so a client can immediately run the next command.
     try { await executeStream(await readBody(req), res); if (!res.writableEnded) res.end(); return; }
     catch (error) { if (!res.headersSent) send(res, 400, { error: error instanceof Error ? error.message : "bad_request" }); else if (!res.writableEnded) res.end(); return; }
   }
   if (req.method !== "POST" || req.url !== "/execute") return send(res, 404, { error: "not_found" });
+  if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
+  let releaseSlot;
+  try { releaseSlot = acquireRunSlot(); } catch (error) { return send(res, 429, { error: error.message }); }
   try {
     const body = await readBody(req);
     const started = Date.now();
@@ -383,6 +419,6 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, Object.assign({}, result, { durationMs: Date.now() - started }));
   } catch (error) {
     return send(res, 400, { error: error instanceof Error ? error.message : "bad_request" });
-  }
+  } finally { releaseSlot(); }
 });
 server.listen(PORT, HOST, () => console.log("bossnu multi-runtime sandbox listening on :" + server.address().port));
