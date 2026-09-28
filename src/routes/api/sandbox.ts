@@ -1,3 +1,5 @@
+import { executeJudge0, usesJudge0, judge0Endpoint, JUDGE0_LANGUAGES } from "@/lib/sandbox/judge0.server";
+import { runnerHttpError } from "@/lib/sandbox/runner-auth.server";
 import { assessSandboxRisk } from "@/lib/sandbox/detect";
 import {
   PYTHON_SAFE_RUNNER_ERROR,
@@ -199,6 +201,7 @@ async function runOnRunner(
     response = await fetch(`${runner.url}/execute`, {
       method: "POST",
       headers: { "content-type": "application/json", ...runnerAuthHeaders() },
+      redirect: "error",
       body: runnerBody({ language: runtime, command, stdin, workspace, seed }),
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(runner.timeoutMs)]) : AbortSignal.timeout(runner.timeoutMs),
     });
@@ -258,7 +261,7 @@ async function runOnRunner(
           ? "Sandbox Runner ปฏิเสธการยืนยันตัวตน — ตั้ง SANDBOX_RUNNER_TOKEN ให้ตรงกับ RUNNER_TOKEN ของ Runner"
           : !bodyIsJson
             ? RUNNER_NOT_READY_ERROR
-            : typeof data.error === "string" ? data.error : `Runner ตอบกลับ HTTP ${response.status}`,
+            : runnerHttpError(response.status, data.error),
         detail: !bodyIsJson ? rawBody.slice(0, 300) : undefined,
         durationMs: Date.now() - started,
         steps,
@@ -428,12 +431,9 @@ async function handleGet(request: Request): Promise<Response> {
     success: true,
     count: skills.length,
     skills,
-    runner: {
-      configured: true,
-      source: runner.source,
-      runtimes: [...RUNNER_RUNTIMES],
-      tokenConfigured: runner.tokenConfigured,
-    },
+    runner: usesJudge0()
+      ? { provider: "judge0", configured: Boolean(judge0Endpoint()), source: "env", runtimes: Object.keys(JUDGE0_LANGUAGES) }
+      : { provider: "runner", configured: true, source: runner.source, runtimes: [...RUNNER_RUNTIMES], tokenConfigured: runner.tokenConfigured },
   };
   return json(body);
 }
@@ -480,6 +480,13 @@ async function handlePost(request: Request): Promise<Response> {
     if (!skill) return fail(400, "ต้องระบุ skill");
     const result: CommandResult = { success: true, status: "success", type: "skill", skill, steps };
     return json(result);
+  }
+
+  if (usesJudge0() && !(type && (isWebRuntime(type) || type === "json"))) {
+    const risk = type === "bash" ? assessSandboxRisk(cmd as string) : { dangerous: false };
+    if (risk.dangerous && !parsed.data.allowDangerous) return fail(409, "ต้องอนุญาตก่อนรันคำสั่งอันตราย");
+    const { result, httpStatus } = await executeJudge0(parsed.data, request.signal);
+    return json({ ...result, skill, steps }, httpStatus);
   }
 
   const command = type === "python-safe" ? (cmd as string) : (cmd as string).trim();

@@ -35,6 +35,7 @@ type RunnerEnv = {
   VITE_SANDBOX_RUNNER_URL?: string;
   SANDBOX_RUNNER_TIMEOUT_MS?: string;
   SANDBOX_RUNNER_TOKEN?: string;
+  RUNNER_TOKEN?: string;
   VITE_SANDBOX_RUNNER_TOKEN?: string;
 };
 
@@ -70,8 +71,9 @@ export function runnerConfig(env: RunnerEnv = process.env): RunnerConfig {
  * no token is configured (the runner then answers 401 to any execution).
  */
 export function runnerAuthHeaders(
-  env: { SANDBOX_RUNNER_TOKEN?: string; VITE_SANDBOX_RUNNER_TOKEN?: string } = process.env,
+  env: { SANDBOX_RUNNER_TOKEN?: string; RUNNER_TOKEN?: string; VITE_SANDBOX_RUNNER_TOKEN?: string } = process.env,
 ): Record<string, string> {
-  const token = env.SANDBOX_RUNNER_TOKEN?.trim() || env.VITE_SANDBOX_RUNNER_TOKEN?.trim() || "";
+  // VITE_* is browser-visible: never accept it as a credential source.
+  const token = env.SANDBOX_RUNNER_TOKEN?.trim() || env.RUNNER_TOKEN?.trim() || "";
   return token ? { authorization: `Bearer ${token}` } : {};
 }

@@ -51,3 +51,13 @@ test("SANDBOX_RUNNER_TOKEN takes precedence over the VITE_ alias", () => {
     { authorization: "Bearer server" },
   );
 });
+
+test("server-only RUNNER_TOKEN fallback is reflected in metadata", () => {
+  assert.deepEqual(runnerAuthHeaders({ RUNNER_TOKEN: "private" }), { authorization: "Bearer private" });
+  assert.equal(runnerConfig({ RUNNER_TOKEN: "private" }).tokenConfigured, true);
+});
+
+test("browser-visible VITE_ token is not accepted as a secret", () => {
+  assert.deepEqual(runnerAuthHeaders({ VITE_SANDBOX_RUNNER_TOKEN: "public" }), {});
+  assert.equal(runnerConfig({ VITE_SANDBOX_RUNNER_TOKEN: "public" }).tokenConfigured, false);
+});

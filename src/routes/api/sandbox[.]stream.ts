@@ -1,3 +1,5 @@
+import { executeJudge0, usesJudge0 } from "@/lib/sandbox/judge0.server";
+import { runnerHttpError } from "@/lib/sandbox/runner-auth.server";
 import { loadSkill } from "@/lib/sandbox/skills.server";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -66,7 +68,7 @@ async function handle(request: Request): Promise<Response> {
     attachedSkill = loaded.skill;
   }
   const runner = runnerUrl();
-  if (runtime === "python-safe") {
+  if (!usesJudge0() && runtime === "python-safe") {
     const health = await probeRunnerHealth(runner, request.signal);
     if (!health.ok) {
       return Response.json(
@@ -99,6 +101,16 @@ async function handle(request: Request): Promise<Response> {
       };
       try {
         send({ type: "status", status: "queued", message: "รับคำสั่ง Sandbox" });
+        if (usesJudge0()) {
+          const { result } = await executeJudge0(parsed.data,
+            AbortSignal.any([request.signal, abort.signal]),
+            message => send({ type: "status", status: "running", message }));
+          if ("stdout" in result && result.stdout) send({ type: "output", stream: "stdout", text: result.stdout });
+          if ("stderr" in result && result.stderr) send({ type: "output", stream: "stderr", text: result.stderr });
+          if (result.error) send({ type: "error", error: result.error });
+          send({ type: "complete", result });
+          close(); return;
+        }
         if (workspace) {
           seed = await loadSeed(workspace);
           send({ type: "status", status: "seed", message: seed.ok ? `โหลด Workspace จาก Neon • ${seed.files.length} ไฟล์` : `โหลด Workspace จาก Neon ไม่สำเร็จ • ${seed.error}` });
@@ -106,6 +118,7 @@ async function handle(request: Request): Promise<Response> {
         const response = await fetch(runner + "/execute/stream", {
           method: "POST",
           headers: { "content-type": "application/json", accept: "text/event-stream", ...runnerAuthHeaders() },
+          redirect: "error",
           body: runnerBody({ language: runtime, command, stdin, workspace, seed }),
           signal: AbortSignal.any([request.signal, abort.signal, AbortSignal.timeout(Number(process.env.SANDBOX_RUNNER_TIMEOUT_MS) || 140000)]),
         });
@@ -119,12 +132,12 @@ async function handle(request: Request): Promise<Response> {
             close(); return;
           }
           const legacy = await fetch(runner + "/execute", {
-            method: "POST", headers: { "content-type": "application/json", ...runnerAuthHeaders() },
+            method: "POST", headers: { "content-type": "application/json", ...runnerAuthHeaders() }, redirect: "error",
             body: runnerBody({ language: runtime, command, stdin, workspace, seed }),
             signal: AbortSignal.any([request.signal, abort.signal, AbortSignal.timeout(140000)]),
           });
           const result = await legacy.json();
-          if (!legacy.ok) throw new Error(result.error || `Runner HTTP ${legacy.status}`);
+          if (!legacy.ok) throw new Error(runnerHttpError(legacy.status, result.error));
           const warning = "Legacy runner: live output and persistent workspace may be unavailable. Redeploy Sandbox Runner v6.";
           send({ type: "status", status: "running", message: warning });
           if (result.stdout) send({ type: "output", stream: "stdout", text: result.stdout });
