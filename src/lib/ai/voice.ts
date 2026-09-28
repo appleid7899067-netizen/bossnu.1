@@ -110,14 +110,32 @@ async function speakPuter(_text: string, _token: number) {
   return false;
 }
 async function speakDevice(text: string) {
-  if (!hasSpeech || !settings.enabled) return;
+  if (!hasSpeech || !settings.enabled || !text.trim()) return;
+  const synth = window.speechSynthesis;
+  // Android Chrome can leave the synthesis engine paused after a long stream.
+  // Always resume before enqueueing and clear a stale paused state.
+  try { synth.resume(); } catch {}
   const utterance = createDeviceUtterance(text);
   speaking = true;
   await new Promise<void>((resolve) => {
-    utterance.onend = () => { speaking = false; resolve(); };
-    utterance.onerror = () => { speaking = false; resolve(); };
-    window.speechSynthesis.resume();
-    window.speechSynthesis.speak(utterance);
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      speaking = false;
+      resolve();
+    };
+    utterance.onend = done;
+    utterance.onerror = done;
+    try {
+      synth.speak(utterance);
+      // Some mobile engines need a second resume immediately after speak().
+      window.setTimeout(() => {
+        try { synth.resume(); } catch {}
+      }, 40);
+    } catch {
+      done();
+    }
   });
 }
 
@@ -199,7 +217,24 @@ export function finishVoice() {
     pending = "";
     return;
   }
+  // Flush every remaining streamed fragment. This is the authoritative
+  // end-of-response path, so a short final fragment can never stay silent.
   void drain(true);
+}
+
+export async function speakNow(text: string) {
+  const cleaned = cleanSpeechText(text);
+  if (!cleaned || !settings.enabled) return false;
+  generation += 1;
+  pending = "";
+  const token = generation;
+  try {
+    if (hasSpeech) {
+      await speakDevice(cleaned);
+      return true;
+    }
+  } catch {}
+  return false;
 }
 
 export function stopVoice() {
