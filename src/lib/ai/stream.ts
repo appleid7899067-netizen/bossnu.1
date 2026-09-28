@@ -2,6 +2,7 @@ import { SANDBOX_TOOL_PROMPT } from "./sandbox-tool";
 import type { ChatMode } from "@/lib/types";
 import { buildSkillContext } from "@/lib/skills";
 import { useAppStore } from "@/lib/store";
+import { getPuterModel } from "./models";
 
 export type StreamEvent =
   | { type: "start"; id: string }
@@ -64,6 +65,7 @@ export async function streamChat(opts: {
   tools?: boolean;
   latestUser?: string;
   onEvent: (event: StreamEvent) => void;
+  model?: string;
 }) {
   try {
     const puter = await ensurePuterSignedIn();
@@ -75,6 +77,7 @@ export async function streamChat(opts: {
     const latestUser =
       opts.latestUser ?? [...opts.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     const settings = useAppStore.getState();
+    const selectedModel = getPuterModel(opts.model ?? settings.selectedModel).id;
     const activeSkills = settings.agentSkills.filter((s) => s.enabled || s.id === "sandbox-terminal").map((s) => s.name).join(", ");
     const memories = settings.memory.slice(0, 12).map((m) => `- ${m.content}`).join("\n");
     const agent = settings.agentProfiles[0];
@@ -99,7 +102,7 @@ export async function streamChat(opts: {
     const response = await puter.ai.chat(
       [{ role: "system", content: system }, ...opts.messages],
       {
-        model: "gpt-5.6-luna",
+        model: selectedModel,
         stream: true,
         temperature: opts.mode === "think" ? 0.6 : 0.7,
         max_tokens: opts.mode === "think" ? 2200 : 1400,
