@@ -373,7 +373,7 @@ function authHeaders() {
 }
 
 function requestBody(command, language, options = {}) {
-  const body = { language, command, workspace: els.workspace.value.trim() || undefined, snapshot: 1 };
+  const body = { language, command, workspace: active().workspace || undefined, snapshot: 1 };
   if (language === "python-safe") body.stdin = els.stdin.value;
   // Seed = write files back into the workspace before the command runs. These
   // are the same fields the app sends, so saving needs no extra endpoint.
@@ -415,6 +415,7 @@ async function run(command, language, options) {
   if (session.status === "running") { note("✗ เซสชันนี้กำลังรันอยู่ — กดหยุดก่อน", "stderr"); return; }
 
   localStorage.setItem(STORE.token, els.token.value.trim());
+  syncWorkspace();
   const seed = options?.seed !== undefined ? options.seed : seedPayload();
   const body = requestBody(command, language, { seed });
 
@@ -609,12 +610,24 @@ els.language.addEventListener("change", () => {
   persist();
 });
 
-els.workspace.addEventListener("change", () => {
-  active().workspace = els.workspace.value.trim();
-  els.promptLabel.textContent = `~/${active().workspace || "project"} $`;
+/**
+ * The workspace field is the single source of truth for where a run goes, so it
+ * is folded into the session on every edit — not only on `change`, which waits
+ * for a blur. Syncing late left a run executing in the typed workspace while the
+ * tab, the prompt and the persisted state still named the previous one.
+ */
+function syncWorkspace() {
+  const session = active();
+  const value = els.workspace.value.trim();
+  if (session.workspace === value) return;
+  session.workspace = value;
+  els.promptLabel.textContent = `~/${value || "project"} $`;
   renderTabs();
   persist();
-});
+}
+
+els.workspace.addEventListener("input", syncWorkspace);
+els.workspace.addEventListener("change", syncWorkspace);
 
 els.command.addEventListener("input", () => {
   const session = active();
