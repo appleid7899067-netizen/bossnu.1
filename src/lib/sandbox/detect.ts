@@ -118,7 +118,8 @@ export function detectSandboxInput(input: string): SandboxDetection {
 
 
 export function hasExplicitExecutionIntent(input: string): boolean {
-  return /(?:^|\s)(?:รัน|run|execute|ทดสอบ|test|debug|ดีบัก|สร้าง|create|แก้(?:ไข)?|แก้โค้ด|ติดตั้ง|install|deploy|build|compile|ตรวจระบบ|ตรวจจริง|เช็กระบบ|เช็คระบบ|เปิดเว็บ|start|serve|commit|push|แก้ปัญหา|ซ่อม|repair)(?:\s|$)/iu.test(input.normalize("NFKC"));
+  return /(?:^|\s)(?:รัน|run|execute|ทดสอบ|test|debug|ดีบัก|แก้โค้ด|แก้ปัญหา|ติดตั้ง|install|deploy|build|compile|ตรวจระบบ|ตรวจจริง|เช็กระบบ|เช็คระบบ|เปิดเว็บ|start|serve|commit|push|ซ่อม|repair)(?:\s|$)/iu.test(input.normalize("NFKC")) ||
+    /(?:^|\s)(?:สร้าง|create)\s+(?:แอป|เว็บ|เว็บไซต์|โค้ด|ไฟล์|โปรเจกต์|โปรเจ็ค|app|website|web|code|file|project)\b/iu.test(input.normalize("NFKC"));
 }
 
 export function shouldExecuteSandboxInput(input: string, detection = detectSandboxInput(input)): boolean {
