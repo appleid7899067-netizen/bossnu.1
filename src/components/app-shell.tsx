@@ -125,7 +125,32 @@ export function AppShell({ search }: { search: Search }) {
     setDraft(""); setAttachments([]); setActiveTool(null); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
     stopVoice(); go({ view: "chat", c: id });
     let reply = "";
-    const append = (text: string) => { reply += text; store.patchAssistant(id, assistantId, { content: reply }); };
+    let queuedReply = "";
+    let replyFrame: number | null = null;
+    const flushReply = () => {
+      replyFrame = null;
+      if (!queuedReply) return;
+      reply += queuedReply;
+      queuedReply = "";
+      store.patchAssistant(id, assistantId, { content: reply });
+    };
+    const append = (text: string) => {
+      if (!text) return;
+      queuedReply += text;
+      if (replyFrame !== null) return;
+      replyFrame = window.requestAnimationFrame(flushReply);
+    };
+    const flushReplyNow = () => {
+      if (replyFrame !== null) {
+        window.cancelAnimationFrame(replyFrame);
+        replyFrame = null;
+      }
+      if (queuedReply) {
+        reply += queuedReply;
+        queuedReply = "";
+        store.patchAssistant(id, assistantId, { content: reply });
+      }
+    };
     const pushActivity = (activity: PendingActivity) => {
       const current = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
       const next = [...current, { ...activity, id: uid("activity"), createdAt: Date.now() } as ChatActivity].slice(-120);
@@ -266,6 +291,7 @@ export function AppShell({ search }: { search: Search }) {
       if (ac.signal.aborted) { append("\n\n⛔ หยุดการทำงานแล้ว"); }
       else { const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด"; append(`\n\n${message}`); toast.error(message); }
     } finally {
+      flushReplyNow();
       finishVoice(); setBusyChat(false); setStreamingId(null);
     }
   }
