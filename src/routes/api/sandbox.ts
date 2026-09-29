@@ -42,6 +42,7 @@ import {
   type SkillsListResponse,
 } from "@/types/sandbox";
 import { runnerAuthHeaders, runnerConfig } from "@/lib/sandbox/runner-config.server";
+import { e2bConfigured, runE2B } from "@/lib/sandbox/e2b-runner.server";
 
 const MAX_BODY_BYTES = 256 * 1024;
 
@@ -171,6 +172,38 @@ async function runOnRunner(
   stdin?: string,
   signal?: AbortSignal,
 ): Promise<{ result: CommandResult; httpStatus: number }> {
+  if (e2bConfigured()) {
+    steps.push(`ส่งไปรันที่ E2B Sandbox (${runtime})`);
+    const started = Date.now();
+    try {
+      const executed = await runE2B(runtime, command, workspace, stdin, (stream, text) => {
+        if (text) steps.push(`${stream === "stderr" ? "stderr" : "stdout"}: ${text.slice(0, 160)}`);
+      });
+      const data = executed.raw as Record<string, unknown>;
+      const status = normalizeStatus(data.status);
+      const stdout = typeof data.stdout === "string" ? data.stdout : "";
+      const stderr = typeof data.stderr === "string" ? data.stderr : "";
+      const output = [stdout, stderr].filter(Boolean).join("\n").trim().slice(-SANDBOX_LIMITS.outputChars);
+      if (executed.workspaceSync) steps.push(describeEvidence(executed.workspaceSync));
+      steps.push(status === "success" ? `E2B รันสำเร็จ (${((Number(data.durationMs) || Date.now() - started) / 1000).toFixed(1)}s)` : "E2B รันไม่สำเร็จ");
+      return {
+        httpStatus: 200,
+        result: {
+          success: status === "success", status, type: runtime, runtime, label, command,
+          output, stdout, stderr,
+          exitCode: typeof data.exitCode === "number" ? data.exitCode : null,
+          durationMs: typeof data.durationMs === "number" ? data.durationMs : Date.now() - started,
+          steps,
+          workspaceSync: executed.workspaceSync,
+          e2b: { sandboxId: executed.sandboxId, persistent: executed.persistent },
+        },
+      };
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      steps.push(`E2B ล้มเหลว: ${detail.slice(0, 300)}`);
+      return { httpStatus: 502, result: { success: false, status: "error", type: runtime, runtime, label, command, error: "E2B Sandbox execution failed", detail: detail.slice(0, 500), durationMs: Date.now() - started, steps } };
+    }
+  }
   const runner = runnerConfig();
   steps.push(`ส่งไปรันที่ Sandbox Runner (${runtime})`);
   const started = Date.now();
