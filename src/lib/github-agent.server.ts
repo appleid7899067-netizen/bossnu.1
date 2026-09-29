@@ -5,20 +5,20 @@ function config() {
   const token = process.env.GITHUB_TOKEN?.trim();
   const repo = process.env.GITHUB_REPO?.trim() || DEFAULT_REPO;
   if (!token) throw new Error("GitHub Agent ยังไม่ได้ตั้ง GITHUB_TOKEN บนเซิร์ฟเวอร์");
-  if (!/^[^/]+\\/[^/]+$/.test(repo)) throw new Error("GITHUB_REPO ไม่ถูกต้อง");
+  if (!/^[^/]+\/[^^/]+$/.test(repo)) throw new Error("GITHUB_REPO ไม่ถูกต้อง");
   return { token, repo };
 }
 
 function safeBranch(value: string | undefined) {
   const branch = value?.trim() || "sali/agent";
-  if (!/^[A-Za-z0-9._\\/-]{1,120}$/.test(branch) || branch.startsWith("-") || branch.includes("..")) {
+  if (!/^[A-Za-z0-9._\/-]{1,120}$/.test(branch) || branch.startsWith("-") || branch.includes("..")) {
     throw new Error("ชื่อ branch ไม่ปลอดภัย");
   }
   return branch;
 }
 
 function safePath(value: string) {
-  const path = value.replace(/^\\/+/, "").trim();
+  const path = value.replace(/^\/+/, "").trim();
   if (!path || path.includes("\0") || path.split("/").some(part => part === "..")) throw new Error("path ไม่ปลอดภัย");
   return path;
 }
