@@ -81,6 +81,19 @@ export class SandboxClient {
     return this.post({ skill, reference, type: "skill" });
   }
 
+  /**
+   * Persist a generated SKILL.md in the user's workspace. The returned
+   * skillCreate object is the source of truth; callers must require
+   * created + verified + persisted before saying the skill was saved.
+   */
+  async createSkill(workspace: string, skillId: string, content: string): Promise<CommandResult> {
+    if (!workspace || !/^[a-zA-Z0-9_-]{1,100}$/.test(workspace)) return errorResult("workspace ไม่ถูกต้อง");
+    if (!/^[a-z0-9][a-z0-9-]*$/i.test(skillId) || skillId.length > 64) return errorResult("skillId ไม่ถูกต้อง");
+    if (!content.trim()) return errorResult("SKILL.md ว่างเปล่า");
+    if (new TextEncoder().encode(content).byteLength > 128 * 1024) return errorResult("SKILL.md ใหญ่เกิน 128 KiB");
+    return this.post({ action: "create-skill", workspace, skillId, content });
+  }
+
   /** Stream a command through the same central Sandbox API. */
   async executeStream(cmd: string, options: ExecuteOptions & { onEvent?: (event: SandboxStreamEvent) => void } = {}): Promise<CommandResult> {
     try {
@@ -302,6 +315,12 @@ export function useSandbox(options: UseSandboxOptions = {}) {
     [client, run],
   );
 
+  const createSkill = useCallback(
+    (workspace: string, skillId: string, content: string) =>
+      run(() => client.createSkill(workspace, skillId, content), { skill: skillId, type: "skill" }),
+    [client, run],
+  );
+
   const loadSkill = useCallback(
     (skill: string, reference?: string) =>
       run(() => client.loadSkill(skill, reference), { skill, type: "skill" }),
@@ -337,6 +356,7 @@ export function useSandbox(options: UseSandboxOptions = {}) {
     execute,
     executeStream,
     loadSkill,
+    createSkill,
     getSkills: client.getSkills.bind(client),
     executeNode: (cmd: string, opts: Omit<ExecuteOptions, "type"> = {}) =>
       execute(cmd, { ...opts, type: "node" }),
