@@ -42,7 +42,7 @@ import {
   type SkillsListResponse,
 } from "@/types/sandbox";
 import { runnerAuthHeaders, runnerConfig } from "@/lib/sandbox/runner-config.server";
-import { e2bConfigured, runE2B } from "@/lib/sandbox/e2b-runner.server";
+import { createVerifiedSkill, e2bConfigured, runE2B } from "@/lib/sandbox/e2b-runner.server";
 
 const MAX_BODY_BYTES = 256 * 1024;
 
@@ -496,6 +496,43 @@ export async function handlePost(request: Request, emit?: StreamEmit): Promise<R
     body = raw ? JSON.parse(raw) : {};
   } catch {
     return fail(400, "Body ต้องเป็น JSON");
+  }
+
+  // Creating a skill is a separate mutation with a strict proof contract.
+  // The model may only claim the skill was saved when E2B write, read-back,
+  // and workspace sync all report success.
+  if (body && typeof body === "object" && (body as { action?: unknown }).action === "create-skill") {
+    const value = body as { workspace?: unknown; skillId?: unknown; content?: unknown };
+    if (
+      typeof value.workspace !== "string" ||
+      !/^[a-zA-Z0-9_-]{1,100}$/.test(value.workspace) ||
+      typeof value.skillId !== "string" ||
+      !/^[a-z0-9][a-z0-9-]*$/i.test(value.skillId) ||
+      value.skillId.length > 64 ||
+      typeof value.content !== "string" ||
+      !value.content.trim()
+    ) {
+      return fail(400, "สร้าง Skill ไม่สำเร็จ: workspace, skillId หรือ content ไม่ถูกต้อง");
+    }
+    if (Buffer.byteLength(value.content, "utf8") > 128 * 1024) {
+      return fail(413, "สร้าง Skill ไม่สำเร็จ: SKILL.md ใหญ่เกิน 128 KiB");
+    }
+    const created = await createVerifiedSkill(value.workspace, value.skillId, value.content);
+    const success = created.created && created.verified && created.persisted;
+    return json({
+      success,
+      status: success ? "success" : "error",
+      type: "skill-create",
+      skillCreate: created,
+      steps: success
+        ? [
+            "เขียน SKILL.md ใน E2B สำเร็จ",
+            "อ่านไฟล์กลับและตรวจ hash สำเร็จ",
+            "Sync workspace และตรวจหลักฐานสำเร็จ",
+          ]
+        : ["ไม่ยืนยันการบันทึก Skill เพราะหลักฐานยังไม่ครบ"],
+      error: success ? undefined : created.error || "บันทึก Skill ไม่ผ่าน verification",
+    }, success ? 200 : 502);
   }
 
   const parsed = CommandRequestSchema.safeParse(body);
