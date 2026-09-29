@@ -208,7 +208,11 @@ function MessageBubble({
         {empty ? (
           <p className="lumina-shimmer text-sm font-medium">กำลังคิด…</p>
         ) : message.content ? (
-          <Markdown text={message.content} live={live} />
+          live ? (
+            <p className="assistant-stream-text whitespace-pre-wrap break-words">{message.content}</p>
+          ) : (
+            <Markdown text={message.content} live={false} />
+          )
         ) : null}
         {live && message.content ? <span className="lumina-caret" /> : null}
         {!live && message.content ? (
