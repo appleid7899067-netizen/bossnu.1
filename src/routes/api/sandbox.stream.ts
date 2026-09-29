@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { handlePost } from "./sandbox";
 
 function corsHeaders(): Record<string, string> {
   return {
@@ -7,88 +8,80 @@ function corsHeaders(): Record<string, string> {
     "access-control-allow-headers": "content-type",
     "cache-control": "no-cache, no-transform",
     "content-type": "text/event-stream; charset=utf-8",
+    "x-accel-buffering": "no",
   };
 }
 
 function sse(value: unknown): Uint8Array {
-  return new TextEncoder().encode(`data: ${JSON.stringify(value)}
-
-`);
+  return new TextEncoder().encode(`data: ${JSON.stringify(value)}\n\n`);
 }
 
 /**
- * Keep one canonical execution path. The JSON /api/sandbox handler owns E2B
- * selection and returns e2b.sandboxId. This SSE adapter wraps that exact result
- * so the streaming UI cannot silently fall back to the legacy runner path.
+ * True SSE execution stream.
+ *
+ * Unlike the old adapter, this does not POST to /api/sandbox and wait for the
+ * final JSON response. It runs through the same canonical handler and forwards
+ * status/output events as they happen, then emits exactly one complete result.
  */
 async function handle(request: Request): Promise<Response> {
-  const target = new URL("/api/sandbox", request.url);
-  const body = await request.text();
-  const upstream = await fetch(target, {
-    method: "POST",
-    headers: {
-      "content-type": request.headers.get("content-type") || "application/json",
-      accept: "application/json",
-    },
-    body,
-    signal: request.signal,
-  });
-
-  const payload = await upstream.json().catch(() => ({
-    success: false,
-    status: "error",
-    type: "error",
-    error: `Sandbox API HTTP ${upstream.status}`,
-  }));
+  const encoder = new TextEncoder();
+  let controllerRef: ReadableStreamDefaultController<Uint8Array> | undefined;
+  let closed = false;
 
   const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(sse({
-        type: "status",
-        status: "queued",
-        message: "ส่งคำสั่งเข้า Sandbox",
-      }));
-      controller.enqueue(sse({
-        type: "complete",
-        result: payload,
-      }));
-      controller.close();
+    async start(controller) {
+      controllerRef = controller;
+      const send = (value: unknown) => {
+        if (!closed) controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`));
+      };
+
+      try {
+        const response = await handlePost(request, (event) => send(event));
+        const payload = await response.json().catch(() => ({
+          success: false,
+          status: "error",
+          type: "error",
+          error: `Sandbox API HTTP ${response.status}`,
+        }));
+        if (!closed) {
+          send({ type: "complete", result: payload });
+          send("[DONE]");
+          closed = true;
+          controller.close();
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!closed) {
+          send({ type: "error", error: message });
+          send({
+            type: "complete",
+            result: {
+              success: false,
+              status: "error",
+              type: "error",
+              error: message,
+            },
+          });
+          send("[DONE]");
+          closed = true;
+          controller.close();
+        }
+      }
+    },
+    cancel() {
+      closed = true;
+      controllerRef = undefined;
     },
   });
 
-  return new Response(stream, {
-    status: upstream.status >= 400 ? upstream.status : 200,
-    headers: corsHeaders(),
-  });
+  return new Response(stream, { status: 200, headers: corsHeaders() });
 }
 
 export const Route = createFileRoute("/api/sandbox.stream")({
   server: {
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: corsHeaders() }),
-      POST: async ({ request }) => {
-        try {
-          return await handle(request);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          const stream = new ReadableStream<Uint8Array>({
-            start(controller) {
-              controller.enqueue(sse({ type: "error", error: message }));
-              controller.enqueue(sse({
-                type: "complete",
-                result: {
-                  success: false,
-                  status: "error",
-                  type: "error",
-                  error: message,
-                },
-              }));
-              controller.close();
-            },
-          });
-          return new Response(stream, { status: 500, headers: corsHeaders() });
-        }
-      },
+      POST: async ({ request }) => handle(request),
     },
   },
 });
