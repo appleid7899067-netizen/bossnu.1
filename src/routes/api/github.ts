@@ -24,7 +24,7 @@ export const Route = createFileRoute("/api/github")({
           const requestedBranch = str(body.branch, 120) || undefined;
           const writeAction = ["write_file", "delete_file", "create_branch", "create_pr"].includes(action);
           const branch = writeAction
-            ? (user ? `sali/${user.id.slice(0, 20)}/${requestedBranch?.replace(/^sali\\//, "") || "workspace"}` : requestedBranch)
+            ? (user ? `sali/${user.id.slice(0, 20)}/${requestedBranch?.replace(/^sali\//, "") || "workspace"}` : requestedBranch)
             : requestedBranch;
           if (!["list", "read_file", "write_file", "delete_file", "create_branch", "create_pr"].includes(action)) {
             return Response.json({ ok: false, error: "GitHub action ไม่ถูกต้อง" }, { status: 400 });
