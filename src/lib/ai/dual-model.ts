@@ -1,5 +1,3 @@
-import type { PuterModelOption } from "./models";
-
 export const QWEN_DEBUG_MODEL = "qwen/qwen3-coder-next";
 
 type PuterChat = {
