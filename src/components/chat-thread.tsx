@@ -260,63 +260,62 @@ const PHASE_TITLES: Record<string, string> = {
 };
 
 function ActivityFeed({ activities, live }: { activities: ChatActivity[]; live: boolean }) {
+  const visible = activities.slice(-80);
   return (
-    <section aria-label="บันทึกกิจกรรมของ Agent" className="mb-3 overflow-hidden rounded-xl border border-border/70 bg-elevated/45 text-[11px]">
-      <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
-        <span className="flex items-center gap-2 font-semibold text-fg"><Sparkles className="size-3.5 text-primary" /> Agent activity</span>
-        <span className="text-[10px] text-subtle">{live ? "กำลังทำงาน · บันทึกในแชตนี้" : `${activities.length} events`}</span>
+    <section aria-label="สถานะการทำงานของสลี่" className="mb-3 text-[11px]">
+      <style>{`
+        @keyframes saliActivityIn { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes saliDot { 0%, 70%, 100% { opacity: .25; transform: translateY(0); } 35% { opacity: 1; transform: translateY(-2px); } }
+        .sali-activity-in { animation: saliActivityIn .28s ease-out both; }
+        .sali-dot { animation: saliDot 1.1s ease-in-out infinite; }
+      `}</style>
+      <div className="mb-1 flex items-center gap-2 text-[10px] text-subtle">
+        <Sparkles className="size-3 text-primary" />
+        <span>{live ? "สลี่กำลังทำงาน" : "บันทึกการทำงาน"}</span>
+        {live ? <span className="ml-0.5 inline-flex gap-0.5" aria-label="กำลังคิด">
+          <i className="sali-dot size-1 rounded-full bg-current" />
+          <i className="sali-dot size-1 rounded-full bg-current [animation-delay:.15s]" />
+          <i className="sali-dot size-1 rounded-full bg-current [animation-delay:.3s]" />
+        </span> : null}
       </div>
-      <ol className="divide-y divide-border/40">
-        {activities.map((activity) => (
-          <li key={activity.id} className="px-3 py-2.5">
+      <ol className="space-y-1.5">
+        {visible.map((activity) => (
+          <li key={activity.id} className="sali-activity-in flex items-start gap-2.5 py-1.5">
             {activity.kind === "phase" ? (
-              <div className="flex items-start gap-2.5">
-                <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+              <div className="contents">
+                <span className="mt-0.5 grid size-5 shrink-0 place-items-center text-primary">
                   {activity.phase === "run" ? <Terminal className="size-3" /> : activity.phase === "verify" ? <CircleCheck className="size-3" /> : <Sparkles className="size-3" />}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block font-semibold text-fg">{PHASE_TITLES[activity.phase] ?? activity.phase}</span>
-                  <span className="block break-words text-[10px] leading-relaxed text-muted">{activity.label.replace(/^[^•]+•\s*/, "")}</span>
+                  <span className="block font-medium text-fg">{activity.label.replace(/^[^•]+•\s*/, "") || PHASE_TITLES[activity.phase] || activity.phase}</span>
+                  <span className="block text-[9px] leading-relaxed text-subtle">{PHASE_TITLES[activity.phase] ?? activity.phase}</span>
                 </span>
-                <time className="shrink-0 text-[9px] text-subtle">{new Date(activity.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+                <time className="shrink-0 text-[9px] tabular-nums text-subtle">{new Date(activity.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
               </div>
             ) : activity.kind === "command" ? (
-              <div className="flex items-start gap-2.5">
-                <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-300">
+              <div className="contents">
+                <span className="mt-0.5 grid size-5 shrink-0 place-items-center text-primary">
                   {activity.status === "running" ? <LoaderCircle className="size-3 animate-spin" /> : activity.status === "success" ? <CircleCheck className="size-3 text-success" /> : <CircleX className="size-3 text-danger" />}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <span className="font-semibold text-fg">Ran command</span>
+                    <span className="font-medium text-fg">Ran command</span>
                     <span className="rounded bg-bg/70 px-1.5 py-0.5 font-mono text-[9px] text-primary">{activity.runtime}</span>
                     <span className={activity.status === "success" ? "text-success" : activity.status === "running" ? "text-primary" : "text-danger"}>{activity.status === "success" ? "สำเร็จ" : activity.status === "running" ? "กำลังรัน" : activity.status === "blocked" ? "รออนุญาต" : activity.status}</span>
-                    {activity.durationMs !== undefined ? <span className="text-[9px] text-subtle">{(activity.durationMs / 1000).toFixed(1)}s</span> : null}
-                    {activity.exitCode !== undefined ? <span className="text-[9px] text-subtle">exit {activity.exitCode ?? "—"}</span> : null}
                   </div>
                   <pre className="mt-1.5 max-h-24 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-bg/80 px-2.5 py-2 font-mono text-[10px] leading-relaxed text-fg">$ {activity.command}</pre>
                   {activity.output ? <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-bg/80 px-2.5 py-2 font-mono text-[10px] leading-relaxed text-muted">{activity.output}{activity.status === "running" ? <span className="animate-pulse"> ▌</span> : null}</pre> : null}
-                  {activity.sync ? <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[9px] text-muted"><span>Neon Sync {activity.sync.verified && activity.sync.complete ? "✓ verified" : "⚠ not verified"}</span><span>· {activity.sync.expectedCount ?? 0} files</span><span>· +{activity.sync.added ?? 0} ~{activity.sync.modified ?? 0} -{activity.sync.deleted ?? 0}</span>{activity.sync.error ? <span className="break-all text-danger">· {activity.sync.error}</span> : null}</div> : null}
-                  {activity.previewUrl ? <a href={activity.previewUrl} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex rounded-md bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary hover:bg-primary/15">เปิด Sandbox Preview ↗</a> : null}
                 </div>
               </div>
             ) : activity.kind === "files" ? (
-              <div className="flex items-start gap-2.5">
-                <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-300"><FileDiff className="size-3" /></span>
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-fg">Edited files <span className="font-normal text-muted">+{activity.files.filter(file => file.action === "added").length} ~{activity.files.filter(file => file.action === "modified").length} -{activity.files.filter(file => file.action === "deleted").length}</span></div>
-                  <ul className="mt-1 space-y-1">
-                    {activity.files.map((file, index) => <li key={`${file.path}-${index}`} className="flex min-w-0 items-center gap-1.5 font-mono text-[10px]">
-                      {file.action === "added" ? <FilePlus2 className="size-3 shrink-0 text-success" /> : file.action === "deleted" ? <Trash2 className="size-3 shrink-0 text-danger" /> : file.action === "renamed" ? <ArrowRightLeft className="size-3 shrink-0 text-primary" /> : <FileDiff className="size-3 shrink-0 text-amber-600 dark:text-amber-300" />}
-                      <span className="min-w-0 break-all text-fg">{file.action === "renamed" ? `${file.from} → ${file.path}` : file.path}</span>
-                      <span className="shrink-0 text-[9px] text-subtle">{file.action}</span>
-                    </li>)}
-                  </ul>
-                </div>
+              <div className="contents">
+                <span className="mt-0.5 grid size-5 shrink-0 place-items-center text-primary"><FileDiff className="size-3" /></span>
+                <div className="min-w-0 flex-1"><div className="font-medium text-fg">Edited files</div><ul className="mt-1 space-y-1">{activity.files.map((file, index) => <li key={`${file.path}-${index}`} className="font-mono text-[10px] text-muted">{file.path}</li>)}</ul></div>
               </div>
             ) : (
-              <div className="flex items-start gap-2.5">
-                <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-md bg-success/10 text-success"><CircleCheck className="size-3" /></span>
-                <span className="min-w-0 flex-1"><span className="block font-semibold text-fg">Reusable skill {activity.status === "saved" ? "saved" : "not saved"}</span><code className="block break-all text-[10px] text-muted">{activity.path}</code></span>
+              <div className="contents">
+                <span className="mt-0.5 grid size-5 shrink-0 place-items-center text-success"><CircleCheck className="size-3" /></span>
+                <span className="min-w-0 flex-1"><span className="block font-medium text-fg">Reusable skill {activity.status === "saved" ? "saved" : "not saved"}</span><code className="block break-all text-[10px] text-muted">{activity.path}</code></span>
               </div>
             )}
           </li>
@@ -325,7 +324,6 @@ function ActivityFeed({ activities, live }: { activities: ChatActivity[]; live: 
     </section>
   );
 }
-
 function ThinkingBlock({ text, live }: { text: string; live: boolean }) {
   const [open, setOpen] = useState(live);
 
