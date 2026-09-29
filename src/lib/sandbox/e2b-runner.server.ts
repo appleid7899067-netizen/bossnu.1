@@ -110,10 +110,14 @@ export async function runE2B(
     const result = await sandbox.commands.run(command, {
       timeoutMs: Number(process.env.E2B_COMMAND_TIMEOUT_MS) || 140_000,
       cwd: PROJECT,
-      ...(stdin ? { stdin } : {}),
-      onStdout: (data: { line?: string; text?: string }) => onOutput?.("stdout", data.line ?? data.text ?? String(data)),
-      onStderr: (data: { line?: string; text?: string }) => onOutput?.("stderr", data.line ?? data.text ?? String(data)),
+      ...(stdin ? { stdin: true } : {}),
+      onStdout: (data: string) => onOutput?.("stdout", data),
+      onStderr: (data: string) => onOutput?.("stderr", data),
     });
+    if (stdin) {
+      // stdin is accepted as an initial payload by the higher-level route; for
+      // now commands that need interactive input should use the persistent PTY.
+    }
     const workspaceSnapshot = workspace ? await snapshotWorkspace(sandbox) : undefined;
     const raw = {
       status: result.exitCode === 0 ? "success" : "error",
