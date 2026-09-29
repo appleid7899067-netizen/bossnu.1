@@ -308,7 +308,7 @@ export async function runAgentLoop(opts: {
       catch (error) { result = { status: "error", error: error instanceof Error ? error.message : String(error) }; }
       core.setPhase("observe");
       opts.onPhase?.("observe", "👀 Observe • อ่านผลจาก GitHub");
-      opts.onText(`\n```github\n${JSON.stringify(result).slice(-20000)}\n```\n`);
+      opts.onText("\n```github\n" + JSON.stringify(result).slice(-20000) + "\n```\n");
       lastVerdict = { passed: result.status === "success" || result.status === "ok", reasons: result.status === "success" || result.status === "ok" ? [] : [result.error || "GitHub operation failed"] };
       core.setPhase("verify");
       opts.onPhase?.("verify", lastVerdict.passed ? "🔍 Verify • GitHub ยืนยันผลแล้ว" : "🔍 Verify • GitHub ไม่ผ่าน");
