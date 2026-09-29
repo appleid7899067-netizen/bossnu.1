@@ -100,6 +100,7 @@ html[data-theme="light"] { --shadow-prompt-focus: 0 0 0 1px color-mix(in srgb, v
 .lumina-shimmer { background-image: linear-gradient(90deg,var(--color-muted) 0%,var(--color-fg) 45%,var(--color-muted) 100%); background-size: 200% 100%; background-clip: text; -webkit-background-clip: text; color: transparent; animation: lumina-shimmer 1.6s linear infinite; }
 .lumina-rise { animation: lumina-rise 400ms cubic-bezier(0.22,1,0.36,1) both; }
 .lumina-caret { display:inline-block; width:.42em; height:1em; margin-left:.12em; vertical-align:-.12em; background:var(--color-primary); animation:lumina-caret 1s steps(1) infinite; }
+.assistant-stream-text { contain: layout paint; white-space: pre-wrap; overflow-wrap: anywhere; }
 @keyframes html-live-pulse {
   0%, 100% { filter: brightness(1); box-shadow: 0 0 0 1px rgba(196,167,255,.18), 0 0 0 rgba(196,167,255,0); }
   50% { filter: brightness(1.22); box-shadow: 0 0 0 1px rgba(255,105,220,.55), 0 0 24px rgba(196,167,255,.28); }
