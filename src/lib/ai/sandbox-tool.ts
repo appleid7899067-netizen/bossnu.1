@@ -58,17 +58,30 @@ export class RunScanner {
   finish(): ScanEvent[] {
     const events = this.pending ? this.line(this.pending) : [];
     this.pending = "";
-    if (this.github) {
-      if (trimmed === "</github>") { const call = this.github; this.github = null; return [{ type: "github", call }]; }
-      if (this.github.action === "write_file") this.github.content = (this.github.content || "") + line;
-      return [];
+    if (this.run) {
+      this.run = null;
+      events.push({ type: "text", text: "\n[Incomplete terminal request — not executed]\n" });
     }
-    if (this.run) { this.run = null; events.push({ type: "text", text: "\n[Incomplete terminal request — not executed]\n" }); }
-    if (this.github) { this.github = null; events.push({ type: "text", text: "\n[Incomplete GitHub request — not executed]\n" }); }
+    if (this.github) {
+      this.github = null;
+      events.push({ type: "text", text: "\n[Incomplete GitHub request — not executed]\n" });
+    }
     return events;
   }
   private line(line: string): ScanEvent[] {
     const trimmed = line.trim();
+    if (this.github) {
+      if (trimmed === "</github>") {
+        const call = this.github;
+        this.github = null;
+        return [{ type: "github", call }];
+      }
+      if (this.github.action === "write_file") {
+        this.github.content = (this.github.content || "") + line;
+        return [];
+      }
+      return [];
+    }
     if (this.run) {
       if (trimmed === "</run>") {
         const command = this.run.language === "python-safe"
