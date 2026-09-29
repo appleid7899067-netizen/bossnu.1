@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Sandbox, type Sandbox as SandboxType } from "e2b";
 import { loadSeed, syncRunnerResult, type WorkspaceSeed } from "@/lib/workspace/sync.server";
 
@@ -6,6 +7,8 @@ const PROJECT = "/home/user/project";
 const MAX_FILES = 500;
 const MAX_FILE_BYTES = 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000;
+const MAX_SKILL_ID = 64;
+const MAX_SKILL_CONTENT = 128 * 1024;
 
 export function e2bConfigured() {
   return Boolean(process.env.E2B_API_KEY?.trim());
@@ -53,7 +56,7 @@ async function seedWorkspace(sandbox: SandboxType, seed?: WorkspaceSeed) {
   if (!seed.files.length) return;
   await sandbox.files.write(
     seed.files.map((file) => ({
-      path: `${ROOT}/${file.path.replace(/^\/+/, "")}`,
+      path: `${ROOT}/${file.path.replace(/^\\/+/, "")}`,
       data: file.content,
     })),
     { gzip: true },
@@ -72,7 +75,7 @@ async function snapshotWorkspace(sandbox: SandboxType) {
         if (entry.type === "dir") await walk(entry.path);
         continue;
       }
-      const relative = entry.path.replace(/^\/home\/user\/?/, "");
+      const relative = entry.path.replace(/^\\/home\\/user\\/?/, "");
       if (!relative.startsWith("project/") || relative.includes("/.git/")) continue;
       if (entry.size > MAX_FILE_BYTES) {
         skipped.push({ path: relative, reason: "file-too-large", size: entry.size });
@@ -93,6 +96,130 @@ async function snapshotWorkspace(sandbox: SandboxType) {
     complete: files.length + skipped.length < MAX_FILES,
     source: "runner" as const,
   };
+}
+
+export type CreatedSkillResult = {
+  created: boolean;
+  verified: boolean;
+  persisted: boolean;
+  path: string;
+  skillId: string;
+  bytes: number;
+  sha256: string;
+  sandboxId: string;
+  persistent: boolean;
+  workspaceSync?: Awaited<ReturnType<typeof syncRunnerResult>>;
+  error?: string;
+};
+
+/**
+ * Create a user skill in the persistent E2B workspace.
+ *
+ * The success contract is deliberately strict: the file is only reported as
+ * saved when E2B write, read-back verification, and workspace sync all pass.
+ * This prevents the model from claiming that a skill was saved when it only
+ * generated markdown in its response.
+ */
+export async function createVerifiedSkill(
+  workspace: string,
+  skillId: string,
+  content: string,
+): Promise<CreatedSkillResult> {
+  if (!/^[a-z0-9][a-z0-9-]*$/i.test(skillId) || skillId.length > MAX_SKILL_ID) {
+    throw new Error("skillId ต้องเป็นตัวอักษร ตัวเลข และขีดกลางเท่านั้น");
+  }
+  if (!workspace || !/^[a-zA-Z0-9_-]{1,100}$/.test(workspace)) {
+    throw new Error("workspace ไม่ถูกต้อง");
+  }
+  if (!content.trim()) throw new Error("SKILL.md ว่างเปล่า");
+  if (Buffer.byteLength(content, "utf8") > MAX_SKILL_CONTENT) {
+    throw new Error(`SKILL.md ใหญ่เกิน ${MAX_SKILL_CONTENT} bytes`);
+  }
+
+  const { sandbox, persistent } = await getSandbox(workspace);
+  const relativePath = `skills/verified/${skillId}/SKILL.md`;
+  const absolutePath = `${PROJECT}/${relativePath}`;
+  const sha256 = createHash("sha256").update(content, "utf8").digest("hex");
+
+  try {
+    await seedWorkspace(sandbox, await loadSeed(workspace));
+
+    let alreadyExists = false;
+    try {
+      await sandbox.files.read(absolutePath, { format: "text" });
+      alreadyExists = true;
+    } catch {
+      alreadyExists = false;
+    }
+    if (alreadyExists) {
+      return {
+        created: false,
+        verified: false,
+        persisted: false,
+        path: relativePath,
+        skillId,
+        bytes: Buffer.byteLength(content, "utf8"),
+        sha256,
+        sandboxId: sandbox.sandboxId,
+        persistent,
+        error: "Skill นี้มีอยู่แล้วใน workspace",
+      };
+    }
+
+    await sandbox.commands.run(`mkdir -p ${PROJECT}/skills/verified/${skillId}`, { timeoutMs: 30_000 });
+    await sandbox.files.write([{ path: absolutePath, data: content }], { gzip: true });
+
+    const readBack = await sandbox.files.read(absolutePath, { format: "text" });
+    const readBackHash = createHash("sha256").update(readBack, "utf8").digest("hex");
+    const verified = readBack === content && readBackHash === sha256;
+
+    if (!verified) {
+      return {
+        created: true,
+        verified: false,
+        persisted: false,
+        path: relativePath,
+        skillId,
+        bytes: Buffer.byteLength(content, "utf8"),
+        sha256,
+        sandboxId: sandbox.sandboxId,
+        persistent,
+        error: "เขียนไฟล์แล้วแต่ read-back verification ไม่ตรงกัน",
+      };
+    }
+
+    const workspaceSnapshot = await snapshotWorkspace(sandbox);
+    const raw = {
+      status: "success",
+      stdout: `SKILL_CREATED ${relativePath}`,
+      stderr: "",
+      exitCode: 0,
+      durationMs: 0,
+      workspaceSnapshot,
+      e2b: { sandboxId: sandbox.sandboxId, persistent },
+    };
+    const workspaceSync = await syncRunnerResult(workspace, raw, {
+      command: `create-skill ${relativePath}`,
+      seedOk: true,
+    });
+    const persisted = Boolean(workspaceSync.verified && workspaceSync.complete);
+
+    return {
+      created: true,
+      verified: true,
+      persisted,
+      path: relativePath,
+      skillId,
+      bytes: Buffer.byteLength(content, "utf8"),
+      sha256,
+      sandboxId: sandbox.sandboxId,
+      persistent,
+      workspaceSync,
+      ...(persisted ? {} : { error: "ไฟล์ถูก verify ใน E2B แต่ workspace sync ยังไม่ยืนยัน" }),
+    };
+  } finally {
+    if (!persistent) await sandbox.kill().catch(() => undefined);
+  }
 }
 
 export async function runE2B(
