@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 const API = "https://api.github.com";
 const DEFAULT_REPO = "appleid7899067-netizen/bossnu.1";
 
