@@ -40,19 +40,34 @@ export function ChatThread({
   const scroller = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const lastScrollHeight = useRef(0);
+
+  // Anchor the viewport only while the user is already following the live reply.
+  // Do not call scrollIntoView on every token update: that causes mobile jitter and layout feedback.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || !autoScroll) return;
+    const heightDelta = el.scrollHeight - lastScrollHeight.current;
+    if (heightDelta <= 0) {
+      lastScrollHeight.current = el.scrollHeight;
+      return;
+    }
+    el.scrollTop = el.scrollHeight - el.clientHeight;
+    lastScrollHeight.current = el.scrollHeight;
+  }, [messages, streamingId, autoScroll]);
 
   useEffect(() => {
-    if (!autoScroll) return;
     const el = scroller.current;
     if (!el) return;
-    // Keep the viewport anchored to the bottom without smooth-scroll feedback loops.
-    bottomRef.current?.scrollIntoView({ block: "end", behavior: "auto" });
-  }, [messages, streamingId, autoScroll, sandboxRun]);
+    lastScrollHeight.current = el.scrollHeight;
+  }, []);
 
   function onScroll() {
     const el = scroller.current;
     if (!el) return;
-    setAutoScroll(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setAutoScroll(distance < 64);
+    lastScrollHeight.current = el.scrollHeight;
   }
 
   return (
@@ -203,8 +218,8 @@ function MessageBubble({
     <div className="lumina-rise group flex gap-3 sm:gap-4">
       <LuminaMark className="mt-0.5 size-7 shrink-0 text-primary" />
       <div className="min-w-0 max-w-[1080px] flex-1 break-words text-[13px] leading-[1.6] [overflow-wrap:anywhere] sm:text-[12.5px] sm:leading-[1.55]">
-        {message.activities?.length ? <ActivityFeed activities={message.activities} live={live} /> : null}
-        {message.thinking ? <ThinkingBlock text={message.thinking} live={live && !message.content} /> : null}
+        {message.activities?.length && !message.content ? <ActivityFeed activities={message.activities} live={live} /> : null}
+        {message.thinking && !message.content ? <ThinkingBlock text={message.thinking} live={live} /> : null}
         {empty ? (
           <p className="lumina-shimmer text-sm font-medium">กำลังคิด…</p>
         ) : message.content ? (
@@ -329,24 +344,11 @@ function ActivityFeed({ activities, live }: { activities: ChatActivity[]; live: 
   );
 }
 function ThinkingBlock({ text, live }: { text: string; live: boolean }) {
-  const [open, setOpen] = useState(live);
-
-  useEffect(() => setOpen(live), [live]);
-
+  if (!text) return null;
   return (
     <div className="mb-2">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="text-[11px] font-medium text-muted transition-colors hover:text-fg"
-      >
-        {live ? "กำลังคิด…" : open ? "ซ่อนการคิด" : "แสดงการคิด"}
-      </button>
-      {open ? (
-        <p className="mt-1.5 border-l border-border pl-2.5 text-[11px] leading-[1.5] text-muted">
-          {text}
-        </p>
-      ) : null}
+      <div className="text-[11px] font-medium text-muted">กำลังคิด<span className="thinking-dots">...</span></div>
+      <p className="mt-1.5 border-l border-border pl-2.5 text-[11px] leading-[1.5] text-muted">{text}</p>
     </div>
   );
 }
