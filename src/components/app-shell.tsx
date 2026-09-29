@@ -17,7 +17,7 @@ import { generateMindMap, generateStudioImage } from "@/lib/ai/client";
 import { redactSensitiveCommand, runAgentLoop, type AgentPhase } from "@/lib/ai/agent-loop";
 import { agentWorkspaceIdFor, createHttpWorkspace } from "@/lib/workspace/http-workspace";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
-import type { RunCall } from "@/lib/ai/sandbox-tool";
+import type { GithubCall, RunCall, ToolResult } from "@/lib/ai/sandbox-tool";
 import { isRunnerRuntime } from "@/types/sandbox";
 import { streamChat } from "@/lib/ai/stream";
 import { finishVoice, getVoiceSettings, setVoiceEnabled, speakRealtime, stopVoice } from "@/lib/ai/voice";
@@ -188,6 +188,19 @@ export function AppShell({ search }: { search: Search }) {
     const initialCall = detection.command
       ? { language: isRunnerRuntime(detection.runtime) ? detection.runtime : "bash", command: detection.command } as RunCall
       : undefined;
+    const executeGithub = async (call: GithubCall): Promise<ToolResult> => {
+      const response = await fetch("/api/github", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(call),
+        signal: ac.signal,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        return { status: "error", error: data.error || `GitHub HTTP ${response.status}` };
+      }
+      return { status: "success", output: JSON.stringify(data.result).slice(-30000), exitCode: 0, durationMs: 0 };
+    };
     try {
       if (!executionRequested) {
         let failure = "";
@@ -216,6 +229,7 @@ export function AppShell({ search }: { search: Search }) {
         messages: history, signal: ac.signal, tools,
         maxRuns: 6,
         execute,
+        executeGithub,
         initialCall,
         initialCallApproved: allowDangerous,
         workspace: createHttpWorkspace(workspaceId),
