@@ -66,22 +66,32 @@ async function seedWorkspace(sandbox: SandboxType, seed?: WorkspaceSeed) {
 async function snapshotWorkspace(sandbox: SandboxType) {
   const files: Array<{ path: string; content: string }> = [];
   const skipped: Array<{ path: string; reason: string; size?: number }> = [];
+  const ignoredDirs = new Set(["node_modules", ".next", "dist", "build", "coverage", ".cache"]);
   const walk = async (dir: string) => {
     if (files.length + skipped.length >= MAX_FILES) return;
+    const relativeDir = dir.replace(/^\/home\/user\/?/, "");
+    const dirParts = relativeDir.split("/").filter(Boolean);
+    if (dirParts.some((part) => ignoredDirs.has(part))) return;
+
     const entries = await sandbox.files.list(dir);
     for (const entry of entries) {
       if (files.length + skipped.length >= MAX_FILES) break;
-      if (entry.type !== "file") {
-        if (entry.type === "dir") await walk(entry.path);
-        continue;
-      }
       const relative = entry.path.replace(/^\/home\/user\/?/, "");
       if (!relative.startsWith("project/") || relative.includes("/.git/")) continue;
+
+      if (entry.type === "dir") {
+        const parts = relative.split("/").filter(Boolean);
+        if (parts.some((part) => ignoredDirs.has(part))) continue;
+        await walk(entry.path);
+        continue;
+      }
+      if (entry.type !== "file") continue;
+
       // Dependencies/build artifacts are reproducible and must never be mirrored to Neon.
       // Commands such as "node install-dayjs.js" can create a huge node_modules tree,
       // which previously made the sync incomplete even when the command itself succeeded.
       const parts = relative.split("/");
-      if (parts.includes("node_modules") || parts.includes(".next") || parts.includes("dist") || parts.includes("build") || parts.includes("coverage") || parts.includes(".cache")) continue;
+      if (parts.some((part) => ignoredDirs.has(part))) continue;
       if (entry.size > MAX_FILE_BYTES) {
         skipped.push({ path: relative, reason: "file-too-large", size: entry.size });
         continue;
@@ -91,14 +101,14 @@ async function snapshotWorkspace(sandbox: SandboxType) {
     }
   };
   await walk(PROJECT);
-  const paths = [...files.map((f) => f.path), ...skipped.map((f) => f.path)];
+  const paths = files.map((f) => f.path);
   return {
     version: 1,
     root: "project",
     files,
     paths,
     skipped,
-    complete: files.length + skipped.length < MAX_FILES,
+    complete: files.length < MAX_FILES,
     source: "runner" as const,
   };
 }
