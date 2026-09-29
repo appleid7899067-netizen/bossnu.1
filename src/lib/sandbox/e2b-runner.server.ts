@@ -56,7 +56,7 @@ async function seedWorkspace(sandbox: SandboxType, seed?: WorkspaceSeed) {
   if (!seed.files.length) return;
   await sandbox.files.write(
     seed.files.map((file) => ({
-      path: `${ROOT}/${file.path.replace(/^\\/+/, "")}`,
+      path: `${ROOT}/${file.path.replace(/^\/+/, "")}`,
       data: file.content,
     })),
     { gzip: true },
@@ -75,7 +75,7 @@ async function snapshotWorkspace(sandbox: SandboxType) {
         if (entry.type === "dir") await walk(entry.path);
         continue;
       }
-      const relative = entry.path.replace(/^\\/home\\/user\\/?/, "");
+      const relative = entry.path.replace(/^\/home\/user\/?/, "");
       if (!relative.startsWith("project/") || relative.includes("/.git/")) continue;
       if (entry.size > MAX_FILE_BYTES) {
         skipped.push({ path: relative, reason: "file-too-large", size: entry.size });
