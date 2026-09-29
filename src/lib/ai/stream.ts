@@ -3,6 +3,7 @@ import type { ChatMode } from "@/lib/types";
 import { buildSkillContext } from "@/lib/skills";
 import { useAppStore } from "@/lib/store";
 import { getPuterModel } from "./models";
+import { formatQwenContext, runQwenAnalyst } from "./dual-model";
 
 export type StreamEvent =
   | { type: "start"; id: string }
@@ -136,12 +137,27 @@ export async function streamChat(opts: {
     ].filter(Boolean).join("\n");
 
     const contextMessages = manageStreamContext(opts.messages);
+
+    // Dual-model agent: Qwen reviews the task/context first, then the primary model acts on that report.
+    // Qwen is advisory only. Real Sandbox/GitHub output remains the source of truth.
+    const qwenReport = opts.tools
+      ? await runQwenAnalyst(puter, {
+          messages: contextMessages,
+          latestUser,
+          modelLabel: selectedModel,
+        })
+      : null;
+    const dualModelContext = qwenReport ? formatQwenContext(qwenReport) : "";
+    const primaryContextMessages = dualModelContext
+      ? [{ role: "system" as const, content: dualModelContext }, ...contextMessages]
+      : contextMessages;
+
     let response: Awaited<ReturnType<typeof puter.ai.chat>>;
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         response = await puter.ai.chat(
-          [{ role: "system", content: system }, ...contextMessages],
+          [{ role: "system", content: system }, ...primaryContextMessages],
           {
             model: selectedModel,
         stream: true,
