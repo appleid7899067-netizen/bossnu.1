@@ -163,6 +163,8 @@ function normalizeStatus(value: unknown): ResultStatus {
   return value === "running" || value === "success" || value === "timeout" ? value : "error";
 }
 
+type StreamEmit = (event: { type: "status"; status: string; message?: string } | { type: "output"; stream: "stdout" | "stderr"; text: string }) => void;
+
 async function runOnRunner(
   runtime: string,
   label: string,
@@ -171,13 +173,18 @@ async function runOnRunner(
   workspace?: string,
   stdin?: string,
   signal?: AbortSignal,
+  emit?: StreamEmit,
 ): Promise<{ result: CommandResult; httpStatus: number }> {
   if (e2bConfigured()) {
     steps.push(`ส่งไปรันที่ E2B Sandbox (${runtime})`);
+    emit?.({ type: "status", status: "running", message: `ส่งไปรันที่ E2B Sandbox (${runtime})` });
     const started = Date.now();
     try {
       const executed = await runE2B(runtime, command, workspace, stdin, (stream, text) => {
-        if (text) steps.push(`${stream === "stderr" ? "stderr" : "stdout"}: ${text.slice(0, 160)}`);
+        if (text) {
+          steps.push(`${stream === "stderr" ? "stderr" : "stdout"}: ${text.slice(0, 160)}`);
+          emit?.({ type: "output", stream, text });
+        }
       });
       const data = executed.raw as Record<string, unknown>;
       const status = normalizeStatus(data.status);
@@ -185,6 +192,7 @@ async function runOnRunner(
       const stderr = typeof data.stderr === "string" ? data.stderr : "";
       const output = [stdout, stderr].filter(Boolean).join("\n").trim().slice(-SANDBOX_LIMITS.outputChars);
       if (executed.workspaceSync) steps.push(describeEvidence(executed.workspaceSync));
+      emit?.({ type: "status", status: status === "success" ? "success" : "error", message: status === "success" ? "E2B รันสำเร็จ" : "E2B รันไม่สำเร็จ" });
       steps.push(status === "success" ? `E2B รันสำเร็จ (${((Number(data.durationMs) || Date.now() - started) / 1000).toFixed(1)}s)` : "E2B รันไม่สำเร็จ");
       return {
         httpStatus: 200,
@@ -350,6 +358,8 @@ async function runOnRunner(
     steps.push(describeEvidence(workspaceSync));
   }
   const publicData = publicRunnerResult(data, workspaceSync);
+  if (stdout) emit?.({ type: "output", stream: "stdout", text: stdout });
+  if (stderr) emit?.({ type: "output", stream: "stderr", text: stderr });
   const error =
     status === "timeout"
       ? "หมดเวลาการรัน — Runner จำกัดเวลาต่อคำสั่ง"
@@ -471,7 +481,7 @@ async function handleGet(request: Request): Promise<Response> {
   return json(body);
 }
 
-async function handlePost(request: Request): Promise<Response> {
+async function handlePost(request: Request, emit?: StreamEmit): Promise<Response> {
   if (rateLimited(request)) {
     return fail(
       429,
@@ -498,6 +508,7 @@ async function handlePost(request: Request): Promise<Response> {
   }
   const { cmd, skill: skillId, reference, type, stdin } = parsed.data;
   const steps: string[] = ["รับคำสั่ง"];
+  emit?.({ type: "status", status: "queued", message: "รับคำสั่ง" });
 
   // Skill only (or explicit type=skill): load, don't run.
   const loadOnly = !cmd || type === "skill";
@@ -524,6 +535,7 @@ async function handlePost(request: Request): Promise<Response> {
 
   const command = type === "python-safe" ? (cmd as string) : (cmd as string).trim();
   const action = plan(command, type, steps);
+  emit?.({ type: "status", status: "planning", message: steps[steps.length - 1] ?? "วางแผนการรัน" });
   const suggestions = skill ? [] : suggestSkills(command).map((s) => s.id);
 
   if (action.kind === "json") {
@@ -547,6 +559,7 @@ async function handlePost(request: Request): Promise<Response> {
     parsed.data.workspace,
     stdin,
     request.signal,
+    emit,
   );
   return json({ ...result, skill, suggestions }, httpStatus);
 }
