@@ -27,6 +27,8 @@ export async function ensurePuterSignedIn() {
 const CONTEXT_CHAR_BUDGET = 48_000;
 const CONTEXT_RECENT_MESSAGES = 18;
 const RETRY_DELAYS_MS = [350, 800, 1600];
+const DUAL_QWEN_MODEL = "qwen3-coder";
+const DUAL_DEEPSEEK_MODEL = "deepseek-v4-flash:free";
 
 function compactMessage(content: string, maxChars = 1_200) {
   const clean = content.replace(/\s+/g, " ").trim();
@@ -136,6 +138,8 @@ export async function streamChat(opts: {
     ].filter(Boolean).join("\n");
 
     const contextMessages = manageStreamContext(opts.messages);
+    const primaryModel = DUAL_QWEN_MODEL;
+    const verifierModel = DUAL_DEEPSEEK_MODEL;
     let response: Awaited<ReturnType<typeof puter.ai.chat>>;
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -143,7 +147,7 @@ export async function streamChat(opts: {
         response = await puter.ai.chat(
           [{ role: "system", content: system }, ...contextMessages],
           {
-            model: selectedModel,
+            model: primaryModel,
         stream: true,
         temperature: opts.mode === "think" ? 0.6 : 0.7,
         max_tokens: opts.mode === "think" ? 2200 : 1400,
@@ -160,6 +164,57 @@ export async function streamChat(opts: {
       }
     }
     if (!response!) throw (lastError instanceof Error ? lastError : new Error(String(lastError ?? "Puter request failed.")));
+
+    const qwenParts: string[] = [];
+    for await (const part of response as AsyncIterable<unknown>) {
+      if (opts.signal?.aborted) return;
+      const chunk = readChunk(part);
+      if (chunk.eventType === "error") throw new Error(chunk.text || "Qwen stream error.");
+      if (chunk.text) qwenParts.push(chunk.text);
+      if (chunk.reasoning) opts.onEvent({ type: "thinking", text: chunk.reasoning });
+    }
+    const qwenDraft = qwenParts.join("").trim();
+    if (!qwenDraft) throw new Error("Qwen3 Coder ไม่ได้ส่งคำตอบกลับมา");
+
+    let verifierResponse: Awaited<ReturnType<typeof puter.ai.chat>>;
+    try {
+      verifierResponse = await puter.ai.chat(
+        [
+          { role: "system", content: "คุณคือ DeepSeek V4 Flash verifier ของ Sali. ตรวจร่างจาก Qwen3 Coder แก้ข้อผิดพลาดที่เห็นชัดเจน รักษาเจตนาผู้ใช้ ห้ามอ้างผลลัพธ์ที่ยังไม่ได้ทำจริง และตอบเป็นคำตอบสุดท้ายชุดเดียวโดยไม่พูดถึงกระบวนการตรวจสอบ." },
+          { role: "user", content: "คำขอของผู้ใช้:\\n" + latestUser + "\\n\\nร่างจาก Qwen3 Coder:\\n" + qwenDraft },
+        ],
+        {
+          model: verifierModel,
+          stream: true,
+          temperature: opts.mode === "think" ? 0.4 : 0.5,
+          max_tokens: opts.mode === "think" ? 2600 : 1600,
+          normalize: true,
+        },
+      );
+    } catch {
+      opts.onEvent({ type: "text", text: qwenDraft });
+      opts.onEvent({ type: "done", stopReason: "qwen_fallback" });
+      return;
+    }
+
+    let verifiedText = "";
+    for await (const part of verifierResponse as AsyncIterable<unknown>) {
+      if (opts.signal?.aborted) return;
+      const chunk = readChunk(part);
+      if (chunk.eventType === "error") throw new Error(chunk.text || "DeepSeek verifier stream error.");
+      if (chunk.reasoning) opts.onEvent({ type: "thinking", text: chunk.reasoning });
+      if (chunk.text) {
+        verifiedText += chunk.text;
+        opts.onEvent({ type: "text", text: chunk.text });
+      }
+    }
+    if (!verifiedText.trim()) {
+      opts.onEvent({ type: "text", text: qwenDraft });
+      opts.onEvent({ type: "done", stopReason: "qwen_fallback_empty_verifier" });
+      return;
+    }
+    opts.onEvent({ type: "done", stopReason: "dual_model_verified" });
+    return;
 
     let activeBlock: number | null = null;
     let activeKind: "thinking" | "text" | "tool" | null = null;
