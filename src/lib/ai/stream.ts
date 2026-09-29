@@ -1,4 +1,4 @@
-import { SANDBOX_TOOL_PROMPT } from "./sandbox-tool";
+import { GITHUB_TOOL_PROMPT, SANDBOX_TOOL_PROMPT } from "./sandbox-tool";
 import type { ChatMode } from "@/lib/types";
 import { buildSkillContext } from "@/lib/skills";
 import { useAppStore } from "@/lib/store";
@@ -132,7 +132,7 @@ export async function streamChat(opts: {
       learnedSkills ? `ทักษะจากโค้ดที่เคยทดสอบผ่าน:\n${learnedSkills}` : "ยังไม่มีทักษะโค้ดที่ทดสอบผ่าน",
       "ห้ามอ้างว่าทำสิ่งที่ยังไม่ได้ทำจริง",
       buildSkillContext(latestUser),
-      opts.tools ? SANDBOX_TOOL_PROMPT : "โหมดสนทนาปกติ: ตอบด้วย Puter อย่างเดียว ห้ามสร้างหรือเรียก Sandbox, terminal หรือ tool execution",
+      opts.tools ? SANDBOX_TOOL_PROMPT + "\n" + GITHUB_TOOL_PROMPT : "โหมดสนทนาปกติ: ตอบด้วย Puter อย่างเดียว ห้ามสร้างหรือเรียก Sandbox, terminal, GitHub หรือ tool execution",
     ].filter(Boolean).join("\n");
 
     const contextMessages = manageStreamContext(opts.messages);
