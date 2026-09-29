@@ -19,7 +19,7 @@ function corsHeaders(): Record<string, string> {
 }
 
 function sse(value: unknown): Uint8Array {
-  return new TextEncoder().encode(`data: ${JSON.stringify(value)}\\n\\n`);
+  return new TextEncoder().encode(`data: ${JSON.stringify(value)}\n\n`);
 }
 
 async function handle(request: Request): Promise<Response> {
