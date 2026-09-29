@@ -17,6 +17,7 @@ import {
   type SkillContent,
 } from "@/types/sandbox";
 import { runnerAuthHeaders, runnerConfig } from "@/lib/sandbox/runner-config.server";
+import { e2bConfigured, runE2B } from "@/lib/sandbox/e2b-runner.server";
 
 const MAX_BODY_BYTES = 256 * 1024;
 
@@ -100,7 +101,36 @@ async function handle(request: Request): Promise<Response> {
         return publicRunnerResult(result, evidence);
       };
       try {
-        send({ type: "status", status: "queued", message: "รับคำสั่ง Sandbox" });
+        send({ type: "status", status: "queued", message: e2bConfigured() ? "ส่งงานเข้า E2B Sandbox" : "รับคำสั่ง Sandbox" });
+        if (e2bConfigured()) {
+          try {
+            const executed = await runE2B(runtime, command, workspace, stdin, (stream, text) => {
+              if (text) send({ type: "output", stream, text });
+            });
+            const data = executed.raw as Record<string, unknown>;
+            const result = {
+              success: data.status === "success",
+              status: data.status === "success" ? "success" : "error",
+              type: runtime,
+              runtime,
+              command,
+              output: [data.stdout, data.stderr].filter((v) => typeof v === "string" && v).join("\\n"),
+              stdout: typeof data.stdout === "string" ? data.stdout : "",
+              stderr: typeof data.stderr === "string" ? data.stderr : "",
+              exitCode: typeof data.exitCode === "number" ? data.exitCode : null,
+              durationMs: typeof data.durationMs === "number" ? data.durationMs : Date.now() - started,
+              workspaceSync: executed.workspaceSync,
+              e2b: { sandboxId: executed.sandboxId, persistent: executed.persistent },
+            };
+            if (executed.workspaceSync) send({ type: "status", status: executed.workspaceSync.verified && executed.workspaceSync.complete ? "verified" : "unverified", message: describeEvidence(executed.workspaceSync) });
+            send({ type: "complete", result });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            send({ type: "error", error: message });
+            send({ type: "complete", result: { success: false, status: "error", type: runtime, runtime, command, error: "E2B Sandbox execution failed", detail: message.slice(0, 500), durationMs: Date.now() - started } });
+          }
+          close(); return;
+        }
         if (usesJudge0()) {
           const { result } = await executeJudge0(parsed.data,
             AbortSignal.any([request.signal, abort.signal]),
