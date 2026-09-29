@@ -481,7 +481,7 @@ async function handleGet(request: Request): Promise<Response> {
   return json(body);
 }
 
-async function handlePost(request: Request, emit?: StreamEmit): Promise<Response> {
+export async function handlePost(request: Request, emit?: StreamEmit): Promise<Response> {
   if (rateLimited(request)) {
     return fail(
       429,
