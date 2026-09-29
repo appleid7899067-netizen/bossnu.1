@@ -77,6 +77,11 @@ async function snapshotWorkspace(sandbox: SandboxType) {
       }
       const relative = entry.path.replace(/^\/home\/user\/?/, "");
       if (!relative.startsWith("project/") || relative.includes("/.git/")) continue;
+      // Dependencies/build artifacts are reproducible and must never be mirrored to Neon.
+      // Commands such as "node install-dayjs.js" can create a huge node_modules tree,
+      // which previously made the sync incomplete even when the command itself succeeded.
+      const parts = relative.split("/");
+      if (parts.includes("node_modules") || parts.includes(".next") || parts.includes("dist") || parts.includes("build") || parts.includes("coverage") || parts.includes(".cache")) continue;
       if (entry.size > MAX_FILE_BYTES) {
         skipped.push({ path: relative, reason: "file-too-large", size: entry.size });
         continue;
