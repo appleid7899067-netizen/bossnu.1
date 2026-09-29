@@ -1,4 +1,4 @@
-import { RunScanner, modelResult, terminalTranscript } from "./sandbox-tool.ts";
+import { RunScanner, modelResult, terminalTranscript, type GithubCall } from "./sandbox-tool.ts";
 import type { RunCall, ToolResult } from "./sandbox-tool.ts";
 import { CowAgentCore, buildCowPlan } from "./cow-agent-core.ts";
 import { selectSkills } from "../skills/index.ts";
@@ -119,6 +119,7 @@ export async function runAgentLoop(opts: {
   tools: boolean;
   model: (messages: AgentMessage[], onText: (text: string) => void) => Promise<void>;
   execute: (call: RunCall, approved?: boolean) => Promise<ToolResult>;
+  executeGithub?: (call: GithubCall) => Promise<ToolResult>;
   /** A user-requested command to run only after the goal and plan phases. */
   initialCall?: RunCall;
   initialCallApproved?: boolean;
@@ -215,11 +216,13 @@ export async function runAgentLoop(opts: {
 
     const scanner = new RunScanner();
     const calls: RunCall[] = [];
+    const githubCalls: GithubCall[] = [];
     let raw = "";
     const accept = (events: ReturnType<RunScanner["push"]>) => {
       for (const event of events) {
         if (event.type === "text") show(event.text);
-        else calls.push(event.call);
+        else if (event.type === "run") calls.push(event.call);
+        else githubCalls.push(event.call);
       }
     };
 
@@ -258,7 +261,7 @@ export async function runAgentLoop(opts: {
       if (opts.tools) accept(scanner.finish());
     }
 
-    if (!calls.length) {
+    if (!calls.length && !githubCalls.length) {
       if (gating && lastVerdict) {
         // The model tried to answer while the evidence is failing.
         rejections++;
@@ -288,6 +291,35 @@ export async function runAgentLoop(opts: {
     if (raw.trim()) {
       core.remember("latest-plan", raw, "conversation");
       if (workspace) await safely(() => workspace.remember("latest-plan", raw, "conversation"), undefined);
+    }
+
+    for (let index = 0; index < githubCalls.length; index++) {
+      const call = githubCalls[index];
+      if (opts.signal.aborted) return finish("aborted");
+      if (!opts.executeGithub) {
+        opts.onText("\n⚠️ GitHub Agent ยังไม่ได้เชื่อมต่อในเซิร์ฟเวอร์ค่ะ\n");
+        return finish("unverified");
+      }
+      core.setPhase("act");
+      opts.onPhase?.("act", "🛠️ Act • กำลังแก้ไข GitHub");
+      opts.onPhase?.("run", `🐙 GitHub • ${call.action}`);
+      let result: ToolResult;
+      try { result = await opts.executeGithub(call); }
+      catch (error) { result = { status: "error", error: error instanceof Error ? error.message : String(error) }; }
+      core.setPhase("observe");
+      opts.onPhase?.("observe", "👀 Observe • อ่านผลจาก GitHub");
+      opts.onText(`\n```github\n${JSON.stringify(result).slice(-20000)}\n```\n`);
+      lastVerdict = { passed: result.status === "success" || result.status === "ok", reasons: result.status === "success" || result.status === "ok" ? [] : [result.error || "GitHub operation failed"] };
+      core.setPhase("verify");
+      opts.onPhase?.("verify", lastVerdict.passed ? "🔍 Verify • GitHub ยืนยันผลแล้ว" : "🔍 Verify • GitHub ไม่ผ่าน");
+      pendingVerified = null;
+      if (!lastVerdict.passed) {
+        core.setPhase("fix");
+        opts.onPhase?.("fix", "🐛 Fix • แก้ปัญหา GitHub แล้วลองใหม่");
+        messages.push({ role: "user", content: `GITHUB FAILED:\n${lastVerdict.reasons.join("\n")}\nFix the GitHub operation and try again.` });
+        break;
+      }
+      messages.push({ role: "user", content: `GITHUB RESULT: ${JSON.stringify(result).slice(-12000)}` });
     }
 
     for (let index = 0; index < calls.length; index++) {
