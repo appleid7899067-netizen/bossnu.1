@@ -47,6 +47,8 @@ export const PUTER_MODELS: PuterModelOption[] = [
   { id: "minimax-m2.5", label: "MiniMax M2.5", provider: "MiniMax", role: "balanced" },
   { id: "step-3.7-flash", label: "Step 3.7 Flash", provider: "StepFun", role: "fast" },
   { id: "deepseek/deepseek-v4.1-flash:free", label: "DeepSeek V4.1 Flash • FREE", provider: "DeepSeek", role: "fast" },
+  { id: "deepseek/deepseek-v4-flash:free", label: "DeepSeek V4 Flash • FREE", provider: "DeepSeek", role: "fast" },
+  { id: "deepseek/deepseek-v4-flash-0731:free", label: "DeepSeek V4 Flash 0731 • FREE", provider: "DeepSeek", role: "fast" },
   { id: "deepseek/deepseek-v4-flash-0731", label: "DeepSeek V4 Flash (0731)", provider: "DeepSeek", role: "fast" },
   { id: "deepseek/deepseek-v4-flash", label: "DeepSeek V4 Flash", provider: "DeepSeek", role: "fast" },
   { id: "deepseek/deepseek-v4-pro-0813", label: "DeepSeek V4 Pro (0813)", provider: "DeepSeek", role: "reasoning" },
