@@ -107,16 +107,22 @@ export async function runE2B(
   const started = Date.now();
   try {
     await seedWorkspace(sandbox, seed);
-    const result = await sandbox.commands.run(command, {
-      timeoutMs: Number(process.env.E2B_COMMAND_TIMEOUT_MS) || 140_000,
-      cwd: PROJECT,
-      ...(stdin ? { stdin: true } : {}),
-      onStdout: (data: string) => onOutput?.("stdout", data),
-      onStderr: (data: string) => onOutput?.("stderr", data),
-    });
-    if (stdin) {
-      // stdin is accepted as an initial payload by the higher-level route; for
-      // now commands that need interactive input should use the persistent PTY.
+    let result: { exitCode?: number | null; stdout?: string; stderr?: string };
+    try {
+      result = await sandbox.commands.run(command, {
+        timeoutMs: Number(process.env.E2B_COMMAND_TIMEOUT_MS) || 140_000,
+        cwd: PROJECT,
+        ...(stdin ? { stdin: true } : {}),
+        onStdout: (data: string) => onOutput?.("stdout", data),
+        onStderr: (data: string) => onOutput?.("stderr", data),
+      });
+    } catch (error) {
+      const failure = error as { exitCode?: number; stdout?: string; stderr?: string; error?: string };
+      result = {
+        exitCode: typeof failure.exitCode === "number" ? failure.exitCode : 1,
+        stdout: typeof failure.stdout === "string" ? failure.stdout : "",
+        stderr: typeof failure.stderr === "string" ? failure.stderr : (failure.error ?? String(error)),
+      };
     }
     const workspaceSnapshot = workspace ? await snapshotWorkspace(sandbox) : undefined;
     const raw = {
