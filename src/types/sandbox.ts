@@ -319,6 +319,11 @@ export const CommandResultSchema = z.looseObject({
   riskReason: z.string().optional(),
   error: z.string().optional(),
   detail: z.string().optional(),
+  /** E2B execution metadata returned by the server when E2B handled the command. */
+  e2b: z.looseObject({
+    sandboxId: z.string().min(1),
+    persistent: z.boolean(),
+  }).optional(),
 });
 export type CommandResult = z.infer<typeof CommandResultSchema>;
 
