@@ -27,8 +27,8 @@ export async function ensurePuterSignedIn() {
 const CONTEXT_CHAR_BUDGET = 48_000;
 const CONTEXT_RECENT_MESSAGES = 18;
 const RETRY_DELAYS_MS = [350, 800, 1600];
-const DUAL_QWEN_MODEL = "qwen3-coder";
-const DUAL_DEEPSEEK_MODEL = "deepseek-v4-flash:free";
+const DUAL_QWEN_MODEL = "qwen/qwen3-coder-flash";
+const DUAL_DEEPSEEK_MODEL = "deepseek/deepseek-v4-flash:free";
 
 function compactMessage(content: string, maxChars = 1_200) {
   const clean = content.replace(/\s+/g, " ").trim();
@@ -185,6 +185,7 @@ export async function streamChat(opts: {
         ],
         {
           model: verifierModel,
+          provider: "alibaba",
           stream: true,
           temperature: opts.mode === "think" ? 0.4 : 0.5,
           max_tokens: opts.mode === "think" ? 2600 : 1600,
