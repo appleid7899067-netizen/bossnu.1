@@ -716,7 +716,14 @@ function ResultCard({
           {result.label && result.label !== result.type ? <Chip>{result.label}</Chip> : null}
           {typeof result.exitCode === "number" ? <Chip mono>exit {result.exitCode}</Chip> : null}
           {result.durationMs ? <Chip>{(result.durationMs / 1000).toFixed(2)}s</Chip> : null}
-          <span className="ml-auto text-[10px] text-subtle">Sandbox Runner</span>
+          {result.e2b ? (
+            <span className="ml-auto inline-flex items-center gap-1.5 text-[10px] font-medium text-primary">
+              <span className="size-1.5 rounded-full bg-primary" />
+              E2B • {result.e2b.persistent ? "Persistent" : "Ephemeral"}
+            </span>
+          ) : (
+            <span className="ml-auto text-[10px] text-subtle">Sandbox Runner</span>
+          )}
         </div>
 
         <div className="flex flex-col gap-3 p-3">
@@ -726,6 +733,14 @@ function ResultCard({
               {result.detail ? (
                 <div className="mt-1 font-mono text-[11px] opacity-80">{result.detail}</div>
               ) : null}
+            </div>
+          ) : null}
+
+          {result.e2b ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-[11px]">
+              <span className="font-semibold text-primary">E2B Sandbox</span>
+              <span className="font-mono text-muted">ID: {result.e2b.sandboxId}</span>
+              <span className="text-subtle">• {result.e2b.persistent ? "workspace persistent" : "session only"}</span>
             </div>
           ) : null}
 
