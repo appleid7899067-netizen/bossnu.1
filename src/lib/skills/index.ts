@@ -142,9 +142,6 @@ const skills: Skill[] = [
     route: "Claim → Evidence → Gate → Pass/Repair",
     instructions: "ห้ามเท่ากับคำสั่งสำเร็จกับงานเสร็จ ต้องตรวจ output, integration path และ failure handling ที่เกี่ยวข้องก่อนบอกว่าสำเร็จ",
   },
-];
-
-
   {
     id: "bash-execution",
     name: "Bash Execution",
@@ -262,7 +259,9 @@ const skills: Skill[] = [
     route: "Goal → Inspect Contract → Call → Observe → Verify",
     instructions: "ตรวจ status, response shape และ authentication path จากการเรียกจริง",
   },
-\nconst normalized = (value: string) => value.toLowerCase().normalize("NFKC");
+];
+
+const normalized = (value: string) => value.toLowerCase().normalize("NFKC");
 
 export function listSkills(): Skill[] {
   return skills.map((skill) => ({ ...skill, triggers: [...skill.triggers] }));
