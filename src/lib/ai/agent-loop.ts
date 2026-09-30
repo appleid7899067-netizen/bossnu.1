@@ -51,8 +51,11 @@ export type AgentLoopSummary = {
   lastVerdict: EvidenceVerdict | null;
 };
 
-export const DEFAULT_MAX_RUNS = 6;
-export const MAX_RUNS_CAP = 8;
+// Sali can recover through up to 11 compact execution rounds.
+// The loop still exits immediately on a verified evidence gate, so 11 is a
+// ceiling, not a requirement to spend all rounds.
+export const DEFAULT_MAX_RUNS = 11;
+export const MAX_RUNS_CAP = 11;
 
 export function redactSensitiveCommand(command: string) {
   return command
