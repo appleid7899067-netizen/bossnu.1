@@ -221,7 +221,7 @@ function MessageBubble({
         {message.activities?.length ? <ActivityFeed activities={message.activities} live={live} /> : null}
         {message.thinking && !message.content ? <ThinkingBlock text={message.thinking} live={live} /> : null}
         {empty ? (
-          <p className="lumina-shimmer text-sm font-medium">กำลังคิด…</p>
+          <p className="text-sm font-medium text-muted">กำลังดำเนินการ...</p>
         ) : message.content ? (
           live ? (
             <p className="assistant-stream-text whitespace-pre-wrap break-words">{message.content}</p>
