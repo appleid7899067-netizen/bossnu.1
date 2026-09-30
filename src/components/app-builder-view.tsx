@@ -43,7 +43,7 @@ export function AppBuilderView({ project, workspaceId, onProject, onReset }: { p
         if (cancelled || !response.ok || !data?.ok || !Array.isArray(data.files)) return;
         const files = data.files
           .filter(file => file.path.startsWith("project/") && !file.path.endsWith("/.gitkeep"))
-          .map(file => ({ path: file.path.replace(/^project\\//, ""), content: file.content }));
+          .map(file => ({ path: file.path.replace(/^project\//, ""), content: file.content }));
         // A fresh workspace only contains its scaffold. Do not replace an existing
         // locally-persisted Builder project with that scaffold.
         const hasBuilderFiles = files.some(file => /^(index\\.html|src\\/|styles\\.css|script\\.js)/.test(file.path));
