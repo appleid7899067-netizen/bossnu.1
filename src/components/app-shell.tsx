@@ -21,7 +21,7 @@ import { useCurrentUser } from "@/lib/auth/use-current-user";
 import type { GithubCall, RunCall, ToolResult } from "@/lib/ai/sandbox-tool";
 import { isRunnerRuntime } from "@/types/sandbox";
 import { streamChat } from "@/lib/ai/stream";
-import { finishVoice, getVoiceSettings, setVoiceEnabled, speakRealtime, stopVoice } from "@/lib/ai/voice";
+import { finishVoice, getVoiceSettings, setVoiceEnabled, speakNow, stopVoice } from "@/lib/ai/voice";
 import type { Search } from "@/lib/search";
 import { useAppStore } from "@/lib/store";
 import type { ChatActivity, ChatAttachment, ChatMode, MindMapData } from "@/lib/types";
