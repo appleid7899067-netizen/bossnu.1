@@ -161,6 +161,15 @@ export function AppShell({ search }: { search: Search }) {
       const current = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
       store.patchAssistant(id, assistantId, { activities: current.map(activity => activity.id === activityId ? { ...activity, ...patch } as ChatActivity : activity) });
     };
+    const startStreamLog = (source: Extract<ChatActivity, { kind: "stream" }>["source"], label: string) => {
+      const activityId = uid("stream");
+      pushActivity({ kind: "stream", source, status: "running", text: label, chars: 0 });
+      return activityId;
+    };
+    const updateStreamLog = (activityId: string, source: Extract<ChatActivity, { kind: "stream" }>["source"], status: Extract<ChatActivity, { kind: "stream" }>["status"], text: string, chars: number) => {
+      const current = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
+      store.patchAssistant(id, assistantId, { activities: current.map(activity => activity.id === activityId ? { ...activity, source, status, text: text.slice(-240), chars } as ChatActivity : activity) });
+    };
     const tools = executionRequested;
     const execute = async (call: RunCall) => {
       ac.signal.throwIfAborted();
@@ -230,6 +239,9 @@ export function AppShell({ search }: { search: Search }) {
     try {
       if (!executionRequested) {
         let failure = "";
+        const streamLogId = startStreamLog("puter", "Puter • รอ token แรก…");
+        let streamChars = 0;
+        let streamPreview = "";
         await streamChat({
           messages: history,
           mode: chatMode,
@@ -239,11 +251,23 @@ export function AppShell({ search }: { search: Search }) {
           model: store.selectedModel,
           onEvent: event => {
             if (ac.signal.aborted) return;
-            if (event.type === "text") append(event.text);
-            else if (event.type === "error") failure = event.error;
+            if (event.type === "thinking") {
+              streamPreview = "กำลังคิด • " + event.text;
+              updateStreamLog(streamLogId, "puter", "running", streamPreview, streamChars);
+            } else if (event.type === "text") {
+              streamChars += event.text.length;
+              streamPreview = (streamPreview + event.text).slice(-240);
+              append(event.text);
+              updateStreamLog(streamLogId, "puter", "running", streamPreview, streamChars);
+            } else if (event.type === "done") {
+              updateStreamLog(streamLogId, "puter", "done", "สตรีมจบ • รับ " + streamChars.toLocaleString() + " ตัวอักษร", streamChars);
+            } else if (event.type === "error") {
+              failure = event.error;
+              updateStreamLog(streamLogId, "puter", "error", event.error, streamChars);
+            }
           },
         });
-        if (failure) throw new Error(failure);
+        if (!failure) updateStreamLog(streamLogId, "puter", "done", "สตรีมจบ • รับ " + streamChars.toLocaleString() + " ตัวอักษร", streamChars);
         if (!reply && !ac.signal.aborted && agentSummary.status !== "verified") append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
         return;
       }
@@ -277,15 +301,31 @@ export function AppShell({ search }: { search: Search }) {
         onSkillSaved: (path, saved) => pushActivity({ kind: "skill", path, status: saved ? "saved" : "failed" }),
         model: async (messages, onText) => {
           let failure = "";
+          const streamLogId = startStreamLog("agent", "Agent → Puter • รอ token แรก…");
+          let streamChars = 0;
+          let streamPreview = "";
           await streamChat({ messages, mode: chatMode, signal: ac.signal, tools, latestUser: content, model: store.selectedModel,
             onEvent: event => {
               if (ac.signal.aborted) return;
-              if (event.type === "text") onText(event.text);
-              else if (event.type === "error") failure = event.error;
+              if (event.type === "thinking") {
+                streamPreview = "กำลังคิด • " + event.text;
+                updateStreamLog(streamLogId, "agent", "running", streamPreview, streamChars);
+              } else if (event.type === "text") {
+                streamChars += event.text.length;
+                streamPreview = (streamPreview + event.text).slice(-240);
+                onText(event.text);
+                updateStreamLog(streamLogId, "agent", "running", streamPreview, streamChars);
+              } else if (event.type === "done") {
+                updateStreamLog(streamLogId, "agent", "done", "สตรีมจบ • รับ " + streamChars.toLocaleString() + " ตัวอักษร", streamChars);
+              } else if (event.type === "error") {
+                failure = event.error;
+                updateStreamLog(streamLogId, "agent", "error", event.error, streamChars);
+              }
             },
           });
           if (failure) throw new Error(failure);
         },
+
       });
       if (!reply && !ac.signal.aborted) append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
     } catch (error) {
