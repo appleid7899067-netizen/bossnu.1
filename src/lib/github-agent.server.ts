@@ -5,7 +5,7 @@ function config() {
   const token = process.env.GITHUB_TOKEN?.trim();
   const repo = process.env.GITHUB_REPO?.trim() || DEFAULT_REPO;
   if (!token) throw new Error("GitHub Agent ยังไม่ได้ตั้ง GITHUB_TOKEN บนเซิร์ฟเวอร์");
-  if (!/^[^/]+\/[^^/]+$/.test(repo)) throw new Error("GITHUB_REPO ไม่ถูกต้อง");
+  if (!/^[^/]+\/[^/]+$/.test(repo)) throw new Error("GITHUB_REPO ไม่ถูกต้อง");
   return { token, repo };
 }
 
