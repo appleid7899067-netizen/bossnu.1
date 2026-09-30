@@ -46,7 +46,7 @@ export function AppBuilderView({ project, workspaceId, onProject, onReset }: { p
           .map(file => ({ path: file.path.replace(/^project\//, ""), content: file.content }));
         // A fresh workspace only contains its scaffold. Do not replace an existing
         // locally-persisted Builder project with that scaffold.
-        const hasBuilderFiles = files.some(file => file.path === "index.html" || file.path === "styles.css" || file.path === "script.js" || file.path.startsWith("src/"));
+        const hasBuilderFiles = files.some(file => /^(index\.html|src\/|styles\.css|script\.js)/.test(file.path));
         if (!hasBuilderFiles) return;
         const base = projectRef.current ?? STARTER;
         const entry = files.some(file => file.path === base.entry)
