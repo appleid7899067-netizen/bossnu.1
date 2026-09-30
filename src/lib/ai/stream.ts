@@ -56,22 +56,41 @@ function compactMessage(content: string, maxChars = 1_200) {
 }
 
 export function manageStreamContext(messages: { role: "user" | "assistant"; content: string }[], budget = CONTEXT_CHAR_BUDGET) {
-  if (messages.length <= CONTEXT_RECENT_MESSAGES) return messages;
+  if (!messages.length) return messages;
   const recent = messages.slice(-CONTEXT_RECENT_MESSAGES);
   const older = messages.slice(0, -CONTEXT_RECENT_MESSAGES);
   const digest = older.map((message, index) => `[${index + 1}] ${message.role}: ${compactMessage(message.content)}`).join("\n");
   const result = [
-    { role: "user" as const, content: `CONTEXT DIGEST (older conversation, compressed):\n${digest.slice(0, 9_000)}` },
+    ...(digest ? [{ role: "user" as const, content: `CONTEXT DIGEST (older conversation, compressed):\n${digest.slice(0, 9_000)}` }] : []),
     ...recent,
   ];
-  let total = result.reduce((sum, message) => sum + message.content.length, 0);
-  while (result.length > 2 && total > budget) {
-    const index = result.length - CONTEXT_RECENT_MESSAGES - 1;
-    if (index < 0) break;
-    total -= result[index].content.length;
-    result.splice(index, 1);
+
+  const totalChars = result.reduce((sum, message) => sum + message.content.length, 0);
+  if (totalChars <= budget) return result;
+
+  // Always enforce the budget, even when the chat has <= 18 messages.
+  // Keep the newest user turn intact as much as possible, while shrinking
+  // older context first. This prevents large attachments from overflowing
+  // Puter's request/context limits.
+  const newest = result[result.length - 1];
+  const others = result.slice(0, -1);
+  const newestBudget = Math.min(newest.content.length, Math.floor(budget * 0.55));
+  const otherBudget = Math.max(0, budget - newestBudget);
+  const kept = others.map((message) => ({
+    role: message.role,
+    content: compactMessage(message.content, 2_400),
+  }));
+  let used = kept.reduce((sum, message) => sum + message.content.length, 0);
+  while (kept.length && used > otherBudget) {
+    const removed = kept.shift();
+    used -= removed?.content.length ?? 0;
   }
-  return result;
+  const newestContent = newest.content.length > newestBudget
+    ? newest.content.slice(0, Math.floor(newestBudget * 0.7)) +
+      "\n\n[...ตัดเนื้อหากลางไฟล์/บริบทเพื่อไม่ให้เกิน context...]\n\n" +
+      newest.content.slice(-Math.floor(newestBudget * 0.3))
+    : newest.content;
+  return [...kept, { role: newest.role, content: newestContent }];
 }
 
 function isRetryablePuterError(error: unknown) {
