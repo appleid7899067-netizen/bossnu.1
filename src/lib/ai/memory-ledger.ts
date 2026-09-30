@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 export type FailureMemory = {
   signature: string;
   action: string;
@@ -30,13 +28,26 @@ export function normalizeAction(action: string): string {
     .trim();
 }
 
+function stableHash(value: string): string {
+  // Browser-safe deterministic 64-bit fingerprint. Agent loop code runs in the
+  // client, so importing node:crypto here breaks production browser bundles.
+  let left = 0x811c9dc5;
+  let right = 0x9e3779b9;
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    left = Math.imul(left ^ code, 0x01000193);
+    right = Math.imul(right ^ (code + index), 0x85ebca6b);
+  }
+  return (left >>> 0).toString(16).padStart(8, "0") + (right >>> 0).toString(16).padStart(8, "0");
+}
+
 export function failureSignature(action: string, context: Record<string, unknown>, environmentHash = "unknown"): string {
   const canonical = JSON.stringify(stable({
     action: normalizeAction(action),
     context,
     environmentHash,
   }));
-  return createHash("sha256").update(canonical).digest("hex").slice(0, 16);
+  return stableHash(canonical);
 }
 
 export function failureMemoryKey(signature: string) {
@@ -53,5 +64,5 @@ export function parseFailureMemory(value: string): FailureMemory | null {
 }
 
 export function strategyHash(parts: string[]): string {
-  return createHash("sha256").update(JSON.stringify(parts.map(normalizeAction))).digest("hex").slice(0, 16);
+  return stableHash(JSON.stringify(parts.map(normalizeAction)));
 }
