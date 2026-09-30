@@ -101,6 +101,15 @@ export async function upsertWorkspaceFile(id: string, path: string, content: str
   `;
 }
 
+export async function appendWorkspaceFile(id: string, path: string, content: string, maxChars = 3_500_000) {
+  const workspaceId = await ensureBossWorkspace(id);
+  const cleanPath = safePath(path);
+  const existing = await readWorkspaceFile(workspaceId, cleanPath);
+  const next = ((existing?.content ?? "") + content).slice(-Math.min(maxChars, MAX_CONTENT));
+  await upsertWorkspaceFile(workspaceId, cleanPath, next);
+  return { path: cleanPath, chars: next.length };
+}
+
 export async function listProjectFiles(id: string, limit = 5000): Promise<WorkspaceFile[]> {
   const workspaceId = await ensureBossWorkspace(id);
   const sql = await getSql();
