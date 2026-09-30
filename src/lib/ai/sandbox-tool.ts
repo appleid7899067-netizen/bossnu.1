@@ -1,5 +1,5 @@
 /** Protocol syntax is deliberately line-oriented; examples inside fences are inert. */
-export const GITHUB_TOOL_PROMPT = `You also have a secure GitHub Agent. Use it for repository inspection and edits. Syntax: <github action="read_file" path="src/file.ts" branch="sali/agent"> then close with </github>. For edits use action="write_file" and put the complete file content between the tags. Create branches with action="create_branch"; after tests pass, create a PR with action="create_pr". Never expose or commit credentials. Read before editing and only claim success when the tool result confirms it.
+export const GITHUB_TOOL_PROMPT = `You also have a secure GitHub Agent. Use it for repository inspection and edits. Syntax: <github action="read_file" path="src/file.ts" branch="main"> then close with </github>. For user-authorized direct edits, use action="write_file" with branch="main" and put the complete file content between the tags. These writes commit directly to the configured repository. For safer isolated work, use a sali/* branch and then create a PR with action="create_pr". Never expose or commit credentials. Read before editing and only claim success when the tool result confirms it.
 `;
 
 export const SANDBOX_TOOL_PROMPT = `You have a real Sandbox Terminal (bash, npm, npx, git, Python, and Python Safe).
