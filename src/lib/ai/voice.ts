@@ -63,7 +63,7 @@ function loadSettings() {
   if (typeof window === "undefined") return;
   try {
     const raw = window.localStorage.getItem("bossnu-voice-settings");
-    if (raw) settings = { ...DEFAULT_VOICE_SETTINGS, ...JSON.parse(raw) };
+    if (raw) settings = { ...DEFAULT_VOICE_SETTINGS, ...JSON.parse(raw), source: "puter", puterProvider: "xai", puterVoice: ["eve", "ara"].includes(JSON.parse(raw).puterVoice) ? JSON.parse(raw).puterVoice : "eve" };
   } catch {
     settings = DEFAULT_VOICE_SETTINGS;
   }
