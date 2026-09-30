@@ -268,6 +268,27 @@ function MessageBubble({
 }
 
 
+function SandboxHtmlPreview({ html }: { html: string }) {
+  return (
+    <section className="sali-devlog mb-3" aria-label="Sandbox live preview">
+      <div className="sali-devlog-head">
+        <span className="sali-devlog-mark">›_</span>
+        <span>SANDBOX / PREVIEW</span>
+        <span className="sali-summary-mark">✓</span>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-primary/20 bg-white">
+        <iframe
+          title="Sandbox HTML preview"
+          srcDoc={html}
+          sandbox="allow-scripts allow-forms"
+          className="h-[420px] w-full border-0 bg-white"
+        />
+      </div>
+    </section>
+  );
+}
+
+
 function CopyLine({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   async function copy() {
