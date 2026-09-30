@@ -184,6 +184,14 @@ export function AppShell({ search }: { search: Search }) {
       streamLogTimers.set(activityId, window.setTimeout(() => flushStreamLog(activityId), 150));
     };
     const tools = executionRequested;
+    const notifyProjectChanged = (path?: string) => {
+      window.dispatchEvent(new CustomEvent("bossnu:workspace-changed", { detail: { workspaceId, path } }));
+      if (typeof BroadcastChannel !== "undefined") {
+        const channel = new BroadcastChannel("bossnu-workspace");
+        channel.postMessage({ workspaceId, path });
+        channel.close();
+      }
+    };
     const execute = async (call: RunCall) => {
       ac.signal.throwIfAborted();
       let output = "";
@@ -233,7 +241,10 @@ export function AppShell({ search }: { search: Search }) {
             ...(sync.deletedFiles ?? []).map(path => ({ path, action: "deleted" as const })),
             ...(sync.renamed ?? []).map(item => ({ path: item.to, from: item.from, action: "renamed" as const })),
           ];
-          if (files.length) pushActivity({ kind: "files", files: files.slice(0, 80) });
+          if (files.length) {
+            pushActivity({ kind: "files", files: files.slice(0, 80) });
+            notifyProjectChanged(files[0]?.path);
+          }
         }
         if (result.status === "success" && result.exitCode === 0 && result.workspaceSync?.verified && result.workspaceSync.complete) {
           const safeCommand = redactSensitiveCommand(call.command);
@@ -263,6 +274,29 @@ export function AppShell({ search }: { search: Search }) {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) {
         return { status: "error", error: data.error || `GitHub HTTP ${response.status}` };
+      }
+
+      // Keep GitHub work and the in-app Project Files workspace in lockstep.
+      // A file read/write is mirrored under project/ so it can be opened,
+      // edited, previewed, and used by the next Sandbox run immediately.
+      if (["read_file", "write_file", "delete_file"].includes(call.action) && call.path) {
+        const projectPath = call.path.startsWith("project/") ? call.path : `project/${call.path.replace(/^\/+/, "")}`;
+        const githubResult = (data.result ?? {}) as { content?: string };
+        const content = call.action === "read_file" ? githubResult.content : call.content;
+        const syncResponse = await fetch("/api/workspace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(call.action === "delete_file"
+            ? { workspaceId, action: "delete", path: projectPath }
+            : { workspaceId, action: "write", path: projectPath, content: content ?? "" }),
+          signal: ac.signal,
+        });
+        const syncData = await syncResponse.json().catch(() => ({}));
+        if (!syncResponse.ok || !syncData.ok) {
+          return { status: "error", error: syncData.error || "GitHub สำเร็จ แต่ Sync เข้าไฟล์โปรเจ็คไม่สำเร็จ" };
+        }
+        notifyProjectChanged(projectPath);
+        pushActivity({ kind: "files", files: [{ path: projectPath, action: call.action === "delete_file" ? "deleted" : call.action === "read_file" ? "added" : "modified" }] });
       }
       return { status: "success", output: JSON.stringify(data.result).slice(-30000), exitCode: 0, durationMs: 0 };
     };
