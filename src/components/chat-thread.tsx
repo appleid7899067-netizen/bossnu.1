@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowRightLeft, Check, CircleCheck, CircleX, Copy, FileDiff, FilePlus2, FileText, LoaderCircle, Pencil, RefreshCw, Sparkles, Terminal, Trash2, Volume2 } from "lucide-react";
+import { ArrowDown, Check, Copy, FileText, Pencil, RefreshCw, Trash2, Volume2 } from "lucide-react";
 import { formatBytes } from "@/lib/attachments";
 import { Markdown } from "@/components/markdown";
 import type { ChatActivity, ChatMessage } from "@/lib/types";
@@ -218,7 +218,7 @@ function MessageBubble({
     <div className="lumina-rise group flex gap-3 sm:gap-4">
       <LuminaMark className="mt-0.5 size-7 shrink-0 text-primary" />
       <div className="min-w-0 max-w-[1080px] flex-1 break-words text-[13px] leading-[1.6] [overflow-wrap:anywhere] sm:text-[12.5px] sm:leading-[1.55]">
-        {message.activities?.length && !message.content ? <ActivityFeed activities={message.activities} live={live} /> : null}
+        {message.activities?.length ? <ActivityFeed activities={message.activities} live={live} /> : null}
         {message.thinking && !message.content ? <ThinkingBlock text={message.thinking} live={live} /> : null}
         {empty ? (
           <p className="lumina-shimmer text-sm font-medium">กำลังคิด…</p>
