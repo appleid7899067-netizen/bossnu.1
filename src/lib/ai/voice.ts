@@ -285,7 +285,7 @@ export function speakRealtime(text: string) {
 }
 
 export function isVoiceSpeaking() {
-  return speaking || !!activeAudio?.paused === false || (hasSpeech && window.speechSynthesis.speaking);
+  return speaking || (!!activeAudio && !activeAudio.paused);
 }
 
 export function finishVoice() {
