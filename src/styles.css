@@ -226,6 +226,61 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
   0%, 45% { opacity: 1; }
   46%, 100% { opacity: 0; }
 }
+
+.sali-summary {
+  width: 100%;
+  max-width: 920px;
+  margin-top: 8px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-elevated) 55%, transparent);
+}
+.sali-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  padding: 7px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  color: var(--color-subtle);
+  font-family: "Fira Code", "JetBrains Mono", "IBM Plex Mono", "Noto Sans Thai", ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.sali-summary-mark {
+  color: var(--color-success);
+  font-size: 11px;
+}
+.sali-summary-body {
+  min-width: 0;
+  padding: 10px 12px 11px;
+  overflow-wrap: anywhere;
+}
+.sali-log-output {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  margin: 7px 0 2px;
+  padding: 8px 9px;
+  overflow: auto;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-bg) 72%, transparent);
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 9px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .sali-summary-body { padding: 9px 10px 10px; }
+  .sali-log-output { max-height: 180px; font-size: 8.5px; }
+}
 .sali-devlog {
   font-family: "Fira Code", "JetBrains Mono", "IBM Plex Mono", "Noto Sans Thai", ui-monospace, monospace;
   font-size: 11px;
