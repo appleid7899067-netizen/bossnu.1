@@ -494,13 +494,13 @@ ${message}`); toast.error(message); }
   const mode: ChatMode = activeChat?.mode ?? "instant";
   const builderWorkspaceId = agentWorkspaceIdFor(currentUser?.id, search.c ?? "default");
 
-  async function syncBuilderProject(project: import("@/lib/types").BuilderProject) {
+  async function syncBuilderProject(project: import("@/lib/types").BuilderProject, persist = true) {
     const workspaceId = builderWorkspaceId;
     const previous = useAppStore.getState().builderProject;
     const previousPaths = new Set((previous?.files ?? []).map(file => `project/${file.path}`));
     const nextPaths = new Set(project.files.map(file => `project/${file.path}`));
     try {
-      // Builder, Project Files and Sandbox share one canonical workspace.
+      if (!persist) { store.setBuilderProject(project); return; }\n      // Builder, Project Files and Sandbox share one canonical workspace.
       await Promise.all(project.files.map(file => fetch("/api/workspace", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -667,7 +667,7 @@ ${message}`); toast.error(message); }
           <AppBuilderView
             project={store.builderProject ?? undefined}
             workspaceId={builderWorkspaceId}
-            onProject={(project) => { void syncBuilderProject(project); }}
+            onProject={(project, persist = true) => { void syncBuilderProject(project, persist); }}
             onReset={() => store.setBuilderProject(null)}
           />
         ) : view === "studio" ? (
