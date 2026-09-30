@@ -99,7 +99,15 @@ export function ProjectFilesView({ workspaceId }: { workspaceId: string }) {
 
   function download() {
     if (!selected) return;
-    const blob = new Blob([selected.content], { type: kind === "audio" ? "audio/*" : kind === "video" ? "video/*" : kind === "image" ? "image/*" : "text/plain;charset=utf-8" });
+    let blob: Blob;
+    if (selected.content.startsWith("BOSSNU_BINARY_HEX:")) {
+      const hex = selected.content.slice("BOSSNU_BINARY_HEX:".length);
+      const bytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < bytes.length; i++) bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+      blob = new Blob([bytes], { type: kind === "audio" ? "audio/*" : kind === "video" ? "video/*" : "image/*" });
+    } else {
+      blob = new Blob([selected.content], { type: kind === "audio" ? "audio/*" : kind === "video" ? "video/*" : kind === "image" ? "image/*" : "text/plain;charset=utf-8" });
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = selected.path.split("/").pop() || "project-file"; a.click();
