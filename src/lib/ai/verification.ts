@@ -70,6 +70,8 @@ export function gateMessage(reasons: string[], attempt: number, runsLeft: number
     "The last Sandbox run failed. Treat this as an active repair task, not an answer turn.",
     ...reasons.map((r) => `- ${r}`),
     "Required order: 1) inspect the failing file/error, 2) edit the workspace to fix the root cause, 3) run the repaired file/command again, 4) inspect the real exit code/output, 5) only after it passes may you answer.",
+    "REPAIR ACTION REQUIRED: your next response MUST contain an executable <run> action that changes/fixes the workspace. A read-only rerun of the same failing command is not a repair.",
+    "If the repair and verification need separate commands, use separate <run> blocks: first edit/fix, then run the repaired target and inspect its real output.",
     "Do not merely explain the error, suggest a fix, or ask the user to fix it. Perform the fix in Sandbox when a run is available.",
     "Do not claim success from a command being issued or from text such as VERIFIED: true. Success requires the actual run evidence.",
     runsLeft > 0
