@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, ExternalLink, Eye, FileCode2, FilePlus2, Monitor, RefreshCw, Send, Smartphone, Sparkles, Tablet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { generateAppBuilder } from "@/lib/ai/client";
@@ -16,6 +16,8 @@ const STARTER: BuilderProject = {
 
 export function AppBuilderView({ project, workspaceId, onProject, onReset }: { project?: BuilderProject; workspaceId?: string; onProject: (project: BuilderProject, persist?: boolean) => void; onReset?: () => void }) {
   const current = project ?? STARTER;
+  const projectRef = useRef(project);
+  projectRef.current = project;
   const [prompt, setPrompt] = useState("");
   const [selected, setSelected] = useState(current.entry);
   const [busy, setBusy] = useState(false);
@@ -46,13 +48,13 @@ export function AppBuilderView({ project, workspaceId, onProject, onReset }: { p
         // locally-persisted Builder project with that scaffold.
         const hasBuilderFiles = files.some(file => /^(index\\.html|src\\/|styles\\.css|script\\.js)/.test(file.path));
         if (!hasBuilderFiles) return;
-        const base = project ?? STARTER;
+        const base = projectRef.current ?? STARTER;
         const entry = files.some(file => file.path === base.entry)
           ? base.entry
           : (files.some(file => file.path === "index.html") ? "index.html" : files[0]?.path);
         if (!entry) return;
         onProject({ ...base, files, entry, updatedAt: Date.now() }, false);
-        setSelected(entry);
+        setSelected(currentSelected => files.some(file => file.path === currentSelected) ? currentSelected : entry);
       } catch {
         // Keep the last good Builder state if the workspace is temporarily unavailable.
       }
