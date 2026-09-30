@@ -67,7 +67,8 @@ export const Route = createFileRoute("/api/workspace")({
           if (action === "project-list") {
             await ensureBossWorkspace(workspaceId);
             return Response.json({ ok: true, files: (await listWorkspaceFiles(workspaceId)).filter(file => file.path.startsWith("project/")) });
-          }\n          if (action === "context") {
+          }
+          if (action === "context") {
             const goal = str(body.goal, 2000);
             await ensureBossWorkspace(workspaceId);
             const [files, memory] = await Promise.all([listWorkspaceFiles(workspaceId), recallWorkspaceMemory(workspaceId, goal)]);
