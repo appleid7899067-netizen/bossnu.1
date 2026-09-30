@@ -228,9 +228,9 @@ function MessageBubble({
               <span className="sali-summary-mark">✓</span>
               <span>SUMMARY / สรุป</span>
             </div>
-            <div className="sali-summary-body">
+            <div className="sali-summary-body max-h-[min(62vh,720px)] overflow-y-auto overscroll-contain break-words [overflow-wrap:anywhere]">
               {live ? (
-                <p className="assistant-stream-text whitespace-pre-wrap break-words">{message.content}</p>
+                <p className="assistant-stream-text whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>
               ) : (
                 <Markdown text={message.content} live={false} />
               )}
