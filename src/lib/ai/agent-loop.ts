@@ -159,7 +159,7 @@ export async function runAgentLoop(opts: {
       ? { call: opts.initialCall, result: opts.priorResult }
       : null;
 
-  opts.onPhase?.("goal", "🎯 เป้าหมาย");
+  opts.onPhase?.("goal", "🎯 เป้าหมาย • รับคำสั่งจากผู้ใช้");
   opts.onText(`\n> 🎯 เป้าหมาย: ${goal.slice(0, 300)}\n`);
   const workspaceContext = workspace ? await safely(() => workspace.context(goal), "Persistent Workspace โหลดไม่สำเร็จ") : "ไม่มี Persistent Workspace";
   if (workspace) await safely(() => workspace.startTask(goal, core.task.id), undefined);
