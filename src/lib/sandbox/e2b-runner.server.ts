@@ -9,6 +9,9 @@ const MAX_FILE_BYTES = 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000;
 const MAX_SKILL_ID = 64;
 const MAX_SKILL_CONTENT = 128 * 1024;
+// Dedicated persistent sandbox requested for the chat agent. Operators can
+// replace it without a code change by setting E2B_SANDBOX_ID on the server.
+const DEFAULT_CHAT_SANDBOX_ID = "isn8auizd3xf7egjert64";
 
 export function e2bConfigured() {
   return Boolean(process.env.E2B_API_KEY?.trim());
@@ -16,6 +19,23 @@ export function e2bConfigured() {
 
 function metadataKey(workspace: string) {
   return workspace.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 100);
+}
+
+function chatSandboxId() {
+  return process.env.E2B_SANDBOX_ID?.trim() || DEFAULT_CHAT_SANDBOX_ID;
+}
+
+async function connectChatSandbox(): Promise<SandboxType | null> {
+  const sandboxId = chatSandboxId();
+  if (!sandboxId) return null;
+  try {
+    const sandbox = await Sandbox.connect(sandboxId, { timeoutMs: DEFAULT_TIMEOUT_MS });
+    await sandbox.commands.run(`mkdir -p ${PROJECT}`, { timeoutMs: 30_000 });
+    return sandbox;
+  } catch (error) {
+    console.warn(`[E2B] connect ${sandboxId} failed; falling back to workspace discovery`, error);
+    return null;
+  }
 }
 
 async function findExisting(workspace: string): Promise<SandboxType | null> {
@@ -33,6 +53,11 @@ async function findExisting(workspace: string): Promise<SandboxType | null> {
 async function getSandbox(workspace?: string): Promise<{ sandbox: SandboxType; persistent: boolean }> {
   if (!e2bConfigured()) throw new Error("E2B_API_KEY ยังไม่ได้ตั้งค่า");
   if (workspace) {
+    // Every tool call from the chat reconnects to the same persistent E2B
+    // machine, so commands, installed packages, and project files survive
+    // across messages instead of starting in a fresh sandbox.
+    const connected = await connectChatSandbox();
+    if (connected) return { sandbox: connected, persistent: true };
     const existing = await findExisting(workspace);
     if (existing) return { sandbox: existing, persistent: true };
     const sandbox = await Sandbox.create({
