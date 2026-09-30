@@ -280,69 +280,109 @@ const PHASE_TITLES: Record<string, string> = {
 
 function ActivityFeed({ activities, live }: { activities: ChatActivity[]; live: boolean }) {
   const visible = activities.slice(-80);
+
+  function timeOf(activity: ChatActivity) {
+    return new Date(activity.createdAt).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+
+  function phaseLabel(activity: Extract<ChatActivity, { kind: "phase" }>) {
+    const labels: Record<string, string> = {
+      goal: "กำหนดเป้าหมาย",
+      plan: "วางแผนการทำงาน",
+      act: "ลงมือทำ",
+      run: "รัน Sandbox",
+      observe: "อ่านผลจริง",
+      verify: "ตรวจสอบหลักฐาน",
+      fix: "แก้ไขและรันใหม่",
+      answer: "เตรียมคำตอบ",
+    };
+    return activity.label.replace(/^[^•]+•\\s*/, "") || labels[activity.phase] || activity.phase;
+  }
+
+  function statusText(activity: Extract<ChatActivity, { kind: "command" }>) {
+    if (activity.status === "running") return "กำลังรัน";
+    if (activity.status === "success") return "สำเร็จ";
+    if (activity.status === "blocked") return "รออนุญาต";
+    if (activity.status === "aborted") return "หยุด";
+    return "ผิดพลาด";
+  }
+
   return (
-    <section aria-label="สถานะการทำงานของสลี่" className="mb-3 text-[11px]">
-      <style>{`
-        @keyframes saliActivityIn { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes saliDot { 0%, 70%, 100% { opacity: .25; transform: translateY(0); } 35% { opacity: 1; transform: translateY(-2px); } }
-        .sali-activity-in { animation: saliActivityIn .28s ease-out both; }
-        .sali-dot { animation: saliDot 1.1s ease-in-out infinite; }
-      `}</style>
-      <div className="mb-1 flex items-center gap-2 text-[10px] text-subtle">
-        <Sparkles className="size-3 text-primary" />
-        <span>{live ? "สลี่กำลังทำงาน" : "บันทึกการทำงาน"}</span>
-        {live ? <span className="ml-0.5 inline-flex gap-0.5" aria-label="กำลังคิด">
-          <i className="sali-dot size-1 rounded-full bg-current" />
-          <i className="sali-dot size-1 rounded-full bg-current [animation-delay:.15s]" />
-          <i className="sali-dot size-1 rounded-full bg-current [animation-delay:.3s]" />
-        </span> : null}
+    <section aria-label="Developer log ของสลี่" className="sali-devlog mb-4">
+      <div className="sali-devlog-head">
+        <span className="sali-devlog-mark">›_</span>
+        <span>{live ? "SALI / WORKING" : "SALI / ACTIVITY LOG"}</span>
+        {live ? <span className="sali-live-cursor" aria-label="กำลังทำงาน" /> : null}
       </div>
-      <ol className="space-y-1.5">
+
+      <ol className="sali-devlog-list">
         {visible.map((activity) => (
-          <li key={activity.id} className="sali-activity-in flex items-start gap-2.5 py-1.5">
+          <li key={activity.id} className="sali-log-line">
+            <time className="sali-log-time">{timeOf(activity)}</time>
+
             {activity.kind === "phase" ? (
-              <div className="contents">
-                <span className="mt-0.5 grid size-5 shrink-0 place-items-center text-primary">
-                  {activity.phase === "run" ? <Terminal className="size-3" /> : activity.phase === "verify" ? <CircleCheck className="size-3" /> : <Sparkles className="size-3" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-fg">{activity.label.replace(/^[^•]+•\s*/, "") || PHASE_TITLES[activity.phase] || activity.phase}</span>
-                  <span className="block text-[9px] leading-relaxed text-subtle">{PHASE_TITLES[activity.phase] ?? activity.phase}</span>
-                </span>
-                <time className="shrink-0 text-[9px] tabular-nums text-subtle">{new Date(activity.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
-              </div>
+              <>
+                <span className="sali-log-status sali-log-working">RUN</span>
+                <span className="sali-log-text">{phaseLabel(activity)}</span>
+              </>
             ) : activity.kind === "command" ? (
-              <div className="contents">
-                <span className="mt-0.5 grid size-5 shrink-0 place-items-center text-primary">
-                  {activity.status === "running" ? <LoaderCircle className="size-3 animate-spin" /> : activity.status === "success" ? <CircleCheck className="size-3 text-success" /> : <CircleX className="size-3 text-danger" />}
+              <>
+                <span className={
+                  activity.status === "success"
+                    ? "sali-log-status sali-log-ok"
+                    : activity.status === "running"
+                      ? "sali-log-status sali-log-working"
+                      : "sali-log-status sali-log-error"
+                }>
+                  {activity.status === "success" ? "OK" : activity.status === "running" ? "RUN" : "ERR"}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <span className="font-medium text-fg">Ran command</span>
-                    <span className="rounded bg-bg/70 px-1.5 py-0.5 font-mono text-[9px] text-primary">{activity.runtime}</span>
-                    <span className={activity.status === "success" ? "text-success" : activity.status === "running" ? "text-primary" : "text-danger"}>{activity.status === "success" ? "สำเร็จ" : activity.status === "running" ? "กำลังรัน" : activity.status === "blocked" ? "รออนุญาต" : activity.status}</span>
-                  </div>
-                  <pre className="mt-1.5 max-h-24 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-bg/80 px-2.5 py-2 font-mono text-[10px] leading-relaxed text-fg">$ {activity.command}</pre>
-                  {activity.output ? <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-bg/80 px-2.5 py-2 font-mono text-[10px] leading-relaxed text-muted">{activity.output}{activity.status === "running" ? <span className="animate-pulse"> ▌</span> : null}</pre> : null}
-                </div>
-              </div>
+                <span className="sali-log-text">
+                  <span>{statusText(activity)} </span>
+                  <code className="sali-log-runtime">{activity.runtime}</code>
+                  <code className="sali-log-command">$ {activity.command}</code>
+                </span>
+              </>
             ) : activity.kind === "files" ? (
-              <div className="contents">
-                <span className="mt-0.5 grid size-5 shrink-0 place-items-center text-primary"><FileDiff className="size-3" /></span>
-                <div className="min-w-0 flex-1"><div className="font-medium text-fg">Edited files</div><ul className="mt-1 space-y-1">{activity.files.map((file, index) => <li key={`${file.path}-${index}`} className="font-mono text-[10px] text-muted">{file.path}</li>)}</ul></div>
-              </div>
+              <>
+                <span className="sali-log-status sali-log-ok">EDIT</span>
+                <span className="sali-log-text">
+                  แก้ไขไฟล์ {activity.files.length} รายการ
+                  <span className="sali-log-detail">{activity.files.slice(0, 6).map(file => file.path).join(" • ")}</span>
+                </span>
+              </>
             ) : (
-              <div className="contents">
-                <span className="mt-0.5 grid size-5 shrink-0 place-items-center text-success"><CircleCheck className="size-3" /></span>
-                <span className="min-w-0 flex-1"><span className="block font-medium text-fg">Reusable skill {activity.status === "saved" ? "saved" : "not saved"}</span><code className="block break-all text-[10px] text-muted">{activity.path}</code></span>
-              </div>
+              <>
+                <span className={
+                  activity.status === "saved"
+                    ? "sali-log-status sali-log-ok"
+                    : "sali-log-status sali-log-error"
+                }>
+                  {activity.status === "saved" ? "OK" : "ERR"}
+                </span>
+                <span className="sali-log-text">
+                  {activity.status === "saved" ? "บันทึกทักษะที่ทดสอบผ่าน" : "ไม่บันทึกทักษะ"}
+                  <span className="sali-log-detail">{activity.path}</span>
+                </span>
+              </>
             )}
           </li>
         ))}
+        {live ? (
+          <li className="sali-log-line sali-log-current" aria-live="polite">
+            <time className="sali-log-time">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
+            <span className="sali-log-status sali-log-working">RUN</span>
+            <span className="sali-log-text">กำลังประมวลผล <span className="sali-terminal-caret" /></span>
+          </li>
+        ) : null}
       </ol>
     </section>
   );
 }
+
 function ThinkingBlock({ text, live }: { text: string; live: boolean }) {
   if (!text) return null;
   return (
