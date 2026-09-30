@@ -44,6 +44,8 @@ export class RunScanner {
   private fence = "";
   private run: RunCall | null = null;
   private github: GithubCall | null = null;
+  private dsml: { language: RunCall["language"]; command: string } | null = null;
+  private dsmlParameter = false;
   push(chunk: string): ScanEvent[] {
     this.pending += chunk;
     const events: ScanEvent[] = [];
@@ -65,6 +67,11 @@ export class RunScanner {
     if (this.github) {
       this.github = null;
       events.push({ type: "text", text: "\n[Incomplete GitHub request — not executed]\n" });
+    }
+    if (this.dsml) {
+      this.dsml = null;
+      this.dsmlParameter = false;
+      events.push({ type: "text", text: "\n[Incomplete DSML terminal request — not executed]\n" });
     }
     return events;
   }
@@ -101,6 +108,50 @@ export class RunScanner {
       else if (fence[1][0] === this.fence[0] && fence[1].length >= this.fence.length && /^(`+|~+)\s*$/.test(trimmed)) this.fence = "";
     }
     if (!this.fence) {
+      // Some Puter models emit the older DSML tool-call envelope instead of
+      // Bossnu's native <run> protocol. Translate only a real runtime invoke
+      // into the same scanner event so DSML markup never reaches the shell.
+      if (trimmed === "<｜DSML｜tool_calls>" || trimmed === "</｜DSML｜tool_calls>" || trimmed === "</｜DSML｜invoke>") {
+        return [];
+      }
+      const dsmlInvoke = trimmed.match(/^<｜DSML｜invoke\s+name=["'](bash|node|python|python-safe|go|rust|java|cpp)["']\s*>$/);
+      if (dsmlInvoke) {
+        this.dsml = { language: dsmlInvoke[1] as RunCall["language"], command: "" };
+        this.dsmlParameter = false;
+        return [];
+      }
+      if (this.dsml) {
+        const parameterOpen = trimmed.match(/^<｜DSML｜parameter\b[^>]*>([\s\S]*)$/);
+        if (parameterOpen) {
+          this.dsmlParameter = true;
+          let body = parameterOpen[1] ?? "";
+          const close = body.indexOf("</｜DSML｜parameter>");
+          if (close >= 0) body = body.slice(0, close);
+          this.dsml.command += body;
+          if (close >= 0) {
+            const call = { ...this.dsml };
+            this.dsml = null;
+            this.dsmlParameter = false;
+            if (!call.command.trim() || call.command.length > 32000) return [{ type: "text", text: "\n[Invalid DSML terminal request — not executed]\n" }];
+            return [{ type: "run", call }];
+          }
+          return [];
+        }
+        if (this.dsmlParameter) {
+          const close = line.indexOf("</｜DSML｜parameter>");
+          if (close >= 0) {
+            this.dsml.command += line.slice(0, close);
+            const call = { ...this.dsml };
+            this.dsml = null;
+            this.dsmlParameter = false;
+            if (!call.command.trim() || call.command.length > 32000) return [{ type: "text", text: "\n[Invalid DSML terminal request — not executed]\n" }];
+            return [{ type: "run", call }];
+          }
+          this.dsml.command += line;
+          return [];
+        }
+        return [];
+      }
       const githubOpen = trimmed.match(/^<github\s+action=["'](list|read_file|write_file|delete_file|create_branch|create_pr)["'](?:\s+path=["']([^"']*)["'])?(?:\s+branch=["']([^"']*)["'])?(?:\s+base=["']([^"']*)["'])?(?:\s+title=["']([^"']*)["'])?(?:\s+body=["']([^"']*)["'])?\s*>$/);
       if (githubOpen) { this.github = { action: githubOpen[1] as GithubCall["action"], path: githubOpen[2], branch: githubOpen[3], base: githubOpen[4], title: githubOpen[5], body: githubOpen[6] }; return []; }
       const open = trimmed.match(/^<run lang=["'](bash|node|python|python-safe|go|rust|java|cpp)["']>$/);
