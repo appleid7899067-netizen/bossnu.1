@@ -326,8 +326,31 @@ function ContextualReplyActions({ onAction }: { text: string; onAction: (action:
 }
 
 
+function LiveExecutionLog({ command, output, fallback }: { command?: string; output?: string; fallback?: string }) {
+  const logRef = useRef<HTMLPreElement>(null);
+  const text = output?.trimEnd() || fallback?.trimEnd() || "กำลังรอข้อมูลจาก Sandbox…";
+
+  useEffect(() => {
+    const element = logRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [text]);
+
+  return (
+    <div className="sali-stream-output" aria-label="บันทึกการทำงานสด" aria-live="polite">
+      <div className="sali-stream-output-head">
+        <span className="sali-stream-output-tab">Live logs</span>
+        <span>TERMINAL / OUTPUT</span>
+        <span className="sali-live-cursor" aria-hidden="true" />
+      </div>
+      {command ? <div className="sali-stream-command"><span>$</span>{command}</div> : null}
+      <pre ref={logRef} className="sali-stream-log"><code>{text}</code><span className="sali-terminal-caret" /></pre>
+    </div>
+  );
+}
+
 function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatActivity[]; live: boolean; liveText?: string }) {
   const visible = activities.slice(-80);
+  const latestCommand = [...visible].reverse().find((activity): activity is Extract<ChatActivity, { kind: "command" }> => activity.kind === "command");
 
   function phaseLabel(activity: Extract<ChatActivity, { kind: "phase" }>) {
     const labels: Record<string, string> = {
@@ -397,15 +420,8 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
         </div>
 
         {live ? (
-          liveText ? (
-            <div className="sali-stream-output" aria-label="HTML live stream" aria-live="polite">
-              <div className="sali-stream-output-head">
-                <span className="sali-stream-output-tab">สตรีมสด</span>
-                <span>HTML / CODE</span>
-                <span className="sali-live-cursor" aria-hidden="true" />
-              </div>
-              <div className="sali-stream-output-body"><Markdown text={liveText} live /></div>
-            </div>
+          latestCommand || liveText ? (
+            <LiveExecutionLog command={latestCommand?.command} output={latestCommand?.output} fallback={liveText} />
           ) : (
             <div className="sali-devlog-terminal" aria-label="terminal logs code stream">
               <span className="sali-devlog-prompt">›</span>
