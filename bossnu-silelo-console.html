@@ -1,0 +1,1212 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BossnuSilelo Console — Terminal + Sandbox HTML</title>
+  <meta name="description" content="BossnuSilelo Console: Interactive Terminal + Real-time HTML Sandbox Preview by PANUPANXBOSS" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #05050a;
+      --surface: #0a0a12;
+      --header-bg: #12121f;
+      --border: #2a2a4a;
+      --border-focus: #8b5cf6;
+      --text: #e6e6f2;
+      --text-muted: #8b8ba7;
+      --primary: #8b5cf6;
+      --primary-hover: #7c3aed;
+      --primary-glow: rgba(139, 92, 246, 0.25);
+      --accent: #06b6d4;
+      --success: #22c55e;
+      --warning: #eab308;
+      --danger: #ef4444;
+      --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: var(--font-ui);
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation Bar */
+    .topbar {
+      height: 56px;
+      background: #090913;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      gap: 12px;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 0 18px rgba(139, 92, 246, 0.4);
+      font-weight: 800;
+      color: #fff;
+      font-size: 16px;
+    }
+
+    .brand-title {
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-tag {
+      background: rgba(139, 92, 246, 0.15);
+      border: 1px solid rgba(139, 92, 246, 0.35);
+      color: #c4b5fd;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: #141424;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background: #1e1e36;
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
+    .btn-icon {
+      padding: 6px 9px;
+    }
+
+    /* Layout Toggle & Status */
+    .view-toggle {
+      display: flex;
+      background: #111120;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .view-btn {
+      appearance: none;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .view-btn.active {
+      background: #23233c;
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    /* Workspace Container */
+    .workspace {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 16px;
+      min-height: calc(100vh - 56px - 32px);
+    }
+
+    @media (max-width: 960px) {
+      .workspace {
+        grid-template-columns: 1fr;
+        display: flex;
+        flex-direction: column;
+      }
+    }
+
+    /* Card / Terminal Window Styles (From user's screenshot) */
+    .terminal {
+      background: #0a0a12;
+      border: 1px solid #2a2a4a;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.15);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 520px;
+    }
+
+    .terminal-header {
+      background: #12121f;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #2a2a4a;
+      user-select: none;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .dot-r { background: #ef4444; }
+    .dot-y { background: #eab308; }
+    .dot-g { background: #22c55e; }
+
+    .terminal-title {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #a5b4fc;
+      margin-left: 6px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .terminal-header-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill-tabs {
+      display: flex;
+      background: #0a0a16;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .pill-tab {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 500;
+      padding: 4px 11px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .pill-tab.active {
+      background: #1f1f35;
+      color: #ffffff;
+      font-weight: 600;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    }
+
+    /* Terminal Body & Interactive CLI */
+    .terminal-body {
+      padding: 16px;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 12.5px;
+      line-height: 1.6;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #07070f;
+    }
+
+    .terminal-output {
+      flex: 1;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      padding-right: 6px;
+      scrollbar-width: thin;
+      scrollbar-color: #2a2a4a transparent;
+    }
+
+    .terminal-output::-webkit-scrollbar {
+      width: 6px;
+    }
+    .terminal-output::-webkit-scrollbar-thumb {
+      background: #2a2a4a;
+      border-radius: 4px;
+    }
+
+    .term-line {
+      margin-bottom: 4px;
+      line-height: 1.5;
+    }
+
+    .term-banner {
+      color: #c084fc;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .term-prompt-line {
+      color: #a78bfa;
+    }
+
+    .term-user {
+      color: #34d399;
+      font-weight: 600;
+    }
+
+    .term-path {
+      color: #60a5fa;
+    }
+
+    .term-success {
+      color: #4ade80;
+    }
+
+    .term-warn {
+      color: #facc15;
+    }
+
+    .term-err {
+      color: #f87171;
+    }
+
+    .term-muted {
+      color: #64748b;
+    }
+
+    .term-highlight {
+      color: #38bdf8;
+    }
+
+    /* Terminal Input Box */
+    .terminal-input-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 10px;
+      border-top: 1px solid #1a1a2e;
+      margin-top: 8px;
+    }
+
+    .cli-prefix {
+      color: #34d399;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .cli-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #f1f5f9;
+      font-family: inherit;
+      font-size: 13px;
+      caret-color: #8b5cf6;
+    }
+
+    .quick-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding-top: 8px;
+      border-top: 1px dashed #1a1a2e;
+      margin-top: 8px;
+    }
+
+    .badge-btn {
+      background: rgba(139, 92, 246, 0.1);
+      border: 1px solid rgba(139, 92, 246, 0.25);
+      color: #c4b5fd;
+      font-family: inherit;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .badge-btn:hover {
+      background: rgba(139, 92, 246, 0.25);
+      color: #fff;
+    }
+
+    /* Sandbox Right Pane */
+    .sandbox-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .sandbox-preview-wrap {
+      flex: 1;
+      position: relative;
+      background: #06060c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .sandbox-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #ffffff;
+      transition: width 0.2s ease;
+    }
+
+    /* Editor View inside Sandbox Pane */
+    .editor-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #090913;
+      position: relative;
+    }
+
+    .editor-textarea {
+      flex: 1;
+      width: 100%;
+      background: #070710;
+      color: #e2e8f0;
+      border: none;
+      outline: none;
+      padding: 14px 16px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      resize: none;
+      white-space: pre;
+      tab-size: 2;
+    }
+
+    /* Bottom status bar */
+    .statusbar {
+      height: 32px;
+      background: #090913;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+      user-select: none;
+    }
+
+    .status-left, .status-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      display: inline-block;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 640px) {
+      .topbar {
+        padding: 0 10px;
+      }
+      .brand-title {
+        font-size: 13px;
+      }
+      .btn span {
+        display: none;
+      }
+      .workspace {
+        padding: 10px;
+        gap: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top App Navigation -->
+  <header class="topbar">
+    <a href="#" class="brand" title="BossnuSilelo Console">
+      <div class="brand-icon">▦</div>
+      <div class="brand-title">
+        Bossnu.Silelo
+        <span class="brand-tag">Terminal + HTML Sandbox</span>
+      </div>
+    </a>
+
+    <!-- View Mode Switcher -->
+    <div class="view-toggle" role="tablist">
+      <button id="view-split" class="view-btn active" type="button" title="แสดงทั้งเทอร์มินัลและแซนด์บ็อก">🪟 ทั้งสองจอ</button>
+      <button id="view-terminal" class="view-btn" type="button" title="แสดงเฉพาะเทอร์มินัล">💻 เทอร์มินัล</button>
+      <button id="view-sandbox" class="view-btn" type="button" title="แสดงเฉพาะแซนด์บ็อก">🌐 แซนด์บ็อก</button>
+    </div>
+
+    <!-- Actions -->
+    <div class="topbar-actions">
+      <button id="btn-run" class="btn btn-primary" type="button" title="รันโค้ดทันที (Ctrl + Enter)">
+        <span>▶ รัน</span>
+      </button>
+      <button id="btn-download" class="btn" type="button" title="ดาวน์โหลดไฟล์ .html เต็ม">
+        <span>💾 ดาวน์โหลด .html</span>
+      </button>
+      <button id="btn-copy" class="btn btn-icon" type="button" title="คัดลอกโค้ด">
+        📋
+      </button>
+      <button id="btn-clear" class="btn btn-icon" type="button" title="ล้างหน้าจอเทอร์มินัล">
+        🧹
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Split Workspace -->
+  <main class="workspace" id="workspace">
+
+    <!-- LEFT PANE: Interactive Terminal -->
+    <section class="terminal" id="pane-terminal">
+      <div class="terminal-header">
+        <span class="dot dot-r" title="Close / Stop"></span>
+        <span class="dot dot-y" title="Minimize"></span>
+        <span class="dot dot-g" title="Maximize"></span>
+        <div class="terminal-title">
+          <span>boss@silelo: ~/sandbox</span>
+        </div>
+        <div class="terminal-header-actions">
+          <span style="font-size:10px; color:#10b981; font-weight:600; display:flex; align-items:center; gap:4px;">
+            <span class="status-dot"></span> LIVE
+          </span>
+        </div>
+      </div>
+
+      <div class="terminal-body">
+        <div class="terminal-output" id="term-output">
+          <div class="term-banner">
+██████╗  ██████╗ ███████╗███████╗███╗   ██╗██╗   ██╗
+██╔══██╗██╔═══██╗██╔════╝██╔════╝████╗  ██║██║   ██║
+██████╔╝██║   ██║███████╗███████╗██╔██╗ ██║██║   ██║
+██╔══██╗██║   ██║╚════██║╚════██║██║╚██╗██║██║   ██║
+██████╔╝╚██████╔╝███████║███████║██║ ╚████║╚██████╔╝
+╚═════╝  ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═══╝ ╚═════╝ 
+          </div>
+          <div class="term-line term-muted">BossnuSilelo Console [Version 2.0.0-PROD]</div>
+          <div class="term-line term-muted">รันสภาพแวดล้อม Terminal + HTML Sandbox เรียบร้อยแล้วค่ะ 💜</div>
+          <div class="term-line term-highlight">พิมพ์ <span style="text-decoration:underline;">help</span> เพื่อดูคำสั่งทั้งหมด หรือคลิกปุ่มลัดด้านล่างเพื่อรันตัวอย่าง</div>
+          <div class="term-line term-success">✓ Sandbox iframe โหลดเสร็จสมบูรณ์ (พร้อมจับ console.log กลับมาที่นี่)</div>
+          <div class="term-line" style="margin-top:6px; color:#cbd5e1;">&gt; Sandbox output stream initialized:</div>
+        </div>
+
+        <!-- Quick badges -->
+        <div class="quick-badges">
+          <button class="badge-btn" onclick="execCmd('help')">help</button>
+          <button class="badge-btn" onclick="execCmd('demo 1')">demo: dashboard</button>
+          <button class="badge-btn" onclick="execCmd('demo 2')">demo: matrix</button>
+          <button class="badge-btn" onclick="execCmd('demo 3')">demo: neon-clock</button>
+          <button class="badge-btn" onclick="execCmd('demo 4')">demo: game</button>
+          <button class="badge-btn" onclick="execCmd('status')">status</button>
+          <button class="badge-btn" onclick="execCmd('clear')">clear</button>
+        </div>
+
+        <!-- Interactive Input Line -->
+        <div class="terminal-input-bar">
+          <span class="cli-prefix">boss@silelo:~$</span>
+          <input
+            id="cli-input"
+            class="cli-input"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="พิมพ์คำสั่ง เช่น help, run, demo 2, clear..."
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT PANE: HTML Sandbox (Preview + Code Editor) -->
+    <section class="terminal" id="pane-sandbox">
+      <div class="terminal-header">
+        <span class="dot dot-r"></span>
+        <span class="dot dot-y"></span>
+        <span class="dot dot-g"></span>
+
+        <!-- Tab switches matching Image 2 -->
+        <div class="pill-tabs" role="tablist">
+          <button id="tab-preview" class="pill-tab active" type="button">ตัวอย่าง</button>
+          <button id="tab-code" class="pill-tab" type="button">โค้ด</button>
+        </div>
+
+        <div class="terminal-header-actions">
+          <!-- Device viewports -->
+          <button class="badge-btn" onclick="setDevice('100%')" title="Desktop View">🖥 100%</button>
+          <button class="badge-btn" onclick="setDevice('768px')" title="Tablet View">📱 768px</button>
+          <button class="badge-btn" onclick="setDevice('390px')" title="Mobile View">📱 390px</button>
+          <button class="badge-btn" onclick="runSandbox()" title="รีเฟรช Sandbox">↻</button>
+        </div>
+      </div>
+
+      <!-- Live Sandbox Preview Tab -->
+      <div class="sandbox-container" id="sandbox-preview-container">
+        <div class="sandbox-preview-wrap">
+          <iframe
+            id="sandbox-frame"
+            class="sandbox-frame"
+            title="Sandbox HTML Preview"
+            sandbox="allow-scripts allow-forms allow-modals allow-popups"
+          ></iframe>
+        </div>
+      </div>
+
+      <!-- Code Editor Tab -->
+      <div class="editor-wrap" id="sandbox-editor-container" style="display:none;">
+        <textarea
+          id="code-editor"
+          class="editor-textarea"
+          spellcheck="false"
+          placeholder="ใส่โค้ด HTML / CSS / JavaScript ที่นี่..."
+        ></textarea>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Bottom Status Bar -->
+  <footer class="statusbar">
+    <div class="status-left">
+      <span><span class="status-dot"></span> BossnuSilelo Engine: Active</span>
+      <span>Sandbox: HTML5 + CSS3 + ES2026</span>
+    </div>
+    <div class="status-right">
+      <span id="char-count">0 ตัวอักษร</span>
+      <span>UTF-8</span>
+      <span>PANUPANXBOSS</span>
+    </div>
+  </footer>
+
+  <script>
+    // --- Predefined Templates ---
+    const DEMOS = {
+      1: `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BossnuSilelo Live Dashboard</title>
+  <style>
+    body {
+      background: radial-gradient(circle at 50% 20%, #1e1138 0%, #05050e 100%);
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      margin: 0;
+      padding: 30px 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      background: rgba(18, 18, 35, 0.75);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      backdrop-filter: blur(12px);
+      border-radius: 20px;
+      padding: 32px;
+      max-width: 540px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 0 50px rgba(139, 92, 246, 0.2);
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(139, 92, 246, 0.2);
+      border: 1px solid #8b5cf6;
+      color: #c4b5fd;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 28px;
+      margin: 0 0 10px 0;
+      background: linear-gradient(135deg, #ffffff, #c4b5fd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat {
+      background: #0d0d1a;
+      border: 1px solid #23233c;
+      padding: 14px;
+      border-radius: 12px;
+      text-align: left;
+    }
+    .stat-label { font-size: 11px; color: #64748b; }
+    .stat-val { font-size: 18px; font-weight: 700; color: #38bdf8; margin-top: 4px; }
+    .btn-action {
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      color: #fff;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 4px 18px rgba(139, 92, 246, 0.4);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-action:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(139, 92, 246, 0.6);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">Bossnu.Silelo Live Preview</div>
+    <h1>HTML + Terminal Sandbox</h1>
+    <p>แซนด์บ็อก HTML แบบแยกกรอบปลอดภัย พร้อมส่ง log กลับไปยังเทอร์มินัลอัตโนมัติ 💜</p>
+    
+    <div class="grid">
+      <div class="stat">
+        <div class="stat-label">RUNTIME</div>
+        <div class="stat-val">HTML5 + JS</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">STATUS</div>
+        <div class="stat-val" style="color:#22c55e;">Ready ✓</div>
+      </div>
+    </div>
+
+    <button class="btn-action" onclick="sendPing()">กดทดสอบ Console Log</button>
+  </div>
+
+  <script>
+    console.log("🚀 [BossnuSilelo Sandbox] loaded successfully!");
+    let count = 0;
+    function sendPing() {
+      count++;
+      console.log("✨ [Sandbox Click] ทดสอบส่ง log ครั้งที่: " + count + " เวลา: " + new Date().toLocaleTimeString());
+      alert("ส่ง log ครั้งที่ " + count + " ไปยังเทอร์มินัลแล้วค่ะ!");
+    }
+  <\/script>
+</body>
+</html>`,
+
+      2: `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Matrix Rain</title>
+  <style>
+    body { margin: 0; background: #000; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <script>
+    console.log("🟢 Starting Matrix Rain animation...");
+    const canvas = document.getElementById("c");
+    const ctx = canvas.getContext("2d");
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.onresize = resize; resize();
+    const chars = "BOSSNU SILELO 0123456789 ABCDEF HIJKLMNOPQRSTUVWXYZ";
+    const fontSize = 14;
+    let cols = Math.floor(canvas.width / fontSize);
+    let drops = Array(cols).fill(1);
+    function draw() {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#22c55e";
+      ctx.font = fontSize + "px monospace";
+      for (let i = 0; i < drops.length; i++) {
+        const text = chars[Math.floor(Math.random() * chars.length)];
+        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+        drops[i]++;
+      }
+    }
+    setInterval(draw, 33);
+  <\/script>
+</body>
+</html>`,
+
+      3: `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Neon Cyber Clock</title>
+  <style>
+    body {
+      background: #05050c;
+      color: #38bdf8;
+      font-family: 'JetBrains Mono', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .clock {
+      font-size: 52px;
+      font-weight: 700;
+      text-shadow: 0 0 20px #0ea5e9, 0 0 40px #8b5cf6;
+      border: 2px solid #0ea5e9;
+      padding: 24px 40px;
+      border-radius: 16px;
+      background: rgba(14, 165, 233, 0.05);
+      letter-spacing: 2px;
+    }
+    .date {
+      margin-top: 16px;
+      color: #94a3b8;
+      font-size: 14px;
+      letter-spacing: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="clock" id="clock">00:00:00</div>
+  <div class="date" id="date">BOSS.SILELO ENGINE</div>
+  <script>
+    console.log("⏰ Neon Cyber Clock running");
+    function update() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString();
+      document.getElementById('date').textContent = now.toDateString().toUpperCase();
+    }
+    setInterval(update, 1000);
+    update();
+  <\/script>
+</body>
+</html>`,
+
+      4: `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Cyber Clicker Game</title>
+  <style>
+    body {
+      background: #090915;
+      color: #fff;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      user-select: none;
+    }
+    .score { font-size: 42px; font-weight: 800; color: #a855f7; margin-bottom: 20px; }
+    .target {
+      width: 100px; height: 100px; border-radius: 50%;
+      background: radial-gradient(circle, #c084fc, #7e22ce);
+      box-shadow: 0 0 30px #a855f7;
+      cursor: pointer;
+      display: grid; place-items: center; font-size: 36px;
+      transition: transform 0.1s;
+    }
+    .target:active { transform: scale(0.9); }
+  </style>
+</head>
+<body>
+  <div class="score" id="score">0</div>
+  <div class="target" id="btn" onclick="hit()">⚡</div>
+  <p style="color:#94a3b8; margin-top:20px;">คลิกเพื่อเก็บคะแนน (Log จะส่งกลับไปยัง Terminal!)</p>
+  <script>
+    let score = 0;
+    function hit() {
+      score++;
+      document.getElementById('score').textContent = score;
+      console.log("🎯 [Game Hit] คะแนนเพิ่มเป็น: " + score);
+    }
+  <\/script>
+</body>
+</html>`
+    };
+
+    // --- State & DOM References ---
+    let currentCode = DEMOS[1];
+    const editor = document.getElementById('code-editor');
+    const iframe = document.getElementById('sandbox-frame');
+    const termOutput = document.getElementById('term-output');
+    const cliInput = document.getElementById('cli-input');
+    const charCount = document.getElementById('char-count');
+    const tabPreview = document.getElementById('tab-preview');
+    const tabCode = document.getElementById('tab-code');
+    const previewContainer = document.getElementById('sandbox-preview-container');
+    const editorContainer = document.getElementById('sandbox-editor-container');
+
+    const history = [];
+    let historyIdx = -1;
+
+    // Initialize editor
+    editor.value = currentCode;
+    updateCharCount();
+
+    // --- Log Interceptor for Sandbox ---
+    window.addEventListener("message", (e) => {
+      if (e.data && e.data.__bossnu_log) {
+        const { type, text } = e.data.__bossnu_log;
+        const colorClass = type === 'error' ? 'term-err' : type === 'warn' ? 'term-warn' : 'term-success';
+        appendTermLine(`[iframe console.${type}] ${text}`, colorClass);
+      }
+    });
+
+    // Run Sandbox
+    function runSandbox() {
+      currentCode = editor.value;
+      updateCharCount();
+
+      // Inject console bridge script into html
+      const scriptBridge = `
+        <script>
+          (function() {
+            const send = (type, args) => {
+              try {
+                const text = Array.from(args).map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+                window.parent.postMessage({ __bossnu_log: { type, text } }, '*');
+              } catch(e) {}
+            };
+            const origLog = console.log;
+            const origWarn = console.warn;
+            const origErr = console.error;
+            console.log = function() { origLog.apply(console, arguments); send('log', arguments); };
+            console.warn = function() { origWarn.apply(console, arguments); send('warn', arguments); };
+            console.error = function() { origErr.apply(console, arguments); send('error', arguments); };
+          })();
+        <\/script>
+      `;
+
+      let srcDoc = currentCode;
+      if (/<head>/i.test(srcDoc)) {
+        srcDoc = srcDoc.replace(/<head>/i, '<head>' + scriptBridge);
+      } else {
+        srcDoc = scriptBridge + srcDoc;
+      }
+
+      iframe.srcdoc = srcDoc;
+      appendTermLine(`▶ [Sandbox] อัปเดตการแสดงผล HTML Sandbox เรียบร้อยแล้ว`, 'term-success');
+    }
+
+    // --- Terminal Functions ---
+    function appendTermLine(text, className = '') {
+      const line = document.createElement('div');
+      line.className = `term-line ${className}`;
+      line.textContent = text;
+      termOutput.appendChild(line);
+      termOutput.scrollTop = termOutput.scrollHeight;
+    }
+
+    function execCmd(cmd) {
+      if (!cmd || !cmd.trim()) return;
+      cmd = cmd.trim();
+      history.push(cmd);
+      historyIdx = history.length;
+
+      appendTermLine(`boss@silelo:~$ ${cmd}`, 'term-prompt-line');
+      const parts = cmd.split(' ');
+      const action = parts[0].toLowerCase();
+      const arg = parts.slice(1).join(' ');
+
+      switch (action) {
+        case 'help':
+          appendTermLine(`รายชื่อคำสั่งที่ใช้งานได้:`, 'term-highlight');
+          appendTermLine(`  run               - รันโค้ดปัจจุบันใน HTML Sandbox`);
+          appendTermLine(`  demo <1|2|3|4>    - โหลดตัวอย่างโค้ด (1:Dashboard, 2:Matrix, 3:Clock, 4:Game)`);
+          appendTermLine(`  clear             - ล้างจอเทอร์มินัล`);
+          appendTermLine(`  status            - ดูสถานะและข้อมูลระบบ`);
+          appendTermLine(`  download          - ดาวน์โหลดไฟล์ .html ปัจจุบัน`);
+          appendTermLine(`  whoami            - แสดงชื่อผู้ใช้ปัจจุบัน`);
+          appendTermLine(`  date              - แสดงวันเวลาปัจจุบัน`);
+          appendTermLine(`  echo <text>       - พิมพ์ข้อความ`);
+          appendTermLine(`  ls                - แสดงรายการไฟล์จำลอง`);
+          appendTermLine(`  cat index.html    - แสดงเนื้อหาโค้ด HTML ปัจจุบัน`);
+          break;
+
+        case 'run':
+          runSandbox();
+          break;
+
+        case 'clear':
+          termOutput.innerHTML = '';
+          break;
+
+        case 'demo':
+          const n = arg.trim() || '1';
+          if (DEMOS[n]) {
+            editor.value = DEMOS[n];
+            runSandbox();
+            appendTermLine(`✓ โหลดตัวอย่าง Demo #${n} สำเร็จแล้ว`, 'term-success');
+          } else {
+            appendTermLine(`ไม่พบ Demo #${n} (มีตัวเลือก: 1, 2, 3, 4)`, 'term-err');
+          }
+          break;
+
+        case 'status':
+          appendTermLine(`=== สถานะระบบ BossnuSilelo ===`, 'term-highlight');
+          appendTermLine(`Engine: Bossnu.Silelo Terminal + Sandbox v2.0`);
+          appendTermLine(`Terminal Status: Active & Listening`);
+          appendTermLine(`Sandbox State: Isolated iframe (allow-scripts)`);
+          appendTermLine(`Memory Usage: 42.4 MB (Virtual)`);
+          appendTermLine(`User: bossnu / panupanxboss`);
+          break;
+
+        case 'download':
+          downloadHtml();
+          break;
+
+        case 'whoami':
+          appendTermLine(`bossnu (PANUPANXBOSS • Full Terminal Admin)`, 'term-success');
+          break;
+
+        case 'date':
+          appendTermLine(new Date().toString(), 'term-muted');
+          break;
+
+        case 'echo':
+          appendTermLine(arg);
+          break;
+
+        case 'ls':
+          appendTermLine(`-rw-r--r-- 1 bossnu bossnu ${editor.value.length}B index.html`);
+          appendTermLine(`-rw-r--r-- 1 bossnu bossnu 1024B README.md`);
+          break;
+
+        case 'cat':
+          if (arg === 'index.html' || arg === 'index.htm') {
+            appendTermLine(editor.value);
+          } else {
+            appendTermLine(`cat: ${arg}: No such file or directory`, 'term-err');
+          }
+          break;
+
+        default:
+          appendTermLine(`bash: command not found: ${action} (พิมพ์ 'help' เพื่อดูคำสั่ง)`, 'term-err');
+          break;
+      }
+    }
+
+    // CLI Input Event
+    cliInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const val = cliInput.value;
+        cliInput.value = '';
+        execCmd(val);
+      } else if (e.key === 'ArrowUp') {
+        if (historyIdx > 0) {
+          historyIdx--;
+          cliInput.value = history[historyIdx] || '';
+        }
+      } else if (e.key === 'ArrowDown') {
+        if (historyIdx < history.length - 1) {
+          historyIdx++;
+          cliInput.value = history[historyIdx] || '';
+        } else {
+          historyIdx = history.length;
+          cliInput.value = '';
+        }
+      }
+    });
+
+    // --- Tab Switching in Sandbox (Image 2 style) ---
+    tabPreview.addEventListener('click', () => {
+      tabPreview.classList.add('active');
+      tabCode.classList.remove('active');
+      previewContainer.style.display = 'flex';
+      editorContainer.style.display = 'none';
+      runSandbox();
+    });
+
+    tabCode.addEventListener('click', () => {
+      tabCode.classList.add('active');
+      tabPreview.classList.remove('active');
+      previewContainer.style.display = 'none';
+      editorContainer.style.display = 'flex';
+      editor.focus();
+    });
+
+    // --- View Toggle (Both / Terminal / Sandbox) ---
+    const viewSplit = document.getElementById('view-split');
+    const viewTerminal = document.getElementById('view-terminal');
+    const viewSandbox = document.getElementById('view-sandbox');
+    const paneTerm = document.getElementById('pane-terminal');
+    const paneSand = document.getElementById('pane-sandbox');
+    const workspaceEl = document.getElementById('workspace');
+
+    viewSplit.addEventListener('click', () => {
+      viewSplit.classList.add('active');
+      viewTerminal.classList.remove('active');
+      viewSandbox.classList.remove('active');
+      paneTerm.style.display = 'flex';
+      paneSand.style.display = 'flex';
+      workspaceEl.style.gridTemplateColumns = '1fr 1fr';
+    });
+
+    viewTerminal.addEventListener('click', () => {
+      viewTerminal.classList.add('active');
+      viewSplit.classList.remove('active');
+      viewSandbox.classList.remove('active');
+      paneTerm.style.display = 'flex';
+      paneSand.style.display = 'none';
+      workspaceEl.style.gridTemplateColumns = '1fr';
+    });
+
+    viewSandbox.addEventListener('click', () => {
+      viewSandbox.classList.add('active');
+      viewSplit.classList.remove('active');
+      viewTerminal.classList.remove('active');
+      paneTerm.style.display = 'none';
+      paneSand.style.display = 'flex';
+      workspaceEl.style.gridTemplateColumns = '1fr';
+    });
+
+    // --- Actions ---
+    document.getElementById('btn-run').addEventListener('click', () => {
+      runSandbox();
+      tabPreview.click();
+    });
+
+    document.getElementById('btn-clear').addEventListener('click', () => {
+      termOutput.innerHTML = '';
+      appendTermLine(`🧹 ล้างจอเทอร์มินัลเรียบร้อยแล้ว`, 'term-muted');
+    });
+
+    document.getElementById('btn-copy').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(editor.value);
+        appendTermLine(`📋 คัดลอกโค้ดลง Clipboard เรียบร้อยแล้ว`, 'term-success');
+      } catch(e) {
+        appendTermLine(`❌ คัดลอกไม่สำเร็จ: ` + e, 'term-err');
+      }
+    });
+
+    function downloadHtml() {
+      const blob = new Blob([editor.value], { type: 'text/html;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'bossnu-silelo-console.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+      appendTermLine(`💾 บันทึกและดาวน์โหลด 'bossnu-silelo-console.html' เรียบร้อยแล้ว`, 'term-success');
+    }
+
+    document.getElementById('btn-download').addEventListener('click', downloadHtml);
+
+    // Device Viewport Size
+    function setDevice(width) {
+      iframe.style.width = width;
+      appendTermLine(`📱 ปรับขนาดหน้าจอ Sandbox เป็น: ${width}`, 'term-muted');
+    }
+
+    function updateCharCount() {
+      charCount.textContent = `${editor.value.length.toLocaleString()} ตัวอักษร`;
+    }
+    editor.addEventListener('input', updateCharCount);
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        runSandbox();
+      }
+    });
+
+    // Initial run
+    runSandbox();
+  </script>
+</body>
+</html>

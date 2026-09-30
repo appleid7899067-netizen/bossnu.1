@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Copy, Maximize2, Minimize2 } from "lucide-react";
+import { Check, Copy, Download, Maximize2, Minimize2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { fenceBareSvg } from "@/lib/markdown-format";
@@ -195,6 +195,7 @@ function CodeBlock({ code, lang, live, showPreview = true }: { code: string; lan
   const [preview, setPreview] = useState(isWeb && value !== "css" && value !== "tailwind" && value !== "tailwindcss");
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+
   async function copyCode() {
     try {
       await navigator.clipboard.writeText(code);
@@ -202,27 +203,78 @@ function CodeBlock({ code, lang, live, showPreview = true }: { code: string; lan
       window.setTimeout(() => setCopied(false), 1500);
     } catch { /* Clipboard may be unavailable in embedded previews. */ }
   }
+
+  function downloadFile() {
+    const ext = value === "html" || value === "htm" ? "html" : value === "javascript" || value === "js" ? "js" : value === "typescript" || value === "ts" ? "ts" : value === "python" || value === "py" ? "py" : value === "css" ? "css" : "txt";
+    const filename = (value === "html" || value === "htm") ? "bossnu-silelo-console.html" : `code.${ext}`;
+    const blob = new Blob([code], { type: (value === "html" || value === "htm") ? "text/html;charset=utf-8" : "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   return (
-    <div className={cn("overflow-hidden rounded-2xl border border-[#24395f] bg-[#0d1830] text-[#e8efff]", isWeb && live ? "html-live" : "")}>
-      <div className="flex min-h-12 items-center justify-between gap-3 border-b border-[#24395f] bg-[#101d38] px-4 py-2 text-xs text-[#a9badb]">
-        <span>{isTooLong ? "Text" : (lang || "Code")}</span>
+    <div className={cn("terminal overflow-hidden rounded-xl border border-[#2a2a4a] bg-[#0a0a12] text-[#e6e6f2] shadow-[0_0_30px_rgba(139,92,246,0.15)]", isWeb && live ? "html-live" : "")}>
+      <div className="terminal-header flex min-h-11 items-center justify-between gap-3 border-b border-[#2a2a4a] bg-[#12121f] px-3.5 py-2 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="dot dot-r" />
+          <span className="dot dot-y" />
+          <span className="dot dot-g" />
+          {isWeb && !isTooLong ? (
+            <div className="ml-2 flex items-center rounded-lg bg-[#0a0a14] p-0.5 border border-[#2a2a4a]/80 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setPreview(true)}
+                className={cn(
+                  "rounded-md px-2.5 py-1 font-medium transition",
+                  preview ? "bg-[#1f1f35] text-white shadow-sm font-semibold" : "text-[#94a3b8] hover:text-white"
+                )}
+              >
+                ตัวอย่าง
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreview(false)}
+                className={cn(
+                  "rounded-md px-2.5 py-1 font-medium transition",
+                  !preview ? "bg-[#1f1f35] text-white shadow-sm font-semibold" : "text-[#94a3b8] hover:text-white"
+                )}
+              >
+                โค้ด
+              </button>
+            </div>
+          ) : (
+            <span className="ml-1 font-mono text-[11px] font-medium text-[#a5b4fc]">{isTooLong ? "Text" : (lang || "Code")}</span>
+          )}
+        </div>
         <div className="flex items-center gap-1">
-          {isWeb ? <button type="button" onClick={() => setPreview((v) => !v)} className="rounded-lg px-2.5 py-1.5 text-xs hover:bg-white/10">{preview ? "‹ Code" : "▶ Preview"}</button> : null}
-          <button type="button" onClick={() => void copyCode()} aria-label="Copy code" title="Copy code" className="grid size-8 place-items-center rounded-lg hover:bg-white/10">{copied ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}</button>
-          <button type="button" onClick={() => setExpanded((v) => !v)} aria-label={expanded ? "Collapse code" : "Expand code"} title={expanded ? "Collapse" : "Expand"} className="grid size-8 place-items-center rounded-lg hover:bg-white/10">{expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}</button>
+          <button type="button" onClick={() => void copyCode()} aria-label="Copy code" title="คัดลอกโค้ด" className="grid size-7 place-items-center rounded-lg text-[#94a3b8] transition hover:bg-white/10 hover:text-white">
+            {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+          </button>
+          <button type="button" onClick={downloadFile} aria-label="Download file" title="ดาวน์โหลดไฟล์" className="grid size-7 place-items-center rounded-lg text-[#94a3b8] transition hover:bg-white/10 hover:text-white">
+            <Download className="size-3.5" />
+          </button>
+          <button type="button" onClick={() => setExpanded((v) => !v)} aria-label={expanded ? "Collapse code" : "Expand code"} title={expanded ? "ย่อ" : "ขยายเต็ม"} className="grid size-7 place-items-center rounded-lg text-[#94a3b8] transition hover:bg-white/10 hover:text-white">
+            {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+          </button>
         </div>
       </div>
       {isTooLong ? (
-        <div className="bg-[#171717]">
-          <div className="flex items-center justify-between border-b border-[#24395f] px-4 py-2 text-[11px] text-[#9ca3af]"><span>Long text</span><span>{code.length.toLocaleString()} characters</span></div>
-          <pre className={cn("overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-[#e8efff]", expanded ? "max-h-[75vh]" : "max-h-[320px]")}><code>{code}</code></pre>
+        <div className="bg-[#070710]">
+          <div className="flex items-center justify-between border-b border-[#2a2a4a] px-4 py-2 text-[11px] text-[#9ca3af]"><span>Long text</span><span>{code.length.toLocaleString()} characters</span></div>
+          <pre className={cn("overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-[#e6e6f2]", expanded ? "max-h-[75vh]" : "max-h-[320px]")}><code>{code}</code></pre>
         </div>
       ) : preview && isWeb && showPreview && value !== "css" && value !== "tailwind" && value !== "tailwindcss" ? (
-        <iframe title="HTML preview" sandbox="allow-scripts" srcDoc={code} className={cn("w-full bg-white", expanded ? "h-[75vh]" : "h-[360px]")} />
+        <iframe title="HTML preview" sandbox="allow-scripts allow-forms" srcDoc={code} className={cn("w-full bg-white", expanded ? "h-[75vh]" : "h-[380px]")} />
       ) : (
-        <pre className={cn("overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-[#e8efff]", expanded ? "max-h-[75vh]" : "max-h-[320px]")}><code>{code}</code></pre>
+        <pre className={cn("terminal-body overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12.5px] leading-relaxed text-[#e6e6f2]", expanded ? "max-h-[75vh]" : "max-h-[340px]")}><code>{code}</code></pre>
       )}
-      {isWeb ? <div className="flex items-center justify-between border-t border-[#24395f] px-4 py-2 text-[10px] text-[#9ca3af]"><span>{value === "css" ? "CSS • Sandbox Style" : value.startsWith("tailwind") ? "Tailwind CSS • Sandbox" : "HTML • Sandboxed Preview"}</span><span>Isolated preview</span></div> : null}
+      {isWeb ? <div className="flex items-center justify-between border-t border-[#2a2a4a] bg-[#0c0c17] px-4 py-1.5 text-[10px] text-[#8b8ba7]"><span>{value === "css" ? "CSS • Sandbox Style" : value.startsWith("tailwind") ? "Tailwind CSS • Sandbox" : "HTML • Sandboxed Preview"}</span><span>Bossnu.Silelo Isolated preview</span></div> : null}
     </div>
   );
 }

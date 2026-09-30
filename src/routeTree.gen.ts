@@ -11,10 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SandboxRouteImport } from './routes/sandbox'
+import { Route as ApiGithubRouteImport } from './routes/api/github'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiSandboxRouteImport } from './routes/api/sandbox'
 import { Route as ApiSandboxDotstreamRouteImport } from './routes/api/sandbox[.]stream'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
+import { Route as ApiGithubHealthRouteImport } from './routes/api/github/health'
+import { Route as ApiSandboxStreamRouteImport } from './routes/api/sandbox.stream'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -24,6 +27,11 @@ const IndexRoute = IndexRouteImport.update({
 const SandboxRoute = SandboxRouteImport.update({
   id: '/sandbox',
   path: '/sandbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGithubRoute = ApiGithubRouteImport.update({
+  id: '/api/github',
+  path: '/api/github',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
@@ -46,64 +54,93 @@ const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
   path: '/api/workspace',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGithubHealthRoute = ApiGithubHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => ApiGithubRoute,
+} as any)
+const ApiSandboxStreamRoute = ApiSandboxStreamRouteImport.update({
+  id: '/stream',
+  path: '/stream',
+  getParentRoute: () => ApiSandboxRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/sandbox': typeof SandboxRoute
+  '/api/github': typeof ApiGithubRouteWithChildren
   '/api/health': typeof ApiHealthRoute
-  '/api/sandbox': typeof ApiSandboxRoute
+  '/api/sandbox': typeof ApiSandboxRouteWithChildren
   '/api/sandbox.stream': typeof ApiSandboxDotstreamRoute
   '/api/workspace': typeof ApiWorkspaceRoute
+  '/api/github/health': typeof ApiGithubHealthRoute
+  '/api/sandbox/stream': typeof ApiSandboxStreamRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sandbox': typeof SandboxRoute
+  '/api/github': typeof ApiGithubRouteWithChildren
   '/api/health': typeof ApiHealthRoute
-  '/api/sandbox': typeof ApiSandboxRoute
+  '/api/sandbox': typeof ApiSandboxRouteWithChildren
   '/api/sandbox.stream': typeof ApiSandboxDotstreamRoute
   '/api/workspace': typeof ApiWorkspaceRoute
+  '/api/github/health': typeof ApiGithubHealthRoute
+  '/api/sandbox/stream': typeof ApiSandboxStreamRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/sandbox': typeof SandboxRoute
+  '/api/github': typeof ApiGithubRouteWithChildren
   '/api/health': typeof ApiHealthRoute
-  '/api/sandbox': typeof ApiSandboxRoute
+  '/api/sandbox': typeof ApiSandboxRouteWithChildren
   '/api/sandbox.stream': typeof ApiSandboxDotstreamRoute
   '/api/workspace': typeof ApiWorkspaceRoute
+  '/api/github/health': typeof ApiGithubHealthRoute
+  '/api/sandbox/stream': typeof ApiSandboxStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/sandbox'
+    | '/api/github'
     | '/api/health'
     | '/api/sandbox'
     | '/api/sandbox.stream'
     | '/api/workspace'
+    | '/api/github/health'
+    | '/api/sandbox/stream'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/sandbox'
+    | '/api/github'
     | '/api/health'
     | '/api/sandbox'
     | '/api/sandbox.stream'
     | '/api/workspace'
+    | '/api/github/health'
+    | '/api/sandbox/stream'
   id:
     | '__root__'
     | '/'
     | '/sandbox'
+    | '/api/github'
     | '/api/health'
     | '/api/sandbox'
     | '/api/sandbox.stream'
     | '/api/workspace'
+    | '/api/github/health'
+    | '/api/sandbox/stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SandboxRoute: typeof SandboxRoute
+  ApiGithubRoute: typeof ApiGithubRouteWithChildren
   ApiHealthRoute: typeof ApiHealthRoute
-  ApiSandboxRoute: typeof ApiSandboxRoute
+  ApiSandboxRoute: typeof ApiSandboxRouteWithChildren
   ApiSandboxDotstreamRoute: typeof ApiSandboxDotstreamRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
 }
@@ -122,6 +159,13 @@ declare module '@tanstack/react-router' {
       path: '/sandbox'
       fullPath: '/sandbox'
       preLoaderRoute: typeof SandboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/github': {
+      id: '/api/github'
+      path: '/api/github'
+      fullPath: '/api/github'
+      preLoaderRoute: typeof ApiGithubRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/health': {
@@ -152,14 +196,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/github/health': {
+      id: '/api/github/health'
+      path: '/health'
+      fullPath: '/api/github/health'
+      preLoaderRoute: typeof ApiGithubHealthRouteImport
+      parentRoute: typeof ApiGithubRoute
+    }
+    '/api/sandbox/stream': {
+      id: '/api/sandbox/stream'
+      path: '/stream'
+      fullPath: '/api/sandbox/stream'
+      preLoaderRoute: typeof ApiSandboxStreamRouteImport
+      parentRoute: typeof ApiSandboxRoute
+    }
   }
 }
+
+interface ApiGithubRouteChildren {
+  ApiGithubHealthRoute: typeof ApiGithubHealthRoute
+}
+
+const ApiGithubRouteChildren: ApiGithubRouteChildren = {
+  ApiGithubHealthRoute: ApiGithubHealthRoute,
+}
+
+const ApiGithubRouteWithChildren = ApiGithubRoute._addFileChildren(
+  ApiGithubRouteChildren,
+)
+
+interface ApiSandboxRouteChildren {
+  ApiSandboxStreamRoute: typeof ApiSandboxStreamRoute
+}
+
+const ApiSandboxRouteChildren: ApiSandboxRouteChildren = {
+  ApiSandboxStreamRoute: ApiSandboxStreamRoute,
+}
+
+const ApiSandboxRouteWithChildren = ApiSandboxRoute._addFileChildren(
+  ApiSandboxRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SandboxRoute: SandboxRoute,
+  ApiGithubRoute: ApiGithubRouteWithChildren,
   ApiHealthRoute: ApiHealthRoute,
-  ApiSandboxRoute: ApiSandboxRoute,
+  ApiSandboxRoute: ApiSandboxRouteWithChildren,
   ApiSandboxDotstreamRoute: ApiSandboxDotstreamRoute,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
 }

@@ -67,7 +67,8 @@ export async function snapshotWorkspace(root, limits = LIMITS) {
       if (!buffer) { skipped.push({ path, reason: "unreadable" }); continue; }
       const text = buffer.toString("utf8");
       const isUtf8 = !buffer.includes(0) && Buffer.byteLength(text, "utf8") === buffer.length;
-      const content = isUtf8 ? text : encodeBinary(buffer);
+      if (!isUtf8) { skipped.push({ path, reason: "binary", size: info.size }); continue; }
+      const content = text;
       totalBytes += buffer.length;
       files.push({ path, content, sha256: sha256Buffer(buffer), size: buffer.length });
     }

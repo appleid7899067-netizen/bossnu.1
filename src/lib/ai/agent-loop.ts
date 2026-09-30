@@ -1,6 +1,7 @@
-import { RunScanner, modelResult, type GithubCall } from "./sandbox-tool.ts";
+import { RunScanner, modelResult, terminalTranscript, type GithubCall } from "./sandbox-tool.ts";
 import type { RunCall, ToolResult } from "./sandbox-tool.ts";
 import { CowAgentCore, buildCowPlan } from "./cow-agent-core.ts";
+import { failureSignature, strategyHash, type FailureMemory } from "./memory-ledger.ts";
 import { selectSkills } from "../skills/index.ts";
 import {
   MAX_GATE_REJECTIONS,
@@ -54,8 +55,8 @@ export type AgentLoopSummary = {
 // Sali can recover through up to 11 compact execution rounds.
 // The loop still exits immediately on a verified evidence gate, so 11 is a
 // ceiling, not a requirement to spend all rounds.
-export const DEFAULT_MAX_RUNS = 11;
-export const MAX_RUNS_CAP = 11;
+export const DEFAULT_MAX_RUNS = 6;
+export const MAX_RUNS_CAP = 8;
 
 export function redactSensitiveCommand(command: string) {
   return command
@@ -152,6 +153,10 @@ export async function runAgentLoop(opts: {
   let rejections = 0;
   let initialCallPending = opts.initialCall ?? null;
   let lastVerdict: EvidenceVerdict | null = opts.priorResult ? evaluateEvidence(opts.priorResult, { requireWorkspace }) : null;
+  const environmentHash = "env-" + (typeof process !== "undefined" ? process.platform : "web");
+  const memoryRows: unknown[] = [];
+  const priorFailures: FailureMemory[] = [];
+  let lastFailedStrategy = "";
   // A passing run is only a candidate until the loop reaches its final
   // verification boundary. Never persist a Verified Skill mid-recovery.
   let pendingVerified: { call: RunCall; result: ToolResult } | null =
@@ -164,8 +169,8 @@ export async function runAgentLoop(opts: {
   const workspaceContext = workspace ? await safely(() => workspace.context(goal), "Persistent Workspace โหลดไม่สำเร็จ") : "ไม่มี Persistent Workspace";
   if (workspace) {
     await safely(() => workspace.startTask(goal, core.task.id), undefined);
-    await safely(() => workspace.remember("semantic:goal:" + core.task.id, JSON.stringify({ statement: goal.slice(0, 4000), source: "user", confidence: 1, environmentHash, createdAt: Date.now() }), "semantic"), undefined);
-    await safely(() => workspace.remember("episode:" + core.task.id + ":goal", JSON.stringify({ phase: "perceive", goal: goal.slice(0, 4000), timestamp: Date.now(), memoryHits: memoryRows.length }), "episode"), undefined);
+    await safely(() => workspace.remember("latest-semantic-goal:" + core.task.id, JSON.stringify({ statement: goal.slice(0, 4000), source: "user", confidence: 1, environmentHash, createdAt: Date.now() }), "semantic" as any), undefined);
+    await safely(() => workspace.remember("latest-episode-goal:" + core.task.id, JSON.stringify({ phase: "perceive", goal: goal.slice(0, 4000), timestamp: Date.now(), memoryHits: memoryRows.length }), "episode" as any), undefined);
   }
 
   const finish = async (status: AgentLoopStatus): Promise<AgentLoopSummary> => {
@@ -191,7 +196,7 @@ export async function runAgentLoop(opts: {
     if (workspace && status !== "aborted") {
       const outcome = status === "verified" || status === "answered" ? "success" : "failure";
       const reasons = lastVerdict?.reasons?.slice(0, 4).join(" | ") || "no verification error recorded";
-      const learningKey = `learning:${core.task.id}`;
+      const learningKey = `latest-learning:${core.task.id}`;
       const learningValue = [
         `Outcome: ${outcome}`,
         `Goal: ${goal.slice(0, 500)}`,
@@ -304,6 +309,10 @@ export async function runAgentLoop(opts: {
 
     // Tool-call turns are internal execution traffic. Keep them in the live Activity box;
     // only a no-tool turn is allowed to become the final Summary message.
+    if (gating && held.trim() && (calls.length > 0 || githubCalls.length > 0)) {
+      opts.onText(held);
+      held = "";
+    }
     if (raw.trim()) messages.push({ role: "assistant", content: raw });
     if (raw.trim()) {
       core.remember("latest-plan", raw, "conversation");
@@ -381,6 +390,7 @@ export async function runAgentLoop(opts: {
 
       core.setPhase("observe");
       opts.onPhase?.("observe", "👀 Observe • Sandbox ตอบกลับแล้ว กำลังอ่านผลจริง...");
+      opts.onText(terminalTranscript(call, result));
       const observed = modelResult(call, result);
       core.remember(`run-${count}`, observed, "run");
       if (workspace) await safely(() => workspace.remember(`run-${count}`, observed, "run"), undefined);
