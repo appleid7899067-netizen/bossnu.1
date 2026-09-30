@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Menu, Phone, X } from "lucide-react";
+import { Menu, MoreHorizontal, Phone, Volume2, VolumeX, X } from "lucide-react";
 import { ProjectFilesView } from "@/components/project-files-view";
 import { Toaster, toast } from "sonner";
 import { AppBuilderView } from "@/components/app-builder-view";
 import { ChatThread, type SandboxRunView } from "@/components/chat-thread";
 import { Composer } from "@/components/composer";
 import { Discover } from "@/components/discover";
-import { LuminaWordmark } from "@/components/lumina-mark";
 import { MindMapView } from "@/components/mind-map-view";
 import { Sidebar } from "@/components/sidebar";
 import { StudioView } from "@/components/studio-view";
@@ -630,17 +629,22 @@ ${message}`); toast.error(message); }
       ) : null}
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between border-b border-border bg-bg/80 px-3 backdrop-blur-md md:hidden">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={drawer ? "Close menu" : "Open menu"}
-            onClick={() => setDrawer((v) => !v)}
-          >
-            {drawer ? <X className="size-5" /> : <Menu className="size-5" />}
+        <header className="flex min-h-16 items-center gap-2 border-b border-border bg-bg/90 px-3 py-2 backdrop-blur-md md:hidden">
+          <Button variant="ghost" size="icon-sm" aria-label={drawer ? "ปิดเมนู" : "เปิดเมนู"} onClick={() => setDrawer((v) => !v)}>
+            {drawer ? <X className="size-6" /> : <Menu className="size-6" />}
           </Button>
-          <LuminaWordmark compact />
-          <Button variant="ghost" size="icon-sm" aria-label="Voice mode" onClick={() => setCallOpen(true)}><Phone className="size-5" /></Button>
+          <div className="grid size-10 shrink-0 place-items-center rounded-full bg-[conic-gradient(from_210deg,#7c3aed,#f8fafc,#a855f7,#4f46e5,#7c3aed)] p-[3px] shadow-[0_0_18px_rgba(139,92,246,.35)]">
+            <div className="size-full rounded-full bg-bg/80" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px] font-semibold">{store.personality.name || "สลี่"}</p>
+            <p className="truncate text-[11px] text-muted">สร้างโดย AI • พร้อมช่วยงาน</p>
+          </div>
+          <Button variant="ghost" size="icon-sm" aria-label="โหมดโทรคุย" onClick={() => setCallOpen(true)}><Phone className="size-5" /></Button>
+          <Button variant="ghost" size="icon-sm" aria-label={voiceEnabled ? "ปิดเสียงตอบกลับ" : "เปิดเสียงตอบกลับ"} onClick={() => { const next = !voiceEnabled; setVoiceEnabledState(next); setVoiceEnabled(next); }}>
+            {voiceEnabled ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
+          </Button>
+          <Button variant="ghost" size="icon-sm" aria-label="ตั้งค่าเพิ่มเติม" onClick={() => setAgentSettingsOpen(true)}><MoreHorizontal className="size-5" /></Button>
         </header>
 
         {view === "files" ? (

@@ -231,8 +231,9 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
   box-sizing: border-box;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--color-elevated) 55%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-elevated) 88%, var(--color-bg));
+  box-shadow: 0 12px 32px color-mix(in srgb, #000 14%, transparent);
 }
 
 .sali-summary-head,
@@ -451,7 +452,7 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 
 @media (max-width: 640px) {
   .sali-summary,
-  .sali-devlog { max-width: 100%; border-radius: 10px; }
+  .sali-devlog { max-width: 100%; border-radius: 18px; }
 
   .sali-summary-body { padding: 8px 9px 9px; }
 

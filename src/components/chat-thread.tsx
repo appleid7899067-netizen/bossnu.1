@@ -190,7 +190,7 @@ function MessageBubble({
             </button>
           </div>
           <div className="min-w-0">
-            <div className="rounded-[20px] rounded-br-md bg-primary/[0.08] px-3.5 py-2.5 text-[12px] leading-[1.5] shadow-[var(--shadow-border)] ring-1 ring-primary/10">
+            <div className="rounded-[20px] rounded-br-md bg-primary/[0.08] px-3.5 py-2.5 text-[12px] leading-[1.5] shadow-[var(--shadow-border)] ring-1 ring-primary/10 max-md:bg-primary max-md:text-primary-fg max-md:ring-primary/40">
               {message.attachments?.length ? (
                 <ul className="mb-2 flex flex-wrap gap-1.5">
                   {message.attachments.map((file, index) => (
