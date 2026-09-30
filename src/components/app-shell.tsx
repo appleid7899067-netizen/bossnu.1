@@ -152,7 +152,7 @@ export function AppShell({ search }: { search: Search }) {
         store.patchAssistant(id, assistantId, { content: reply });
       }
     };
-    const pushActivity = (activity: PendingActivity) => {
+    const pushActivity = (activity: PendingActivity, activityId = uid("activity")) => {
       const current = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
       const next = [...current, { ...activity, id: uid("activity"), createdAt: Date.now() } as ChatActivity].slice(-120);
       store.patchAssistant(id, assistantId, { activities: next });
