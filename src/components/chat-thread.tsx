@@ -219,15 +219,23 @@ function MessageBubble({
       <LuminaMark className="mt-0.5 size-7 shrink-0 text-primary" />
       <div className="min-w-0 max-w-[1080px] flex-1 break-words text-[13px] leading-[1.6] [overflow-wrap:anywhere] sm:text-[12.5px] sm:leading-[1.55]">
         {message.activities?.length ? <ActivityFeed activities={message.activities} live={live} /> : null}
-        {message.thinking && !message.content ? <ThinkingBlock text={message.thinking} live={live} /> : null}
-        {empty ? (
+        {empty && !message.activities?.length ? (
           <p className="text-sm font-medium text-muted">กำลังดำเนินการ...</p>
-        ) : message.content ? (
-          live ? (
-            <p className="assistant-stream-text whitespace-pre-wrap break-words">{message.content}</p>
-          ) : (
-            <Markdown text={message.content} live={false} />
-          )
+        ) : null}
+        {message.content ? (
+          <section className="sali-summary" aria-label="สรุปคำตอบของสลี่">
+            <div className="sali-summary-head">
+              <span className="sali-summary-mark">✓</span>
+              <span>SUMMARY / สรุป</span>
+            </div>
+            <div className="sali-summary-body">
+              {live ? (
+                <p className="assistant-stream-text whitespace-pre-wrap break-words">{message.content}</p>
+              ) : (
+                <Markdown text={message.content} live={false} />
+              )}
+            </div>
+          </section>
         ) : null}
         {live && message.content ? <span className="lumina-caret" /> : null}
         {!live && message.content ? (
@@ -344,6 +352,7 @@ function ActivityFeed({ activities, live }: { activities: ChatActivity[]; live: 
                   <span>{statusText(activity)} </span>
                   <code className="sali-log-runtime">{activity.runtime}</code>
                   <code className="sali-log-command">$ {activity.command}</code>
+                  {activity.output ? <pre className="sali-log-output">{activity.output}</pre> : null}
                 </span>
               </>
             ) : activity.kind === "stream" ? (
