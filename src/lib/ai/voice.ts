@@ -43,13 +43,13 @@ const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   mode: "warm",
   // Browser/device speech synthesis is the single playback path.
   // Keep "source" for backwards-compatible saved settings.
-  source: "device",
+  source: "puter",
   rate: 1,
   pitch: 1,
   volume: 1,
   voiceName: "",
   puterProvider: "xai",
-  puterVoice: "ara",
+  puterVoice: "eve",
   puterModel: "",
 };
 
