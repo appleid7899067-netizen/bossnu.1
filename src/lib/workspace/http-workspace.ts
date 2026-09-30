@@ -34,5 +34,8 @@ export function createHttpWorkspace(workspaceId: string, fetcher: typeof fetch =
     async writeFile(path, content) {
       await call({ action: "write", path, content });
     },
+    async recall(query, limit = 24) {
+      return (await call<{ memory: Array<{ key: string; value: string; source: string; updatedAt: string }> }>({ action: "recall", goal: query, limit })).memory;
+    },
   };
 }
