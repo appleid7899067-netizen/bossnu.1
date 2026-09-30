@@ -12,7 +12,7 @@ import { ACCENTS } from "@/lib/use-appearance";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { getVoiceSettings, isVoiceSupported, updateVoiceSettings, type VoiceSettings } from "@/lib/ai/voice";
+import { applyVoiceMode, getAvailableVoices, getVoiceSettings, isVoiceSupported, updateVoiceSettings, VOICE_MODES, type VoiceSettings } from "@/lib/ai/voice";
 
 const SANDBOX_LANGUAGES = [
   { id: "python", label: "Python", file: "main.py" },
@@ -557,9 +557,26 @@ function ProfilesPanel() {
 /* ---------------------------------- Voice ---------------------------------- */
 
 function VoicePanel({ supported, settings, onChange }: { supported: boolean; settings: VoiceSettings; onChange: (patch: Partial<VoiceSettings>) => void }) {
+  const [deviceVoices, setDeviceVoices] = useState(() => getAvailableVoices());
+
+  useEffect(() => {
+    if (!supported) return;
+    const refresh = () => setDeviceVoices(getAvailableVoices());
+    refresh();
+    window.speechSynthesis.addEventListener("voiceschanged", refresh);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", refresh);
+  }, [supported]);
+
+  const selectMode = (mode: VoiceSettings["mode"]) => {
+    applyVoiceMode(mode);
+    const preset = VOICE_MODES.find((item) => item.id === mode);
+    onChange({ mode, rate: preset?.rate ?? 1, pitch: preset?.pitch ?? 1, source: "device" });
+  };
+
   const testVoice = () => {
     void import("@/lib/ai/voice").then(async ({ speakNow }) => {
-      await speakNow("สวัสดีค่ะ นี่คือเสียงของสลี่จาก Browser กำลังทดสอบเสียงภาษาไทยค่ะ");
+      const preset = VOICE_MODES.find((item) => item.id === settings.mode);
+      await speakNow(`สวัสดีค่ะ ตอนนี้สลี่กำลังใช้โทน${preset?.label.replace(/^\S+\s*/, "") ?? "ที่คุณเลือก"} ลองฟังดูนะคะ`);
     });
   };
 
@@ -571,33 +588,41 @@ function VoicePanel({ supported, settings, onChange }: { supported: boolean; set
         value={settings.enabled}
         onChange={(value) => onChange({ enabled: value, source: "device" })}
       />
-      <div className="grid gap-2 sm:grid-cols-2">
-        {VOICE_MODE_OPTIONS.map((voice) => (
-          <button key={voice.id} type="button"
-            onClick={() => onChange({ mode: voice.id, source: "device" })}
-            className={cn("rounded-xl border p-3 text-left", settings.mode === voice.id ? "border-primary bg-primary/10" : "border-border bg-clay/60")}>
-            <span className="block text-sm font-medium">{voice.label}</span>
-            <span className="mt-1 block text-xs text-muted">{voice.description}</span>
-          </button>
-        ))}
+      <div>
+        <div className="mb-2 flex items-end justify-between gap-3">
+          <div><p className="text-sm font-medium">เลือกโทนการพูด</p><p className="mt-0.5 text-xs text-muted">แต่ละโทนจะปรับความเร็วและระดับสูง–ต่ำให้อัตโนมัติ</p></div>
+          <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary">{VOICE_MODES.length} โทน</span>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {VOICE_MODES.map((voice) => (
+            <button key={voice.id} type="button"
+              onClick={() => selectMode(voice.id)}
+              aria-pressed={settings.mode === voice.id}
+              className={cn("rounded-xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40", settings.mode === voice.id ? "border-primary bg-primary/10 shadow-[0_0_0_2px_var(--accent-soft)]" : "border-border bg-clay/60")}>
+              <span className="flex items-center justify-between gap-2 text-sm font-medium"><span>{voice.label}</span>{settings.mode === voice.id ? <Check className="size-4 text-primary" /> : null}</span>
+              <span className="mt-1 block text-xs text-muted">{voice.description}</span>
+            </button>
+          ))}
+        </div>
       </div>
-      <p className="text-xs text-muted">ใช้เสียงภาษาไทยที่ Browser/อุปกรณ์มีให้ ไม่มี XAI หรือบริการ TTS ภายนอก</p>
+      {deviceVoices.length ? (
+        <label className="block text-sm">
+          <span className="mb-2 block">เสียงจากอุปกรณ์</span>
+          <select value={settings.voiceName} onChange={(event) => onChange({ voiceName: event.target.value, source: "device" })} className="w-full rounded-xl border border-border bg-clay px-3 py-2.5 text-sm outline-none focus:border-primary/50">
+            <option value="">อัตโนมัติ — เลือกเสียงภาษาไทยที่เหมาะสม</option>
+            {deviceVoices.map((voice) => <option key={`${voice.name}-${voice.lang}`} value={voice.name}>{voice.name} ({voice.lang})</option>)}
+          </select>
+        </label>
+      ) : null}
+      <p className="text-xs text-muted">เสียงจริงขึ้นอยู่กับ Browser และเสียงที่ติดตั้งในอุปกรณ์ ไม่ใช้บริการ TTS ภายนอก</p>
       <SliderRow label="ความเร็วเสียง" value={`${settings.rate.toFixed(2)}×`} min="0.75" max="1.50" step="0.05" current={settings.rate} onChange={(rate) => onChange({ rate, source: "device" })} />
+      <SliderRow label="โทนสูง–ต่ำ" value={settings.pitch.toFixed(2)} min="0.65" max="1.35" step="0.05" current={settings.pitch} onChange={(pitch) => onChange({ pitch, source: "device" })} />
       <SliderRow label="ระดับเสียง" value={`${Math.round(settings.volume * 100)}%`} min="0" max="1" step="0.05" current={settings.volume} onChange={(volume) => onChange({ volume, source: "device" })} />
       <button type="button" onClick={testVoice} disabled={!supported} className="accent-gradient w-full rounded-xl px-4 py-2.5 text-sm font-medium text-primary-fg shadow-lg transition-transform hover:scale-[1.01] active:scale-[.99] disabled:opacity-40">🔊 ทดลองเสียงสลี่</button>
       {!supported ? <p className="text-center text-[11px] text-subtle">Browser นี้ไม่รองรับ SpeechSynthesis</p> : null}
     </div>
   </Panel>;
 }
-
-const VOICE_MODE_OPTIONS: Array<{ id: VoiceSettings["mode"]; label: string; description: string }> = [
-  { id: "cute", label: "😊 น่ารักใสๆ", description: "สดใส เป็นกันเอง" },
-  { id: "warm", label: "🥰 อ่อนโยนอบอุ่น", description: "นุ่ม ฟังสบาย" },
-  { id: "calm", label: "😌 สงบผ่อนคลาย", description: "ช้า ชัด ฟังง่าย" },
-  { id: "bright", label: "✨ ร่าเริงสดใส", description: "มีพลังแต่ไม่แหลม" },
-  { id: "special", label: "💜 ที่รักพิเศษ", description: "นุ่มลึก เป็นส่วนตัว" },
-  { id: "gentle", label: "🌸 ละมุนใจ", description: "อ่อนโยน นุ่มนวล" },
-];
 
 function SliderRow({ label, value, min, max, step, current, onChange }: { label: string; value: string; min: string; max: string; step: string; current: number; onChange: (v: number) => void }) {
   const fill = ((current - Number(min)) / (Number(max) - Number(min))) * 100;
