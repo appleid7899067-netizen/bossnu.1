@@ -13,6 +13,28 @@ export type StreamEvent =
   | { type: "done"; stopReason: string }
   | { type: "error"; error: string };
 
+function isGithubHealthIntent(input: string) {
+  const normalized = input.normalize("NFKC").trim().toLowerCase();
+  return /(?:ตรวจ|เช็ค|check|test|ทดสอบ).*(?:github).*(?:health|สุขภาพ)/i.test(normalized)
+    || /github.*(?:health|สุขภาพ).*(?:read|write|commit|verify|cleanup)/i.test(normalized)
+    || /(?:read|write|commit|verify|cleanup).*(?:github)/i.test(normalized);
+}
+
+async function runGithubHealth(signal?: AbortSignal) {
+  const response = await fetch("/api/github/health", {
+    method: "POST",
+    credentials: "include",
+    headers: { accept: "application/json" },
+    signal,
+  });
+  const data = await response.json().catch(() => null) as Record<string, unknown> | null;
+  if (!response.ok) {
+    const message = typeof data?.error === "string" ? data.error : `GitHub Health HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  return data;
+}
+
 async function getPuter() {
   const mod = await import("@heyputer/puter.js");
   return mod.default;
@@ -104,14 +126,42 @@ export async function streamChat(opts: {
   model?: string;
 }) {
   try {
+    const latestUser =
+      opts.latestUser ?? [...opts.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+
+    // GitHub Health is a deterministic native tool call. Do not send this
+    // intent through Sandbox or let the model invent a local-project health
+    // check. The API uses the authenticated browser session and the server's
+    // GITHUB_TOKEN, then performs Read → Write → Commit → Verify → Cleanup.
+    if (opts.tools && isGithubHealthIntent(latestUser)) {
+      const streamId = crypto.randomUUID();
+      opts.onEvent({ type: "start", id: streamId });
+      opts.onEvent({ type: "block_start", index: 0, blockType: "tool" });
+      opts.onEvent({ type: "thinking", text: "🏥 GitHub Health • Read → Write → Commit → Verify → Cleanup" });
+      try {
+        const result = await runGithubHealth(opts.signal);
+        opts.onEvent({ type: "block_stop", index: 0 });
+        opts.onEvent({
+          type: "text",
+          text: "\n## 🏥 GitHub Health\n\n" + JSON.stringify(result, null, 2) + "\n",
+        });
+        opts.onEvent({ type: "done", stopReason: "tool_result" });
+      } catch (error) {
+        opts.onEvent({ type: "block_stop", index: 0 });
+        opts.onEvent({
+          type: "error",
+          error: error instanceof Error ? error.message : "GitHub Health failed.",
+        });
+      }
+      return;
+    }
+
     const puter = await ensurePuterSignedIn();
     if (opts.signal?.aborted) return;
 
     const streamId = crypto.randomUUID();
     opts.onEvent({ type: "start", id: streamId });
 
-    const latestUser =
-      opts.latestUser ?? [...opts.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     const settings = useAppStore.getState();
     const selectedModel = getPuterModel(opts.model ?? settings.selectedModel).id;
     const activeSkills = settings.agentSkills.filter((s) => s.enabled && (opts.tools || s.id !== "sandbox-terminal")).map((s) => s.name).join(", ");
