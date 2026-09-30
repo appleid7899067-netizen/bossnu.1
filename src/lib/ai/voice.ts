@@ -33,6 +33,9 @@ export type VoiceSettings = {
   pitch: number;
   volume: number;
   voiceName: string;
+  puterProvider: string;
+  puterVoice: string;
+  puterModel: string;
 };
 
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
@@ -45,6 +48,9 @@ const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   pitch: 1,
   volume: 1,
   voiceName: "",
+  puterProvider: "xai",
+  puterVoice: "ara",
+  puterModel: "",
 };
 
 let settings: VoiceSettings = DEFAULT_VOICE_SETTINGS;
@@ -57,7 +63,7 @@ function loadSettings() {
   if (typeof window === "undefined") return;
   try {
     const raw = window.localStorage.getItem("bossnu-voice-settings");
-    if (raw) settings = { ...DEFAULT_VOICE_SETTINGS, ...JSON.parse(raw), source: "device" };
+    if (raw) settings = { ...DEFAULT_VOICE_SETTINGS, ...JSON.parse(raw) };
   } catch {
     settings = DEFAULT_VOICE_SETTINGS;
   }
@@ -68,7 +74,7 @@ loadSettings();
 function saveSettings() {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem("bossnu-voice-settings", JSON.stringify({ ...settings, source: "device" }));
+    window.localStorage.setItem("bossnu-voice-settings", JSON.stringify(settings));
   } catch {
     // Voice preferences are optional; ignore unavailable local storage.
   }
@@ -92,6 +98,67 @@ function cleanSpeechText(value: string) {
     .replace(/https?:\/\/\S+/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+
+
+type PuterVoice = { id: string; name?: string; provider?: string; description?: string; language?: { name?: string; code?: string }; supported_models?: string[]; supported_engines?: string[] };
+
+type PuterAI = {
+  txt2speech: ((text: string, options?: Record<string, unknown>) => Promise<HTMLAudioElement>) & {
+    listVoices?: (options?: Record<string, unknown>) => Promise<PuterVoice[]>;
+  };
+};
+
+type PuterGlobal = { ai?: PuterAI };
+
+function getPuter(): PuterGlobal | null {
+  if (typeof window === "undefined") return null;
+  return (window as Window & { puter?: PuterGlobal }).puter ?? null;
+}
+
+export type PuterVoiceOption = { id: string; name: string; provider: string; language: string; description: string };
+
+export async function getPuterVoices(): Promise<PuterVoiceOption[]> {
+  const puter = getPuter();
+  const listVoices = puter?.ai?.txt2speech?.listVoices;
+  if (!listVoices) return [];
+  try {
+    const voices = await listVoices({ provider: "all" });
+    return voices
+      .filter((voice) => !voice.language?.code || /^th(-|_)/i.test(voice.language.code) || /thai/i.test(voice.language?.name ?? ""))
+      .map((voice) => ({ id: voice.id, name: voice.name ?? voice.id, provider: voice.provider ?? "unknown", language: voice.language?.code ?? "auto", description: voice.description ?? "" }));
+  } catch {
+    return [];
+  }
+}
+
+async function speakPuter(text: string) {
+  const puter = getPuter();
+  if (!puter?.ai?.txt2speech || !settings.enabled) return false;
+  try {
+    const options: Record<string, unknown> = {
+      provider: settings.puterProvider,
+      voice: settings.puterVoice,
+      language: "th-TH",
+    };
+    if (settings.puterModel) options.model = settings.puterModel;
+    if (settings.puterProvider === "xai") options.language = "th";
+    const audio = await puter.ai.txt2speech(cleanSpeechText(text).slice(0, 2999), options);
+    activeAudio = audio;
+    audio.volume = settings.volume;
+    await audio.play();
+    await new Promise<void>((resolve) => {
+      const done = () => { audio.removeEventListener("ended", done); audio.removeEventListener("error", done); resolve(); };
+      audio.addEventListener("ended", done, { once: true });
+      audio.addEventListener("error", done, { once: true });
+    });
+    if (activeAudio === audio) activeAudio = null;
+    return true;
+  } catch {
+    if (activeAudio) activeAudio = null;
+    return false;
+  }
 }
 
 function createDeviceUtterance(text: string) {
@@ -136,7 +203,10 @@ async function speakDevice(text: string) {
 async function speakChunk(text: string, token: number) {
   const cleaned = cleanSpeechText(text);
   if (!cleaned || token !== generation || !settings.enabled) return;
-  // Voice/phone mode intentionally uses the browser TTS engine only.
+  if (settings.source === "puter") {
+    const ok = await speakPuter(cleaned);
+    if (ok) return;
+  }
   await speakDevice(cleaned);
 }
 
@@ -169,7 +239,7 @@ export function isVoiceSupported() {
 }
 
 export function getVoiceSettings(): VoiceSettings {
-  return { ...settings, source: "device" };
+  return { ...settings };
 }
 
 export function getAvailableVoices(): { name: string; lang: string }[] {
@@ -183,7 +253,7 @@ export function applyVoiceMode(mode: VoiceMode) {
 }
 
 export function updateVoiceSettings(patch: Partial<VoiceSettings>) {
-  settings = { ...settings, ...patch, source: "device" };
+  settings = { ...settings, ...patch };
   saveSettings();
   if (!settings.enabled) stopVoice();
 }
@@ -226,6 +296,10 @@ export async function speakNow(text: string) {
   const synth = window.speechSynthesis;
   try { synth.cancel(); } catch {}
   await new Promise((resolve) => window.setTimeout(resolve, 30));
+  if (settings.source === "puter") {
+    const ok = await speakPuter(cleaned);
+    if (ok) return true;
+  }
   return speakDevice(cleaned);
 }
 
