@@ -162,7 +162,11 @@ export async function runAgentLoop(opts: {
   opts.onPhase?.("goal", "🎯 เป้าหมาย • รับคำสั่งจากผู้ใช้");
   opts.onText(`\n> 🎯 เป้าหมาย: ${goal.slice(0, 300)}\n`);
   const workspaceContext = workspace ? await safely(() => workspace.context(goal), "Persistent Workspace โหลดไม่สำเร็จ") : "ไม่มี Persistent Workspace";
-  if (workspace) await safely(() => workspace.startTask(goal, core.task.id), undefined);
+  if (workspace) {
+    await safely(() => workspace.startTask(goal, core.task.id), undefined);
+    await safely(() => workspace.remember("semantic:goal:" + core.task.id, JSON.stringify({ statement: goal.slice(0, 4000), source: "user", confidence: 1, environmentHash, createdAt: Date.now() }), "semantic"), undefined);
+    await safely(() => workspace.remember("episode:" + core.task.id + ":goal", JSON.stringify({ phase: "perceive", goal: goal.slice(0, 4000), timestamp: Date.now(), memoryHits: memoryRows.length }), "episode"), undefined);
+  }
 
   const finish = async (status: AgentLoopStatus): Promise<AgentLoopSummary> => {
     if (status === "verified" || status === "answered") {
@@ -348,6 +352,18 @@ export async function runAgentLoop(opts: {
         return finish(lastVerdict && !lastVerdict.passed ? "unverified" : "limit");
       }
 
+      const candidateSignature = failureSignature(call.command, {
+        goal: goal.slice(0, 1000),
+        runtime: call.language,
+      }, environmentHash);
+      const blockedFailure = priorFailures.find(item => item.signature === candidateSignature && item.blacklisted && (!item.expiresAt || item.expiresAt > Date.now()));
+      if (blockedFailure) {
+        opts.onPhase?.("fix", "🐛 Fix • Failure Ledger บล็อก strategy เดิม");
+        opts.onText("\n> 🚫 Strategy ถูก blacklist จาก Failure Ledger: " + candidateSignature + "\n> เปลี่ยนวิธีแล้วค่อย Run ใหม่ค่ะ\n");
+        messages.push({ role: "user", content: "BLACKLISTED STRATEGY: " + candidateSignature + "\nDo not execute this same action. Use a materially different runtime/command/approach and verify it." });
+        lastFailedStrategy = strategyHash([call.language, call.command]);
+        continue;
+      }
       count++;
       core.attempt();
       core.setPhase("act");
