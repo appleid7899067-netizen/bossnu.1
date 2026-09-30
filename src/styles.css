@@ -456,6 +456,7 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 
   .sali-summary { border-color: color-mix(in srgb, var(--color-border) 65%, transparent); }
   .sali-summary .sali-summary-head { display: none; }
+  .sali-summary.sali-live-html-card .sali-summary-head { display: flex; }
   .sali-summary-body { padding: 20px 18px; }
   .sali-summary-body .assistant-prose { gap: 16px; font-size: 15px; line-height: 1.75; }
 

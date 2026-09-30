@@ -220,6 +220,17 @@ function MessageBubble({
         {empty && !live && !message.activities?.length ? (
           <p className="text-sm font-medium text-muted">กำลังดำเนินการ...</p>
         ) : null}
+        {live && /```(?:html|htm)\b/i.test(message.content) ? (
+          <section className="sali-summary sali-live-html-card" aria-label="ตัวอย่าง HTML ระหว่างสตรีมสด">
+            <div className="sali-summary-head">
+              <span className="sali-live-cursor" aria-hidden="true" />
+              <span>HTML / LIVE PREVIEW</span>
+            </div>
+            <div className="sali-summary-body break-words [overflow-wrap:anywhere]">
+              <Markdown text={message.content} live />
+            </div>
+          </section>
+        ) : null}
         {!live && message.content ? (
           <section className="sali-summary" aria-label="สรุปคำตอบของสลี่">
             <div className="sali-summary-head">

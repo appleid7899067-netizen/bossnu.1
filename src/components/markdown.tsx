@@ -259,10 +259,20 @@ export function Markdown({
     (_, lang, code) => `\n\`\`\`${lang}\n${code.trim()}\n\`\`\`\n`,
   );
   const cleanedText = normalizedRuns.replace(/\*{3,}/g, "").replace(/\/\/nn\//gi, "");
-  // Keep the DOM shape stable while tokens stream in. Promoting an unfinished
-  // table or code fence to a richer element mid-stream can confuse hydration
-  // and DOM reconciliation in mobile browsers.
   if (live) {
+    // Render an unfinished HTML fence as a real sandboxed preview while tokens
+    // are still arriving. Non-HTML streaming remains plain text to keep the
+    // DOM stable and avoid rebuilding rich Markdown on every token.
+    const openHtml = /```(html|htm)\s*\n((?:(?!```)[\s\S])*)$/i.exec(cleanedText);
+    if (openHtml) {
+      const prose = cleanedText.slice(0, openHtml.index).trim();
+      return (
+        <div className={cn("assistant-prose flex min-w-0 max-w-full flex-col gap-3 text-[13px] leading-[1.7] tracking-[-0.01em] [overflow-wrap:anywhere]", className)}>
+          {prose ? <MdBlock text={prose} /> : null}
+          <CodeBlock code={openHtml[2]} lang={openHtml[1]} live />
+        </div>
+      );
+    }
     return <div className={cn("assistant-prose min-w-0 max-w-full whitespace-pre-wrap break-words text-[13px] leading-[1.7] tracking-[-0.01em] [overflow-wrap:anywhere]", className)}>{cleanedText}</div>;
   }
   const parts = splitFences(cleanedText);
