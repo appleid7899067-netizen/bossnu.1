@@ -38,7 +38,8 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
       <NavItem active={view === "chat"} icon={MessageSquare} label="แชต" onClick={() => onView("chat")} />
       <NavItem active={view === "maps"} icon={GitBranch} label="แผนผังความคิด" onClick={() => onView("maps")} />
       <NavItem active={view === "studio"} icon={ImageIcon} label="สตูดิโอรูปภาพ" onClick={() => onView("studio")} />
-      <NavItem active={view === "builder"} icon={Bot} label="AI Builder" onClick={() => onView("builder")} />\n      <NavItem active={view === "files"} icon={FileStack} label="ไฟล์โปรเจ็ค" onClick={() => onView("files")} />
+      <NavItem active={view === "builder"} icon={Bot} label="AI Builder" onClick={() => onView("builder")} />
+      <NavItem active={view === "files"} icon={FileStack} label="ไฟล์โปรเจ็ค" onClick={() => onView("files")} />
       <Link to="/sandbox" className={cn(
         "group flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-sm font-medium transition-all duration-200",
         "text-muted hover:bg-hover hover:text-fg",
