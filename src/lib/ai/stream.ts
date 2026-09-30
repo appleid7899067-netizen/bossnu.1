@@ -142,6 +142,7 @@ export async function streamChat(opts: {
     const primaryModel = QWEN_ACTOR_MODEL;
     const verifierModel = QWEN_VERIFIER_MODEL;
     const reasoningModel = QWEN_REASONING_MODEL;
+    const useDeepReasoning = opts.mode === "think" || opts.tools;
     let response: Awaited<ReturnType<typeof puter.ai.chat>>;
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -182,7 +183,7 @@ export async function streamChat(opts: {
     try {
       verifierResponse = await puter.ai.chat(
         [
-          { role: "system", content: "คุณคือ DeepSeek V4 Flash verifier ของ Sali. ตรวจร่างจาก Qwen3 Coder แก้ข้อผิดพลาดที่เห็นชัดเจน รักษาเจตนาผู้ใช้ ห้ามอ้างผลลัพธ์ที่ยังไม่ได้ทำจริง และตอบเป็นคำตอบสุดท้ายชุดเดียวโดยไม่พูดถึงกระบวนการตรวจสอบ." },
+          { role: "system", content: "คุณคือ Qwen3.8 Flash verifier ของ Sali. ตรวจร่างจาก Qwen3 Coder แก้ข้อผิดพลาดที่เห็นชัดเจน รักษาเจตนาผู้ใช้ ห้ามอ้างผลลัพธ์ที่ยังไม่ได้ทำจริง และตอบเป็นคำตอบสุดท้ายชุดเดียวโดยไม่พูดถึงกระบวนการตรวจสอบ." },
           { role: "user", content: "คำขอของผู้ใช้:\\n" + latestUser + "\\n\\nร่างจาก Qwen3 Coder:\\n" + qwenDraft },
         ],
         {
@@ -204,7 +205,7 @@ export async function streamChat(opts: {
     for await (const part of verifierResponse as AsyncIterable<unknown>) {
       if (opts.signal?.aborted) return;
       const chunk = readChunk(part);
-      if (chunk.eventType === "error") throw new Error(chunk.text || "DeepSeek verifier stream error.");
+      if (chunk.eventType === "error") throw new Error(chunk.text || "Qwen3.8 verifier stream error.");
       if (chunk.reasoning) opts.onEvent({ type: "thinking", text: chunk.reasoning });
       if (chunk.text) {
         verifiedText += chunk.text;
@@ -214,6 +215,11 @@ export async function streamChat(opts: {
     if (!verifiedText.trim()) {
       opts.onEvent({ type: "text", text: qwenDraft });
       opts.onEvent({ type: "done", stopReason: "qwen_fallback_empty_verifier" });
+      return;
+    }
+
+    if (!useDeepReasoning) {
+      opts.onEvent({ type: "done", stopReason: "qwen_dual_verified_fast" });
       return;
     }
 
