@@ -215,9 +215,8 @@ function MessageBubble({
   const empty = !message.content && !message.thinking;
 
   return (
-    <div className="lumina-rise group flex gap-3 sm:gap-4">
-      <LuminaMark className="mt-0.5 size-7 shrink-0 text-primary" />
-      <div className="min-w-0 max-w-[1080px] flex-1 break-words text-[13px] leading-[1.6] [overflow-wrap:anywhere] sm:text-[12.5px] sm:leading-[1.55]">
+    <div className="lumina-rise group w-full">
+      <div className="min-w-0 w-full break-words text-[13px] leading-[1.6] [overflow-wrap:anywhere] sm:text-[12.5px] sm:leading-[1.55]">
         {message.activities?.length ? <ActivityFeed activities={message.activities} live={live} /> : null}
         {empty && !message.activities?.length ? (
           <p className="text-sm font-medium text-muted">กำลังดำเนินการ...</p>
