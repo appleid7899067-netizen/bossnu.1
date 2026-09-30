@@ -346,6 +346,24 @@ function ActivityFeed({ activities, live }: { activities: ChatActivity[]; live: 
                   <code className="sali-log-command">$ {activity.command}</code>
                 </span>
               </>
+            ) : activity.kind === "stream" ? (
+              <>
+                <span className={
+                  activity.status === "done"
+                    ? "sali-log-status sali-log-ok"
+                    : activity.status === "error"
+                      ? "sali-log-status sali-log-error"
+                      : "sali-log-status sali-log-working"
+                }>
+                  {activity.status === "done" ? "OK" : activity.status === "error" ? "ERR" : "LIVE"}
+                </span>
+                <span className="sali-log-text">
+                  <span className="sali-stream-source">{activity.source.toUpperCase()}</span>
+                  {" "}{activity.text || "กำลังรับข้อมูล…"}
+                  {typeof activity.chars === "number" ? <span className="sali-log-runtime">{activity.chars.toLocaleString()} chars</span> : null}
+                  {activity.status === "running" ? <span className="sali-terminal-caret" /> : null}
+                </span>
+              </>
             ) : activity.kind === "files" ? (
               <>
                 <span className="sali-log-status sali-log-ok">EDIT</span>
