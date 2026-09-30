@@ -9,7 +9,20 @@ export type SkillId =
   | "frontend"
   | "data-analysis"
   | "writing"
-  | "verification";
+  | "verification"
+  | "bash-execution"
+  | "nodejs-runtime"
+  | "git-operations"
+  | "file-system"
+  | "typescript-dev"
+  | "frontend-react"
+  | "performance-opt"
+  | "ai-agent-builder"
+  | "database"
+  | "security"
+  | "testing"
+  | "deployment"
+  | "api-integration";
 
 export type SkillExecutor =
   | "sandbox"
@@ -131,7 +144,125 @@ const skills: Skill[] = [
   },
 ];
 
-const normalized = (value: string) => value.toLowerCase().normalize("NFKC");
+
+  {
+    id: "bash-execution",
+    name: "Bash Execution",
+    description: "Runs and validates shell commands through the real Sandbox.",
+    triggers: ["bash", "shell", "command", "คำสั่งเชลล์"],
+    executor: "sandbox",
+    route: "Goal → Command → Run → Observe → Verify",
+    instructions: "รันคำสั่งจริงเท่านั้น เก็บ exit code และ output เป็นหลักฐาน",
+  },
+  {
+    id: "nodejs-runtime",
+    name: "Node.js Runtime",
+    description: "Runs Node.js scripts and runtime checks in the real Sandbox.",
+    triggers: ["node", "nodejs", "npm", "npx", "runtime"],
+    executor: "sandbox",
+    route: "Goal → Inspect → Run → Observe → Verify",
+    instructions: "ตรวจเวอร์ชัน runtime และ dependency ก่อนรันเมื่อมีผลต่อปัญหา",
+  },
+  {
+    id: "git-operations",
+    name: "Git Operations",
+    description: "Performs repository operations with real Git/GitHub evidence.",
+    triggers: ["git", "commit", "branch", "merge", "diff", "checkout"],
+    executor: "github",
+    route: "Goal → Inspect → Act → Commit → Read-back → Verify",
+    instructions: "งาน GitHub ต้องใช้ GitHub executor และอ่านกลับหลังเขียนทุกครั้ง",
+  },
+  {
+    id: "file-system",
+    name: "File System",
+    description: "Creates, edits, reads, and verifies files in the real workspace.",
+    triggers: ["file", "ไฟล์", "folder", "directory", "โฟลเดอร์", "path"],
+    executor: "sandbox",
+    route: "Goal → Inspect → Edit → Run → Verify",
+    instructions: "ยืนยัน path และอ่านไฟล์กลับหลังแก้ ห้ามรายงานไฟล์ที่ยังไม่มีหลักฐาน",
+  },
+  {
+    id: "typescript-dev",
+    name: "TypeScript Development",
+    description: "Builds and validates TypeScript code.",
+    triggers: ["typescript", "ts", "typecheck", "tsc", "types"],
+    executor: "puter+sandbox",
+    route: "Goal → Inspect Types → Edit → Typecheck → Verify",
+    instructions: "ตรวจ type errors จริงก่อนสรุปว่าโค้ดผ่าน",
+  },
+  {
+    id: "frontend-react",
+    name: "React Frontend",
+    description: "Builds and verifies React components and application UI.",
+    triggers: ["react", "jsx", "tsx", "component", "hooks"],
+    executor: "puter+sandbox",
+    route: "Goal → Inspect → Edit → Build → Verify",
+    instructions: "รักษา state, streaming, responsive และ error states ให้ทำงานจริง",
+  },
+  {
+    id: "performance-opt",
+    name: "Performance Optimization",
+    description: "Profiles and improves runtime, bundle, and interaction performance.",
+    triggers: ["performance", "perf", "latency", "เร็ว", "ช้า", "optimize"],
+    executor: "puter+sandbox",
+    route: "Goal → Measure → Change → Measure → Verify",
+    instructions: "ต้องมี baseline และผลหลังแก้ก่อนอ้างว่าดีขึ้น",
+  },
+  {
+    id: "ai-agent-builder",
+    name: "AI Agent Builder",
+    description: "Builds agent loops, tool routing, memory, and verification flows.",
+    triggers: ["agent", "ai agent", "builder", "planner", "tool router", "memory"],
+    executor: "puter+sandbox",
+    route: "Goal → Plan → Route → Act → Observe → Verify → Repair",
+    instructions: "รักษา evidence gate และห้ามแทนผล tool ด้วยข้อความจากโมเดล",
+  },
+  {
+    id: "database",
+    name: "Database",
+    description: "Inspects and validates database queries, schemas, and persistence.",
+    triggers: ["database", "db", "sql", "postgres", "neon", "schema"],
+    executor: "puter+sandbox",
+    route: "Goal → Inspect Schema → Query → Validate → Verify",
+    instructions: "ตรวจ schema และผล query จริงก่อนสรุปข้อมูล",
+  },
+  {
+    id: "security",
+    name: "Security",
+    description: "Checks authentication, authorization, secrets, and unsafe data flows.",
+    triggers: ["security", "auth", "token", "secret", "permission", "ความปลอดภัย"],
+    executor: "puter+sandbox",
+    route: "Goal → Inspect → Threat Check → Fix → Verify",
+    instructions: "ห้ามเปิดเผย secret และตรวจ permission boundary ก่อนสรุป",
+  },
+  {
+    id: "testing",
+    name: "Testing",
+    description: "Runs targeted tests and records reproducible evidence.",
+    triggers: ["test", "tests", "unit", "integration", "e2e", "ทดสอบ"],
+    executor: "sandbox",
+    route: "Goal → Select Test → Run → Observe → Verify",
+    instructions: "ผลทดสอบต้องมาจากการรันจริงและระบุขอบเขตที่ทดสอบ",
+  },
+  {
+    id: "deployment",
+    name: "Deployment",
+    description: "Inspects builds, deployments, runtime health, and delivery status.",
+    triggers: ["deploy", "deployment", "render", "build", "release", "ขึ้นระบบ"],
+    executor: "github",
+    route: "Goal → Inspect → Deploy → Observe → Verify",
+    instructions: "ตรวจ deployment จริงและ logs ก่อนบอกว่า live",
+  },
+  {
+    id: "api-integration",
+    name: "API Integration",
+    description: "Builds and validates authenticated API integrations.",
+    triggers: ["api", "endpoint", "http", "fetch", "integration", "webhook"],
+    executor: "puter+sandbox",
+    route: "Goal → Inspect Contract → Call → Observe → Verify",
+    instructions: "ตรวจ status, response shape และ authentication path จากการเรียกจริง",
+  },
+\nconst normalized = (value: string) => value.toLowerCase().normalize("NFKC");
 
 export function listSkills(): Skill[] {
   return skills.map((skill) => ({ ...skill, triggers: [...skill.triggers] }));
