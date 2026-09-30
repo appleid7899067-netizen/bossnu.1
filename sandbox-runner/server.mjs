@@ -12,7 +12,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const GUARDED_PYTHON = fileURLToPath(new URL("./guarded/run_guarded.py", import.meta.url));
 const MAX_PYTHON_SAFE_INPUT = 32_000;
 // Seeds carry the workspace's project files from Neon, so the body limit is generous.
-const MAX_BODY = Number(process.env.MAX_BODY_BYTES) || 16 * 1024 * 1024;
+const MAX_BODY = Number(process.env.MAX_BODY_BYTES) || 32 * 1024 * 1024;
 const RUNNER_VERSION = 6;
 const RUNNER_RUNTIMES = ["node", "javascript", "python", "python-safe", "bash", "go", "rust", "java", "cpp"];
 const MAX_OUTPUT = 64 * 1024;
