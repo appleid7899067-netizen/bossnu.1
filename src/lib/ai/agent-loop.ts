@@ -181,10 +181,8 @@ export async function runAgentLoop(opts: {
           const memoryValue = `Verified reusable skill saved at ${skill.path}. Project snapshot: ${pendingVerified.result.workspaceSync.expectedCount ?? 0} files, manifest ${pendingVerified.result.workspaceSync.manifestHash ?? "unavailable"}.`;
           await safely(() => workspace.remember(`verified skill ${skill.path}`, memoryValue, "run"), undefined);
           opts.onSkillSaved?.(skill.path, true);
-          opts.onText(`\n> 🧠 บันทึกสกิลจากงานที่ตรวจสอบผ่านขั้นสุดท้ายแล้ว: ${skill.path}\n`);
         } else {
           opts.onSkillSaved?.(skill.path, false);
-          opts.onText(`\n> ⚠️ Verification ผ่าน แต่บันทึกสกิลลง Agent Workspace ไม่สำเร็จ (${skill.path})\n`);
         }
       }
       core.complete();
@@ -304,8 +302,8 @@ export async function runAgentLoop(opts: {
       return finish(verified ? "verified" : "answered");
     }
 
-    // The model is acting on the failure: its explanation may be shown now.
-    if (held) opts.onText(held);
+    // Tool-call turns are internal execution traffic. Keep them in the live Activity box;
+    // only a no-tool turn is allowed to become the final Summary message.
     if (raw.trim()) messages.push({ role: "assistant", content: raw });
     if (raw.trim()) {
       core.remember("latest-plan", raw, "conversation");
@@ -372,7 +370,6 @@ export async function runAgentLoop(opts: {
       // Push an immediate visible heartbeat before the sandbox call. The
       // executor can take several seconds before its first terminal event,
       // so the chat must never look frozen during Run.
-      opts.onText(`\n> 💻 Run ${count}/${max} • กำลังส่งคำสั่งเข้า Sandbox...\n`);
 
       let result: ToolResult;
       try {
@@ -384,11 +381,9 @@ export async function runAgentLoop(opts: {
 
       core.setPhase("observe");
       opts.onPhase?.("observe", "👀 Observe • Sandbox ตอบกลับแล้ว กำลังอ่านผลจริง...");
-      opts.onText("\n> 👀 Observe • ได้ผลจาก Sandbox แล้ว กำลังตรวจหลักฐาน...\n");
       const observed = modelResult(call, result);
       core.remember(`run-${count}`, observed, "run");
       if (workspace) await safely(() => workspace.remember(`run-${count}`, observed, "run"), undefined);
-      opts.onText(terminalTranscript(call, result));
       if (opts.signal.aborted) return finish("aborted");
 
       lastVerdict = evaluateEvidence(result, { requireWorkspace });
