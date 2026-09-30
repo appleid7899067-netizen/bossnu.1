@@ -1,4 +1,5 @@
 import { sandboxClient } from "@/lib/sandbox-client";
+import { ProjectFilesView } from "@/components/project-files-view";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot, Brain, Check, Database, Download, FolderOpen, Palette, Pencil, Play, Plus, ShieldCheck,
@@ -42,7 +43,7 @@ const SANDBOX_DEFAULTS: Record<string, string> = {
   json: '{\n  "hello": "world",\n  "ok": true\n}',
 };
 
-type SettingsTab = "appearance" | "personality" | "prompts" | "voice" | "skills" | "agents" | "memory" | "profiles" | "sandbox" | "data";
+type SettingsTab = "appearance" | "personality" | "prompts" | "voice" | "skills" | "agents" | "memory" | "profiles" | "files" | "sandbox" | "data";
 
 const TABS: { id: SettingsTab; label: string; icon: typeof Sparkles }[] = [
   { id: "appearance", label: "หน้าตา", icon: Palette },
@@ -53,11 +54,12 @@ const TABS: { id: SettingsTab; label: string; icon: typeof Sparkles }[] = [
   { id: "agents", label: "ตัวแทน", icon: Bot },
   { id: "memory", label: "ความจำ", icon: Brain },
   { id: "profiles", label: "โปรไฟล์", icon: FolderOpen },
+  { id: "files", label: "ไฟล์โปรเจ็ค", icon: FolderOpen },
   { id: "sandbox", label: "Sandbox", icon: Play },
   { id: "data", label: "ข้อมูล", icon: Database },
 ];
 
-export function SettingsView() {
+export function SettingsView({ workspaceId = "default" }: { workspaceId?: string }) {
   const store = useAppStore();
   const [tab, setTab] = useState<SettingsTab>("appearance");
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => getVoiceSettings());
@@ -213,6 +215,7 @@ printf %s ${quote(sandboxInput)} > stdin.txt
           {tab === "agents" ? <AgentsPanel newAgent={newAgent} setNewAgent={setNewAgent} /> : null}
           {tab === "memory" ? <MemoryPanel newMemory={newMemory} setNewMemory={setNewMemory} /> : null}
           {tab === "profiles" ? <ProfilesPanel /> : null}
+          {tab === "files" ? <ProjectFilesView workspaceId={workspaceId} /> : null}
           {tab === "sandbox" ? <SandboxPanel
             language={sandboxLanguage} code={sandboxCode} input={sandboxInput} output={sandboxOutput}
             busy={sandboxBusy} preview={sandboxPreview} setPreview={setSandboxPreview}
