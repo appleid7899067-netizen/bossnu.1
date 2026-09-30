@@ -46,7 +46,7 @@ const VERSION = Number(process.env.SERVICE_VERSION || 6);
 const RUNNER_TOKEN = (process.env.RUNNER_TOKEN || "").trim();
 const ALLOW_NO_AUTH = process.env.ALLOW_NO_AUTH === "true";
 const ALLOW_ORIGIN = (process.env.ALLOW_ORIGIN || "").trim();
-const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 16 * 1024 * 1024);
+const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 32 * 1024 * 1024);
 const MAX_COMMAND_CHARS = Number(process.env.MAX_COMMAND_CHARS || 32_000);
 const MAX_OUTPUT = Number(process.env.MAX_OUTPUT_BYTES || 64 * 1024);
 const MAX_ACTIVE_RUNS = Math.max(1, Number(process.env.MAX_ACTIVE_RUNS || 2));
