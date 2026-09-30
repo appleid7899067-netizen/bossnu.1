@@ -28,6 +28,7 @@ export function ProjectFilesView({ workspaceId }: { workspaceId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [mediaUrl, setMediaUrl] = useState("");
 
   async function load(selectFirst = false) {
     setLoading(true); setError("");
@@ -54,7 +55,22 @@ export function ProjectFilesView({ workspaceId }: { workspaceId: string }) {
 
   const selected = files.find(file => file.path === selectedPath) ?? null;
   const kind = mediaKind(selected);
-  const source = selected && kind ? mediaSource(selected) : "";
+  useEffect(() => {
+    setMediaUrl("");
+    if (!selected || !kind) return;
+    const value = selected.content.trim();
+    if (!value.startsWith("BOSSNU_BINARY_HEX:")) { setMediaUrl(mediaSource(selected)); return; }
+    try {
+      const hex = value.slice("BOSSNU_BINARY_HEX:".length);
+      const bytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < bytes.length; i++) bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+      const mime = kind === "audio" ? "audio/*" : kind === "video" ? "video/*" : "image/*";
+      const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      setMediaUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } catch { setMediaUrl(""); }
+  }, [selected, kind]);
+  const source = mediaUrl || (selected && kind ? mediaSource(selected) : "");
   const isText = Boolean(selected && !kind);
   const dirty = selected ? draft !== selected.content : false;
 
