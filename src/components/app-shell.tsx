@@ -236,6 +236,25 @@ export function AppShell({ search }: { search: Search }) {
       }
       return { status: "success", output: JSON.stringify(data.result).slice(-30000), exitCode: 0, durationMs: 0 };
     };
+    const persistJournal = async () => {
+      try {
+        const snapshot = useAppStore.getState().conversations.find(chat => chat.id === id);
+        const assistant = snapshot?.messages.find(message => message.id === assistantId);
+        const activityText = (assistant?.activities ?? []).map(activity => JSON.stringify(activity)).join("\n");
+        const journal = "\n## " + new Date().toISOString() + "\n\n### USER\n" + (content || "(ไฟล์แนบอย่างเดียว)") +
+          (files.length ? "\n\n### ATTACHMENTS\n" + files.map(file => "- " + file.name + " (" + file.size + " bytes)").join("\n") : "") +
+          "\n\n### SALI\n" + (assistant?.content || reply || "(ไม่มีข้อความตอบกลับ)") +
+          "\n\n### ACTIVITY\n" + activityText + "\n";
+        await fetch("/api/workspace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workspaceId, action: "journal", value: journal }),
+          keepalive: true,
+        });
+      } catch {
+        // Journal persistence must never break the chat response.
+      }
+    };
     try {
       if (!executionRequested) {
         let failure = "";
@@ -335,6 +354,7 @@ export function AppShell({ search }: { search: Search }) {
 ${message}`); toast.error(message); }
     } finally {
       flushReplyNow();
+      await persistJournal();
       finishVoice(); setBusyChat(false); setStreamingId(null);
     }
   }
