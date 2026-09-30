@@ -216,26 +216,21 @@ function MessageBubble({
   return (
     <div className="lumina-rise group w-full">
       <div className="min-w-0 w-full break-words text-[13px] pl-0 sm:pl-0 leading-[1.6] [overflow-wrap:anywhere] sm:text-[12.5px] sm:leading-[1.55]">
-        {message.activities?.length ? <ActivityFeed activities={message.activities} live={live} /> : null}
+        {message.activities?.length ? <ActivityFeed activities={message.activities} live={live} liveText={live ? message.content : ""} /> : null}
         {empty && !message.activities?.length ? (
           <p className="text-sm font-medium text-muted">กำลังดำเนินการ...</p>
         ) : null}
-        {message.content ? (
+        {!live && message.content ? (
           <section className="sali-summary" aria-label="สรุปคำตอบของสลี่">
             <div className="sali-summary-head">
               <span className="sali-summary-mark">✓</span>
               <span>SUMMARY / สรุป</span>
             </div>
             <div className="sali-summary-body break-words [overflow-wrap:anywhere]">
-              {live ? (
-                <p className="assistant-stream-text whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>
-              ) : (
-                <Markdown text={message.content} live={false} />
-              )}
+              <Markdown text={message.content} live={false} />
             </div>
           </section>
         ) : null}
-        {live && message.content ? <span className="lumina-caret" /> : null}
         {!live && message.content ? (
           <div className="mt-2 flex items-center gap-1">
             <time className="mr-1 inline-flex h-8 items-center rounded-lg px-1 text-[10px] tabular-nums text-subtle opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100">{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
@@ -284,7 +279,7 @@ const PHASE_TITLES: Record<string, string> = {
   answer: "Answer • ตอบในแชต",
 };
 
-function ActivityFeed({ activities, live }: { activities: ChatActivity[]; live: boolean }) {
+function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatActivity[]; live: boolean; liveText?: string }) {
   const visible = activities.slice(-80);
 
   function timeOf(activity: ChatActivity) {
@@ -396,6 +391,12 @@ function ActivityFeed({ activities, live }: { activities: ChatActivity[]; live: 
             )}
           </li>
         ))}
+        {liveText ? (
+          <li className="sali-log-line sali-log-current sali-log-streaming-text" aria-live="polite">
+            <span className="sali-log-status sali-log-working">LIVE</span>
+            <span className="sali-log-text whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{liveText}<span className="sali-terminal-caret" /></span>
+          </li>
+        ) : null}
         {live ? (
           <li className="sali-log-line sali-log-current" aria-live="polite">
             <time className="sali-log-time">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
