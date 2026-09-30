@@ -1,8 +1,8 @@
 import type { ChatAttachment, ChatMessage } from "@/lib/types";
 
 export const MAX_ATTACHMENTS = 4;
-export const MAX_ATTACHMENT_BYTES = 120_000;
-export const MAX_TOTAL_ATTACHMENT_BYTES = 240_000;
+export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+export const MAX_TOTAL_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 
 const TEXT_EXTENSIONS = [
   "txt", "md", "markdown", "csv", "tsv", "json", "jsonl", "xml", "yaml", "yml", "toml", "ini", "env", "log",
@@ -33,7 +33,7 @@ export function formatBytes(bytes: number) {
 
 export type AttachmentResult = { added: ChatAttachment[]; errors: string[] };
 
-/** Reads user-picked files as text, enforcing type and size limits. */
+/** Reads user-picked files as text, enforcing a 25 MB per-file limit. */
 export async function readAttachments(files: Iterable<File>, existing: ChatAttachment[]): Promise<AttachmentResult> {
   const added: ChatAttachment[] = [];
   const errors: string[] = [];
