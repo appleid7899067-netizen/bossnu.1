@@ -88,7 +88,7 @@ export function Composer({
     const el = ref.current;
     if (!el) return;
     el.style.height = "0px";
-    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [value, ref]);
 
   useEffect(() => {
@@ -180,7 +180,7 @@ export function Composer({
         dragging && "ring-2 ring-primary",
       )}>
         {dragging ? (
-          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-[28px] bg-surface/90 text-sm font-medium text-primary">
+          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-[20px] bg-surface/90 text-sm font-medium text-primary">
             วางไฟล์ข้อความหรือโค้ดที่นี่
           </div>
         ) : null}
@@ -214,7 +214,7 @@ export function Composer({
           disabled={disabled}
           maxLength={12000}
           aria-label={placeholder}
-          className="block min-h-12 w-full resize-none bg-transparent px-3 py-2.5 text-[15px] leading-relaxed text-fg placeholder:text-subtle outline-none disabled:opacity-60"
+          className="block min-h-9 w-full resize-none bg-transparent px-2.5 py-1.5 text-[14px] leading-[1.4] text-fg placeholder:text-subtle outline-none disabled:opacity-60"
         />
         {contextualActions?.length ? (
           <div className="flex items-center gap-1.5 overflow-x-auto px-1 pb-1 pt-0.5 no-scrollbar">
@@ -232,7 +232,7 @@ export function Composer({
             ))}
           </div>
         ) : null}
-        <div className="flex items-center gap-1 px-1 pb-0.5 pt-1">
+        <div className="flex items-center gap-1 px-0.5 pb-0 pt-0.5">
           {canAttach ? (
             <>
               <input
@@ -394,7 +394,7 @@ export function Composer({
           ) : null}
           <div className="ml-auto shrink-0">
             {busy ? (
-              <Button type="button" size="icon" variant="primary" aria-label="หยุด" title="หยุด (Esc)" onClick={onStop} className="size-11 rounded-full">
+              <Button type="button" size="icon" variant="primary" aria-label="หยุด" title="หยุด (Esc)" onClick={onStop} className="size-9 rounded-full">
                 <Square className="size-3.5 fill-current" />
               </Button>
             ) : (
