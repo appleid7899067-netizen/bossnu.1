@@ -256,6 +256,33 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
   font-weight: 900;
 }
 
+.sali-devlog-title {
+  flex: 0 0 auto;
+  color: var(--color-primary);
+  font-weight: 850;
+}
+
+.sali-devlog-headline,
+.sali-devlog-trail {
+  height: 1px;
+  flex: 1 1 auto;
+  background: color-mix(in srgb, var(--color-border) 80%, transparent);
+}
+
+.sali-live-cursor {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 14%, transparent);
+  animation: sali-live-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes sali-live-pulse {
+  50% { opacity: .45; transform: scale(.78); }
+}
+
 .sali-summary-mark {
   color: var(--color-success);
   font-size: 10px;
@@ -350,15 +377,65 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .sali-devlog-terminal {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
-  min-height: 25px;
+  min-height: 28px;
   padding: 5px 10px 7px;
   border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
   color: var(--color-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.sali-devlog-prompt {
+  color: var(--color-primary);
+  font-weight: 900;
+}
+
+.sali-devlog-complete {
+  padding: 3px 10px 8px;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+}
+
+.sali-complete-rule {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--color-success);
+  font-size: 8px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.sali-complete-rule::before,
+.sali-complete-rule::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: color-mix(in srgb, var(--color-success) 28%, var(--color-border));
+}
+
+.sali-complete-result {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-top: 6px;
+  color: var(--color-muted);
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+
+.sali-complete-result b { color: var(--color-subtle); font-weight: 500; }
+
+.sali-complete-badge {
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--color-success) 42%, transparent);
+  border-radius: 4px;
+  color: var(--color-success);
+  font-size: 8px;
+  font-weight: 800;
 }
 
 .sali-terminal-caret {

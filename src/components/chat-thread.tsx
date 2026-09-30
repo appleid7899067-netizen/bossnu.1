@@ -216,8 +216,8 @@ function MessageBubble({
   return (
     <div className="lumina-rise group w-full">
       <div className="min-w-0 w-full break-words text-[13px] pl-0 sm:pl-0 leading-[1.6] [overflow-wrap:anywhere] sm:text-[12.5px] sm:leading-[1.55]">
-        {message.activities?.length ? <ActivityFeed activities={message.activities} live={live} liveText={live ? message.content : ""} /> : null}
-        {empty && !message.activities?.length ? (
+        {(live || message.activities?.length) ? <ActivityFeed activities={message.activities ?? []} live={live} liveText={live ? message.content : ""} /> : null}
+        {empty && !live && !message.activities?.length ? (
           <p className="text-sm font-medium text-muted">กำลังดำเนินการ...</p>
         ) : null}
         {!live && message.content ? (
@@ -296,7 +296,9 @@ function CopyLine({ text }: { text: string }) {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
-    } catch {}
+    } catch {
+      // Clipboard access can be unavailable in embedded or non-secure contexts.
+    }
   }
   return <button type="button" onClick={() => void copy()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-fg" aria-label={copied ? "คัดลอกแล้ว" : "คัดลอกคำตอบ"} title={copied ? "คัดลอกแล้ว" : "คัดลอกคำตอบ"}>
     {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
@@ -323,17 +325,6 @@ function ContextualReplyActions({ onAction }: { text: string; onAction: (action:
   </div>;
 }
 
-
-const PHASE_TITLES: Record<string, string> = {
-  goal: "Goal • เป้าหมาย",
-  plan: "Plan • วางแผน",
-  act: "Act • ลงมือทำ",
-  run: "Run • รัน Sandbox",
-  observe: "Observe • อ่านผล",
-  verify: "Verify • ตรวจสอบ",
-  fix: "Fix • แก้แล้วลองใหม่",
-  answer: "Answer • ตอบในแชต",
-};
 
 function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatActivity[]; live: boolean; liveText?: string }) {
   const visible = activities.slice(-80);
@@ -372,9 +363,9 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
   return (
     <section aria-label="SALI live stream" className="sali-devlog mb-3">
       <div className="sali-devlog-head">
-        <span className="sali-devlog-mark">›_</span>
-        <span>{live ? "SALI / LIVE STREAM" : "SALI / STREAM"}</span>
-        {live ? <span className="sali-live-cursor" aria-label="กำลังทำงาน" /> : <span className="sali-summary-mark">✓</span>}
+        <span className="sali-devlog-title">SALI / {live ? "LIVE" : "DONE"}</span>
+        <span className="sali-devlog-headline" aria-hidden="true" />
+        {live ? <span className="sali-live-cursor" aria-label="กำลังทำงาน" /> : <span className="sali-summary-mark" aria-label="เสร็จแล้ว">✓</span>}
       </div>
 
       <div className="sali-devlog-body">
@@ -415,10 +406,19 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
 
         {live ? (
           <div className="sali-devlog-terminal" aria-label="terminal logs code stream">
-            <span>&gt; terminal / logs / code stream</span>
+            <span className="sali-devlog-prompt">›</span>
+            <span>terminal / logs / code stream</span>
+            <span className="sali-devlog-trail" aria-hidden="true" />
             <span className="sali-terminal-caret" />
           </div>
-        ) : null}
+        ) : (
+          <div className="sali-devlog-complete" role="status">
+            <div className="sali-complete-rule"><span>งานเสร็จแล้ว</span></div>
+            <div className="sali-complete-result">
+              <span>แก้ไขเรียบร้อย</span><b>→</b><span>ตรวจสอบแล้ว</span><b>→</b><span>ผลลัพธ์พร้อมใช้งาน</span><span className="sali-complete-badge">OK</span>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
