@@ -479,7 +479,7 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
   line-height: 1.72;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  scroll-behavior: smooth;
+  contain: content;
 }
 
 .sali-devlog-terminal {

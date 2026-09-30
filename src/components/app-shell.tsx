@@ -187,12 +187,27 @@ export function AppShell({ search }: { search: Search }) {
     const execute = async (call: RunCall) => {
       ac.signal.throwIfAborted();
       let output = "";
+      let outputTimer: number | null = null;
       const startedAt = Date.now();
       const activityId = uid("activity");
       const currentActivities = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
       store.patchAssistant(id, assistantId, { activities: [...currentActivities, { id: activityId, kind: "command" as const, runtime: call.language, command: call.command.slice(0, 5000), status: "running", output: "", createdAt: startedAt }].slice(-120) });
       const historyId = store.addCommandHistory({ command: call.command, runtime: call.language, status: "running" });
       setSandboxRun({ runtime: call.language, label: "Sandbox Terminal", command: call.command, status: "running", output });
+      // Terminal output can arrive in hundreds of tiny chunks per second.
+      // Batch visual updates so mobile React rendering stays responsive while
+      // preserving the complete output buffer for the final result.
+      const flushOutput = () => {
+        if (outputTimer !== null) window.clearTimeout(outputTimer);
+        outputTimer = null;
+        const visibleOutput = output.slice(-6000);
+        setSandboxRun(current => current ? { ...current, output: output.slice(-64000) } : current);
+        patchActivity(activityId, { output: visibleOutput });
+      };
+      const scheduleOutput = () => {
+        if (outputTimer !== null) return;
+        outputTimer = window.setTimeout(flushOutput, 120);
+      };
       try {
         const result = await sandboxClient.executeStream(call.command, {
           workspace: workspaceId, type: call.language, signal: ac.signal, allowDangerous: true,
@@ -200,12 +215,12 @@ export function AppShell({ search }: { search: Search }) {
             if (ac.signal.aborted) return;
             if (event.type === "output") {
               output = (output + event.text).slice(-64000);
-              setSandboxRun(current => current ? { ...current, output } : current);
-              patchActivity(activityId, { output: output.slice(-6000) });
+              scheduleOutput();
             }
           },
         });
         ac.signal.throwIfAborted();
+        flushOutput();
         store.updateCommandHistory(historyId, result.status === "success" ? "success" : "error");
         const resultOutput = result.output || output || result.error || "";
         setSandboxRun(current => current ? { ...current, status: result.status, output: resultOutput, previewUrl: result.previewUrl } : current);
@@ -226,6 +241,8 @@ export function AppShell({ search }: { search: Search }) {
         }
         return result;
       } catch (error) {
+        if (outputTimer !== null) window.clearTimeout(outputTimer);
+        outputTimer = null;
         store.updateCommandHistory(historyId, ac.signal.aborted ? "aborted" : "error");
         const message = error instanceof Error ? error.message : String(error);
         setSandboxRun(current => current ? { ...current, status: ac.signal.aborted ? "aborted" : "error", output: message } : current);
