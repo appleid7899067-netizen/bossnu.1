@@ -39,6 +39,9 @@ export const BOSS_WORKSPACE_DEFAULT_FILES: Record<string, string> = {
 
 บันทึกเฉพาะความชอบและบริบทที่ผู้ใช้อนุญาตให้จำ หลีกเลี่ยงข้อมูลลับหรือข้อมูลอ่อนไหว
 `,
+  "memory/episodic.jsonl": `# Episodic Memory\n\nOne JSON event per line.\n`,
+  "memory/semantic.json": `[]\n`,
+  "memory/failures.json": `[]\n`,
   "memory/MEMORY.md": `# Long-term Memory
 
 เก็บเฉพาะข้อสรุปและความชอบที่ยังมีประโยชน์ในระยะยาว ส่วนเหตุการณ์รายวันให้บันทึกใน memory/daily/YYYY-MM-DD.md
@@ -51,7 +54,7 @@ export const BOSS_WORKSPACE_DEFAULT_FILES: Record<string, string> = {
 
 เก็บข้อมูลอ้างอิงที่ใช้ซ้ำได้ แยกเป็นไฟล์ตามหัวข้อ และระบุแหล่งที่มาหรือวันที่ตรวจสอบเมื่อเหมาะสม
 `,
-  "skills/README.md": `# Skills
+  "skills/README.md": `# Procedural Memory / Skills
 
 เก็บขั้นตอนการทำงานที่นำกลับมาใช้ซ้ำได้ แยกเป็นไฟล์ SKILL.md ตามหัวข้อ
 
@@ -79,7 +82,7 @@ Boss จะบันทึกทักษะอัตโนมัติจาก
   "project/generated/.gitkeep": "",
 };
 
-export const BOSS_WORKSPACE_TREE = `agent/\n  AGENT.md\n  RULE.md\n  USER.md\nmemory/\n  MEMORY.md\n  daily/YYYY-MM-DD.md\nknowledge/\nskills/\ntasks/\nproject/\n  src/                 source files\n  package.json\n  tests/\n  generated/           generated files`;
+export const BOSS_WORKSPACE_TREE = `agent/\n  AGENT.md\n  RULE.md\n  USER.md\nmemory/\n  episodic.jsonl\n  semantic.json\n  failures.json\n  MEMORY.md\n  daily/YYYY-MM-DD.md\nknowledge/\nskills/\ntasks/\nproject/\n  src/                 source files\n  package.json\n  tests/\n  generated/           generated files`;
 
 const CONTEXT_ROOTS = ["agent", "memory", "knowledge", "skills", "tasks"] as const;
 
