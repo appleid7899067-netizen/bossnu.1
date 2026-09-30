@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Download, ExternalLink, Eye, FileCode2, FilePlus2, Monitor, RefreshCw, Send, Smartphone, Sparkles, Tablet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { generateAppBuilder } from "@/lib/ai/client";
@@ -14,7 +14,7 @@ const STARTER: BuilderProject = {
   updatedAt: Date.now(),
 };
 
-export function AppBuilderView({ project, onProject, onReset }: { project?: BuilderProject; onProject: (project: BuilderProject) => void; onReset?: () => void }) {
+export function AppBuilderView({ project, workspaceId, onProject, onReset }: { project?: BuilderProject; workspaceId?: string; onProject: (project: BuilderProject) => void; onReset?: () => void }) {
   const current = project ?? STARTER;
   const [prompt, setPrompt] = useState("");
   const [selected, setSelected] = useState(current.entry);
@@ -22,6 +22,34 @@ export function AppBuilderView({ project, onProject, onReset }: { project?: Buil
   const [error, setError] = useState("");
   const [device, setDevice] = useState<"desktop"|"tablet"|"mobile">("desktop");
   const [tab, setTab] = useState<"preview"|"code">("preview");
+
+  // Workspace is the canonical project-file store. Builder state remains useful for
+  // metadata, but files are refreshed from the same workspace used by Project Files/Sandbox.
+  useEffect(() => {
+    let cancelled = false;
+    if (!workspaceId) return () => { cancelled = true; };
+    void fetch("/api/workspace", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ workspaceId, action: "project-list" }),
+    }).then(async response => {
+      const data = await response.json().catch(() => null) as { ok?: boolean; files?: Array<{ path: string; content: string }> } | null;
+      if (cancelled || !response.ok || !data?.ok || !Array.isArray(data.files)) return;
+      const files = data.files
+        .filter(file => file.path.startsWith("project/") && !file.path.endsWith("/.gitkeep"))
+        .map(file => ({ path: file.path.replace(/^project\\//, ""), content: file.content }));
+      // A fresh workspace only contains its scaffold. Do not replace an existing
+      // locally-persisted Builder project with that scaffold.
+      const hasBuilderFiles = files.some(file => /^(index\\.html|src\\/|styles\\.css|script\\.js)/.test(file.path));
+      if (!hasBuilderFiles) return;
+      const base = project ?? STARTER;
+      const entry = files.some(file => file.path === base.entry) ? base.entry : (files.some(file => file.path === "index.html") ? "index.html" : files[0]?.path);
+      if (!entry) return;
+      onProject({ ...base, files, entry, updatedAt: Date.now() });
+      setSelected(entry);
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [workspaceId]);
   const selectedFile = current.files.find((f) => f.path === selected) ?? current.files[0];
   const html = useMemo(() => buildPreview(current), [current]);
 
