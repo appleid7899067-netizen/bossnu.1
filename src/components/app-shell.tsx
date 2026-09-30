@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Menu, Phone, X } from "lucide-react";\nimport { ProjectFilesView } from "@/components/project-files-view";
+import { Menu, Phone, X } from "lucide-react";
+import { ProjectFilesView } from "@/components/project-files-view";
 import { Toaster, toast } from "sonner";
 import { AppBuilderView } from "@/components/app-builder-view";
 import { ChatThread, type SandboxRunView } from "@/components/chat-thread";
@@ -248,7 +249,9 @@ export function AppShell({ search }: { search: Search }) {
       }
       if (detection.webPreview && detection.code && ["html", "javascript", "css", "tailwind"].includes(detection.runtime)) {
         setSandboxRun({ runtime: detection.runtime, label: detection.label, command: "browser sandbox", status: "Preview พร้อมแล้ว", previewHtml: sandboxPreviewDocument(detection.runtime, detection.code) });
-        append("แสดง Live Preview ในแชตแล้วค่ะ\n\n");
+        append("แสดง Live Preview ในแชตแล้วค่ะ
+
+");
       }
       const agentSummary = await runAgentLoop({
         messages: history, signal: ac.signal, tools,
@@ -272,7 +275,9 @@ export function AppShell({ search }: { search: Search }) {
           };
           pushActivity({ kind: "phase", phase, label: detail || labels[phase] });
         },
-        onText: text => { if (text.startsWith("\n\n```sandbox")) return; append(text); speakRealtime(text); },
+        onText: text => { if (text.startsWith("
+
+```sandbox")) return; append(text); speakRealtime(text); },
         onSkillSaved: (path, saved) => pushActivity({ kind: "skill", path, status: saved ? "saved" : "failed" }),
         model: async (messages, onText) => {
           let failure = "";
@@ -288,8 +293,12 @@ export function AppShell({ search }: { search: Search }) {
       });
       if (!reply && !ac.signal.aborted) append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
     } catch (error) {
-      if (ac.signal.aborted) { append("\n\n⛔ หยุดการทำงานแล้ว"); }
-      else { const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด"; append(`\n\n${message}`); toast.error(message); }
+      if (ac.signal.aborted) { append("
+
+⛔ หยุดการทำงานแล้ว"); }
+      else { const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด"; append(`
+
+${message}`); toast.error(message); }
     } finally {
       flushReplyNow();
       finishVoice(); setBusyChat(false); setStreamingId(null);
@@ -530,7 +539,9 @@ export function AppShell({ search }: { search: Search }) {
           <Button variant="ghost" size="icon-sm" aria-label="Voice mode" onClick={() => setCallOpen(true)}><Phone className="size-5" /></Button>
         </header>
 
-        {view === "files" ? (\n          <ProjectFilesView workspaceId={agentWorkspaceIdFor(currentUser?.id, search.c ?? "default")} />\n        ) : view === "maps" ? (
+        {view === "files" ? (
+          <ProjectFilesView workspaceId={agentWorkspaceIdFor(currentUser?.id, search.c ?? "default")} />
+        ) : view === "maps" ? (
           <MindMapView
             maps={store.maps}
             active={activeMap}
@@ -609,7 +620,9 @@ export function AppShell({ search }: { search: Search }) {
                 contextualActions={quickActions}
                 toolActions={roomTools}
                 quickPrompts={store.quickPrompts}
-                onInsertPrompt={(prompt) => setDraft((prev) => [prev.trim(), prompt].filter(Boolean).join(prev.trim() ? "\n\n" : ""))}
+                onInsertPrompt={(prompt) => setDraft((prev) => [prev.trim(), prompt].filter(Boolean).join(prev.trim() ? "
+
+" : ""))}
                 activeTool={activeTool}
                 onToolAction={(tool) => {
                   setActiveTool(tool);
