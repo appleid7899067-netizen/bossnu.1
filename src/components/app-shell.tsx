@@ -127,9 +127,11 @@ export function AppShell({ search }: { search: Search }) {
     stopVoice(); go({ view: "chat", c: id });
     let reply = "";
     let queuedReply = "";
-    let replyFrame: number | null = null;
+    let replyTimer: number | null = null;
+    // Streaming must stay visually smooth without forcing Zustand + localStorage
+    // persistence on every animation frame. Batch UI commits at ~12fps.
     const flushReply = () => {
-      replyFrame = null;
+      replyTimer = null;
       if (!queuedReply) return;
       reply += queuedReply;
       queuedReply = "";
@@ -138,13 +140,13 @@ export function AppShell({ search }: { search: Search }) {
     const append = (text: string) => {
       if (!text) return;
       queuedReply += text;
-      if (replyFrame !== null) return;
-      replyFrame = window.requestAnimationFrame(flushReply);
+      if (replyTimer !== null) return;
+      replyTimer = window.setTimeout(flushReply, 80);
     };
     const flushReplyNow = () => {
-      if (replyFrame !== null) {
-        window.cancelAnimationFrame(replyFrame);
-        replyFrame = null;
+      if (replyTimer !== null) {
+        window.clearTimeout(replyTimer);
+        replyTimer = null;
       }
       if (queuedReply) {
         reply += queuedReply;
@@ -154,7 +156,7 @@ export function AppShell({ search }: { search: Search }) {
     };
     const pushActivity = (activity: PendingActivity, activityId = uid("activity")) => {
       const current = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
-      const next = [...current, { ...activity, id: uid("activity"), createdAt: Date.now() } as ChatActivity].slice(-120);
+      const next = [...current, { ...activity, id: activityId, createdAt: Date.now() } as ChatActivity].slice(-80);
       store.patchAssistant(id, assistantId, { activities: next });
     };
     const patchActivity = (activityId: string, patch: Partial<ChatActivity>) => {
@@ -163,12 +165,24 @@ export function AppShell({ search }: { search: Search }) {
     };
     const startStreamLog = (source: Extract<ChatActivity, { kind: "stream" }>["source"], label: string) => {
       const activityId = uid("stream");
-      pushActivity({ kind: "stream", source, status: "running", text: label, chars: 0 });
+      pushActivity({ kind: "stream", source, status: "running", text: label, chars: 0 }, activityId);
       return activityId;
     };
-    const updateStreamLog = (activityId: string, source: Extract<ChatActivity, { kind: "stream" }>["source"], status: Extract<ChatActivity, { kind: "stream" }>["status"], text: string, chars: number) => {
+    const streamLogTimers = new Map<string, number>();
+    const streamLogPending = new Map<string, { source: Extract<ChatActivity, { kind: "stream" }>["source"]; status: Extract<ChatActivity, { kind: "stream" }>["status"]; text: string; chars: number }>();
+    const flushStreamLog = (activityId: string) => {
+      streamLogTimers.delete(activityId);
+      const pending = streamLogPending.get(activityId);
+      if (!pending) return;
+      streamLogPending.delete(activityId);
       const current = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
-      store.patchAssistant(id, assistantId, { activities: current.map(activity => activity.id === activityId ? { ...activity, source, status, text: text.slice(-240), chars } as ChatActivity : activity) });
+      store.patchAssistant(id, assistantId, { activities: current.map(activity => activity.id === activityId ? { ...activity, ...pending, text: pending.text.slice(-240) } as ChatActivity : activity) });
+    };
+    const updateStreamLog = (activityId: string, source: Extract<ChatActivity, { kind: "stream" }>["source"], status: Extract<ChatActivity, { kind: "stream" }>["status"], text: string, chars: number) => {
+      streamLogPending.set(activityId, { source, status, text, chars });
+      const existing = streamLogTimers.get(activityId);
+      if (existing !== undefined) return;
+      streamLogTimers.set(activityId, window.setTimeout(() => flushStreamLog(activityId), 150));
     };
     const tools = executionRequested;
     const execute = async (call: RunCall) => {
