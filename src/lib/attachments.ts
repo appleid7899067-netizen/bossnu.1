@@ -3,7 +3,7 @@ import type { ChatAttachment, ChatMessage } from "@/lib/types";
 export const MAX_ATTACHMENTS = 4;
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 export const MAX_TOTAL_ATTACHMENT_BYTES = 50 * 1024 * 1024;
-export const MAX_MODEL_ATTACHMENT_CHARS = 40_000;
+export const MAX_MODEL_ATTACHMENT_CHARS = 24_000;
 
 const TEXT_EXTENSIONS = [
   "txt", "md", "markdown", "csv", "tsv", "json", "jsonl", "xml", "yaml", "yml", "toml", "ini", "env", "log",
@@ -69,7 +69,7 @@ export function messageForModel(message: Pick<ChatMessage, "content" | "attachme
   const blocks = message.attachments.map((file) => {
     const content = file.content.length <= MAX_MODEL_ATTACHMENT_CHARS
       ? file.content
-      : file.content.slice(0, 24_000) + "\n\n[...ตัดเนื้อหากลางไฟล์เพื่อไม่ให้เกิน context...]\n\n" + file.content.slice(-16_000);
+      : file.content.slice(0, 14_000) + "\n\n[...ตัดเนื้อหากลางไฟล์เพื่อไม่ให้เกิน context...]\n\n" + file.content.slice(-10_000);
     const fence = content.includes("```") ? "````" : "```";
     return "ไฟล์แนบ: " + file.name + " (" + formatBytes(file.size) + ")\n" + fence + fileExtension(file.name) + "\n" + content + "\n" + fence;
   });
