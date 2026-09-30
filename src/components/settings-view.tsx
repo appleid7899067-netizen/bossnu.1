@@ -559,43 +559,45 @@ function ProfilesPanel() {
 function VoicePanel({ supported, settings, onChange }: { supported: boolean; settings: VoiceSettings; onChange: (patch: Partial<VoiceSettings>) => void }) {
   const testVoice = () => {
     void import("@/lib/ai/voice").then(async ({ speakNow }) => {
-      await speakNow(settings.puterVoice === "ara"
-        ? "สวัสดีค่ะ นี่คือเสียง ARE จาก XAI กำลังทดสอบเสียงที่เลือกไว้ค่ะ"
-        : "สวัสดีค่ะ นี่คือเสียง EVE จาก XAI กำลังทดสอบเสียงที่เลือกไว้ค่ะ");
+      await speakNow("สวัสดีค่ะ นี่คือเสียงของสลี่จาก Browser กำลังทดสอบเสียงภาษาไทยค่ะ");
     });
   };
 
-  return <Panel title="ตั้งค่าเสียงสลี่" icon={Volume2} hint="ใช้ XAI Voice เท่านั้น">
+  return <Panel title="ตั้งค่าเสียงสลี่" icon={Volume2} hint="Browser SpeechSynthesis">
     <div className="space-y-4">
-      <Switch label="เปิดเสียงตอบกลับอัตโนมัติ" description="อ่านคำตอบออกเสียงระหว่างสตรีม" value={settings.enabled} onChange={(value) => onChange({ enabled: value, source: "puter", puterProvider: "xai" })} />
+      <Switch
+        label="เปิดเสียงตอบกลับอัตโนมัติ"
+        description="อ่านเฉพาะสรุปสุดท้ายหลัง Stream ทำงานเสร็จ"
+        value={settings.enabled}
+        onChange={(value) => onChange({ enabled: value, source: "device" })}
+      />
       <div className="grid gap-2 sm:grid-cols-2">
-        {[
-          { id: "eve", label: "EVE", description: "XAI Voice" },
-          { id: "ara", label: "ARE", description: "XAI Voice" },
-        ].map((voice) => (
+        {VOICE_MODE_OPTIONS.map((voice) => (
           <button key={voice.id} type="button"
-            onClick={() => onChange({ source: "puter", puterProvider: "xai", puterVoice: voice.id })}
-            className={cn("rounded-xl border p-3 text-left", settings.puterVoice === voice.id ? "border-primary bg-primary/10" : "border-border bg-clay/60")}>
-            <span className="block text-sm font-medium">💜 {voice.label}</span>
+            onClick={() => onChange({ mode: voice.id, source: "device" })}
+            className={cn("rounded-xl border p-3 text-left", settings.mode === voice.id ? "border-primary bg-primary/10" : "border-border bg-clay/60")}>
+            <span className="block text-sm font-medium">{voice.label}</span>
             <span className="mt-1 block text-xs text-muted">{voice.description}</span>
           </button>
         ))}
       </div>
-      <p className="text-xs text-muted">ไม่มีรายการเสียงอื่น และไม่โหลด voice list 1000+ รายการ</p>
-      <SliderRow
-        label="ความเร็วเสียง"
-        value={`${settings.rate.toFixed(2)}×`}
-        min="0.75"
-        max="1.50"
-        step="0.05"
-        current={settings.rate}
-        onChange={(rate) => onChange({ rate })}
-      />
-      <p className="text-[11px] text-subtle">ปรับความเร็วการเล่นเสียง XAI โดยไม่เปลี่ยนเสียง EVE / ARE</p>
-      <button type="button" onClick={testVoice} disabled={!supported} className="accent-gradient w-full rounded-xl px-4 py-2.5 text-sm font-medium text-primary-fg shadow-lg transition-transform hover:scale-[1.01] active:scale-[.99] disabled:opacity-40">🔊 ทดลองเสียง {settings.puterVoice === "ara" ? "ARE" : "EVE"}</button>
+      <p className="text-xs text-muted">ใช้เสียงภาษาไทยที่ Browser/อุปกรณ์มีให้ ไม่มี XAI หรือบริการ TTS ภายนอก</p>
+      <SliderRow label="ความเร็วเสียง" value={`${settings.rate.toFixed(2)}×`} min="0.75" max="1.50" step="0.05" current={settings.rate} onChange={(rate) => onChange({ rate, source: "device" })} />
+      <SliderRow label="ระดับเสียง" value={`${Math.round(settings.volume * 100)}%`} min="0" max="1" step="0.05" current={settings.volume} onChange={(volume) => onChange({ volume, source: "device" })} />
+      <button type="button" onClick={testVoice} disabled={!supported} className="accent-gradient w-full rounded-xl px-4 py-2.5 text-sm font-medium text-primary-fg shadow-lg transition-transform hover:scale-[1.01] active:scale-[.99] disabled:opacity-40">🔊 ทดลองเสียงสลี่</button>
+      {!supported ? <p className="text-center text-[11px] text-subtle">Browser นี้ไม่รองรับ SpeechSynthesis</p> : null}
     </div>
   </Panel>;
 }
+
+const VOICE_MODE_OPTIONS: Array<{ id: VoiceSettings["mode"]; label: string; description: string }> = [
+  { id: "cute", label: "😊 น่ารักใสๆ", description: "สดใส เป็นกันเอง" },
+  { id: "warm", label: "🥰 อ่อนโยนอบอุ่น", description: "นุ่ม ฟังสบาย" },
+  { id: "calm", label: "😌 สงบผ่อนคลาย", description: "ช้า ชัด ฟังง่าย" },
+  { id: "bright", label: "✨ ร่าเริงสดใส", description: "มีพลังแต่ไม่แหลม" },
+  { id: "special", label: "💜 ที่รักพิเศษ", description: "นุ่มลึก เป็นส่วนตัว" },
+  { id: "gentle", label: "🌸 ละมุนใจ", description: "อ่อนโยน นุ่มนวล" },
+];
 
 function SliderRow({ label, value, min, max, step, current, onChange }: { label: string; value: string; min: string; max: string; step: string; current: number; onChange: (v: number) => void }) {
   const fill = ((current - Number(min)) / (Number(max) - Number(min))) * 100;
