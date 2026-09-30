@@ -63,8 +63,6 @@ export function SettingsView({ workspaceId = "default" }: { workspaceId?: string
   const store = useAppStore();
   const [tab, setTab] = useState<SettingsTab>("appearance");
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => getVoiceSettings());
-  const [voiceList, setVoiceList] = useState<{ name: string; lang: string }[]>([]);
-  const [puterVoiceList, setPuterVoiceList] = useState<PuterVoiceOption[]>([]);
   const [newMemory, setNewMemory] = useState("");
   const [newAgent, setNewAgent] = useState("");
   const [saved, setSaved] = useState(false);
