@@ -226,7 +226,7 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .sali-summary,
 .sali-devlog {
   width: 100%;
-  max-width: 920px;
+  max-width: none;
   margin-top: 8px;
   box-sizing: border-box;
   overflow: hidden;
@@ -313,10 +313,10 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
   align-items: center;
   width: max-content;
   min-width: 100%;
-  min-height: 42px;
+  min-height: 52px;
   box-sizing: border-box;
   gap: 0;
-  padding: 8px 10px;
+  padding: 10px 14px;
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
@@ -341,7 +341,7 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
   display: inline-flex;
   align-items: center;
   min-height: 22px;
-  max-width: min(58vw, 520px);
+  max-width: min(68vw, 760px);
   color: var(--color-fg);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -365,7 +365,7 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 }
 
 .sali-flow-stream-text {
-  max-width: min(76vw, 720px);
+  max-width: min(82vw, 980px);
   overflow: hidden;
   text-overflow: clip;
 }
