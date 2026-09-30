@@ -290,6 +290,12 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
   overflow-wrap: anywhere;
   color: var(--color-fg);
 }
+.sali-stream-source {
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 8px;
+  letter-spacing: .06em;
+}
 .sali-log-runtime {
   margin-left: 5px;
   color: var(--color-primary);
