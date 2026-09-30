@@ -15,7 +15,7 @@ import { syncStatus } from "@/lib/workspace/sync.server";
 
 type Body = {
   workspaceId?: string;
-  action?: "list" | "read" | "write" | "delete" | "context" | "task" | "remember" | "sync-status";
+  action?: "list" | "project-list" | "read" | "write" | "delete" | "context" | "task" | "remember" | "sync-status";
   path?: string;
   content?: string;
   goal?: string;
@@ -64,7 +64,7 @@ export const Route = createFileRoute("/api/workspace")({
         try {
           const workspaceId = body.workspaceId || "default";
           const action = body.action || "list";
-          if (action === "context") {
+          if (action === "project-list") {\n            await ensureBossWorkspace(workspaceId);\n            return Response.json({ ok: true, files: await listWorkspaceFiles(workspaceId).then(files => files.filter(file => file.path.startsWith("project/"))) });\n          }\n          if (action === "context") {
             const goal = str(body.goal, 2000);
             await ensureBossWorkspace(workspaceId);
             const [files, memory] = await Promise.all([listWorkspaceFiles(workspaceId), recallWorkspaceMemory(workspaceId, goal)]);
