@@ -72,6 +72,7 @@ export function ProjectFilesView({ workspaceId }: { workspaceId: string }) {
   }, [selected, kind]);
   const source = mediaUrl || (selected && kind ? mediaSource(selected) : "");
   const isText = Boolean(selected && !kind);
+  const isHtml = Boolean(selected && /\.(html?|xhtml)$/i.test(selected.path));
   const dirty = selected ? draft !== selected.content : false;
 
   function select(path: string) {
@@ -154,7 +155,7 @@ export function ProjectFilesView({ workspaceId }: { workspaceId: string }) {
           {kind === "audio" ? <div className="w-full max-w-xl"><div className="mb-4 flex items-center gap-3"><Music2 className="size-5 text-primary" /><div><p className="text-sm font-medium">{selected.path}</p><p className="text-xs text-muted">แตะเล่นเสียงได้ทันที</p></div></div><audio controls preload="metadata" className="w-full" src={source} /></div> : kind === "video" ? <video controls playsInline className="max-h-[72vh] max-w-full rounded-xl" src={source} /> : <img src={source} alt={selected.path} className="max-h-[72vh] max-w-full rounded-xl object-contain" />}
         </div> : kind ? <div className="mx-auto max-w-4xl rounded-2xl bg-surface p-5"><p className="text-sm font-medium">{selected.path}</p><p className="mt-2 text-xs text-muted">ไฟล์สื่อนี้ถูกเก็บเป็นข้อมูลไฟล์ แต่ยังไม่มี URL/data URI สำหรับ Preview ในเบราว์เซอร์</p></div> : <div className="mx-auto max-w-5xl overflow-hidden rounded-2xl border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border px-3 py-2"><span className="truncate text-xs text-muted">{selected.path}</span>{dirty ? <span className="text-[11px] text-primary">มีการแก้ไขที่ยังไม่บันทึก</span> : <span className="text-[11px] text-subtle">บันทึกอัตโนมัติเมื่อกดบันทึก</span>}</div>
-          <textarea value={draft} onChange={e => setDraft(e.target.value)} spellCheck={false} className="min-h-[65vh] w-full resize-none bg-bg p-4 font-mono text-xs leading-6 text-fg outline-none" aria-label={"แก้ไข " + selected.path} />
+          {isHtml ? <div className="border-b border-border bg-bg p-3"><div className="mb-2 flex items-center justify-between"><span className="text-[11px] font-medium text-muted">Live Preview</span><span className="text-[10px] text-subtle">sandboxed</span></div><iframe title={"Preview " + selected.path} sandbox="allow-scripts" srcDoc={draft} className="h-[45vh] w-full rounded-xl border border-border bg-white" /></div> : null}<textarea value={draft} onChange={e => setDraft(e.target.value)} spellCheck={false} className="min-h-[65vh] w-full resize-none bg-bg p-4 font-mono text-xs leading-6 text-fg outline-none" aria-label={"แก้ไข " + selected.path} />
         </div>}
       </main>
     </div>
