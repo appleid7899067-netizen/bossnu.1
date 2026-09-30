@@ -492,6 +492,38 @@ ${message}`); toast.error(message); }
   }
 
   const mode: ChatMode = activeChat?.mode ?? "instant";
+  const builderWorkspaceId = agentWorkspaceIdFor(currentUser?.id, search.c ?? "default");
+
+  async function syncBuilderProject(project: import("@/lib/types").BuilderProject) {
+    const workspaceId = builderWorkspaceId;
+    const previous = useAppStore.getState().builderProject;
+    const previousPaths = new Set((previous?.files ?? []).map(file => `project/${file.path}`));
+    const nextPaths = new Set(project.files.map(file => `project/${file.path}`));
+    try {
+      // Builder, Project Files and Sandbox share one canonical workspace.
+      await Promise.all(project.files.map(file => fetch("/api/workspace", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId, action: "write", path: `project/${file.path}`, content: file.content }),
+      }).then(async response => {
+        const data = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+        if (!response.ok || !data?.ok) throw new Error(data?.error || `Workspace HTTP ${response.status}`);
+      })));
+      await Promise.all([...previousPaths].filter(path => !nextPaths.has(path)).map(path => fetch("/api/workspace", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId, action: "delete", path }),
+      }).then(async response => {
+        const data = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+        if (!response.ok || !data?.ok) throw new Error(data?.error || `Workspace HTTP ${response.status}`);
+      })));
+      store.setBuilderProject(project);
+      toast.success("บันทึกโปรเจกต์เข้า Workspace แล้ว");
+    } catch (error) {
+      store.setBuilderProject(project);
+      toast.error(error instanceof Error ? `ซิงก์ Workspace ไม่สำเร็จ: ${error.message}` : "ซิงก์ Workspace ไม่สำเร็จ");
+    }
+  }
 
   function contextualActions(text: string): string[] {
     const q = text.toLowerCase();
@@ -634,7 +666,8 @@ ${message}`); toast.error(message); }
         ) : view === "builder" ? (
           <AppBuilderView
             project={store.builderProject ?? undefined}
-            onProject={(project) => store.setBuilderProject(project)}
+            workspaceId={builderWorkspaceId}
+            onProject={(project) => { void syncBuilderProject(project); }}
             onReset={() => store.setBuilderProject(null)}
           />
         ) : view === "studio" ? (
