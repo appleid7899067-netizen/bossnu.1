@@ -577,7 +577,7 @@ ${message}`); toast.error(message); }
           />
         ) : (
           <>
-            {view === "settings" ? <SettingsView /> : null}
+            {view === "settings" ? <SettingsView workspaceId={agentWorkspaceIdFor(currentUser?.id, search.c ?? "default")} /> : null}
             {view === "settings" ? null : showDiscover ? (
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <Discover
