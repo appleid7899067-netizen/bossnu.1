@@ -63,7 +63,7 @@ export function AppShell({ search }: { search: Search }) {
   } | null>(null);
   const [voiceEnabled, setVoiceEnabledState] = useState(() => (typeof window === "undefined" ? true : getVoiceSettings().enabled));
   const [callOpen, setCallOpen] = useState(false);
-  const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [activeTool, setActiveTool] = useState<string | null>("auto");
   const abortRef = useRef<AbortController | null>(null);
 
   // Applies persisted theme / accent / font scale / motion to <html>.
@@ -122,7 +122,7 @@ export function AppShell({ search }: { search: Search }) {
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-    setDraft(""); setAttachments([]); setActiveTool(null); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
+    setDraft(""); setAttachments([]); setActiveTool("auto"); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
     stopVoice(); go({ view: "chat", c: id });
     let reply = "";
     let queuedReply = "";
@@ -598,12 +598,22 @@ ${message}`); toast.error(message); }
 
   const quickActions = contextualActions(draft);
   const roomTools = [
-    { id: "auto", label: "✨ Auto • ให้ Boss เลือกเครื่องมือ" },
-    { id: "sandbox", label: "💻 Sandbox • รัน / ทดสอบโค้ด" },
-    { id: "web", label: "🌐 Web • ค้นข้อมูลสด" },
-    { id: "github", label: "🐙 GitHub • ตรวจ / แก้ Repo" },
-    { id: "builder", label: "🧱 AI Builder • สร้างแอป" },
+    { id: "auto", label: "Auto • เลือกให้อัตโนมัติ" },
+    { id: "node", label: "Node • JavaScript" },
+    { id: "python", label: "Python • python3" },
+    { id: "bash", label: "Bash • Shell" },
+    { id: "html", label: "HTML • Live Preview" },
+    { id: "json", label: "JSON • Validate" },
   ];
+  const commandForTool = (text: string) => {
+    const value = text.trim();
+    if (!value || !activeTool || activeTool === "auto") return text;
+    if (activeTool === "node") return `node - <<'NODE'\n${value}\nNODE`;
+    if (activeTool === "python") return `python3 - <<'PY'\n${value}\nPY`;
+    if (activeTool === "html") return `\`\`\`html\n${value}\n\`\`\``;
+    if (activeTool === "json") return `\`\`\`json\n${value}\n\`\`\``;
+    return value;
+  };
   const showDiscover = view === "chat" && !activeChat?.messages.length;
 
   return (
@@ -776,7 +786,7 @@ ${message}`); toast.error(message); }
                 modelOptions={PUTER_MODELS}
                 onModelChange={store.setSelectedModel}
                 onChange={setDraft}
-                onSubmit={() => void send(draft, activeChat?.id, undefined, false, attachments)}
+                onSubmit={() => void send(commandForTool(draft), activeChat?.id, undefined, false, attachments)}
                 attachments={attachments}
                 onAttachments={setAttachments}
                 inputRef={composerRef}
@@ -790,15 +800,8 @@ ${message}`); toast.error(message); }
                 activeTool={activeTool}
                 onToolAction={(tool) => {
                   setActiveTool(tool);
-                  const prompts: Record<string, string> = {
-                    auto: "ทำงานแบบ Auto ให้ Boss เลือกเครื่องมือที่เหมาะสม",
-                    sandbox: "ใช้ Sandbox เพื่อรันและทดสอบงานนี้จริง",
-                    web: "ค้นข้อมูลสดจากเว็บและตรวจแหล่งข้อมูล",
-                    github: "ตรวจและทำงานกับ GitHub/Repo ที่เกี่ยวข้อง",
-                    builder: "ใช้โหมด AI Builder เพื่อสร้างหรือปรับแอปแบบครบวงจร",
-                  };
-                  const hint = prompts[tool];
-                  if (hint && !draft.trim()) setDraft(hint);
+                  // Runtime tabs only choose how the next message is wrapped;
+                  // they never replace the user's draft with hidden prompts.
                 }}
             voiceEnabled={voiceEnabled}
             onToggleVoice={() => {
