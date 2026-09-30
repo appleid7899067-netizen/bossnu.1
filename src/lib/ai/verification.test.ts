@@ -75,6 +75,8 @@ test("gate: failing run + 'done' answer is rejected, loop fixes, runs again and 
   assert.match(seen[2], /REPAIR LOOP — VERIFICATION GATE/);
   assert.match(seen[2], /inspect the failing file\/error/);
   assert.match(seen[2], /Do not merely explain the error/);
+  assert.match(seen[2], /REPAIR ACTION REQUIRED/);
+  assert.match(seen[2], /workspace/);
   // The premature "done" never reached the user; the verified one did.
   assert.equal(output.split("เสร็จแล้วค่ะ").length - 1, 1);
   assert.ok(output.trimEnd().endsWith("เสร็จแล้วค่ะ"));
