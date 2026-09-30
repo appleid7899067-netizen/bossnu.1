@@ -90,6 +90,12 @@ export const Route = createFileRoute("/api/workspace")({
             await rememberWorkspace(workspaceId, key, body.value.slice(0, 8000), str(body.source, 40) || "conversation");
             return Response.json({ ok: true });
           }
+          if (action === "recall") {
+            const goal = str(body.goal, 4000);
+            await ensureBossWorkspace(workspaceId);
+            const memory = await recallWorkspaceMemory(workspaceId, goal, Math.min(Math.max(Number(body.limit) || 24, 1), 60));
+            return Response.json({ ok: true, memory });
+          }
           if (action === "journal") {
             const date = new Date().toISOString().slice(0, 10);
             const entry = str(body.value, 120000);
