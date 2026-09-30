@@ -220,17 +220,6 @@ function MessageBubble({
         {empty && !live && !message.activities?.length ? (
           <p className="text-sm font-medium text-muted">กำลังดำเนินการ...</p>
         ) : null}
-        {live && /```(?:html|htm)\b/i.test(message.content) ? (
-          <section className="sali-summary sali-live-html-card" aria-label="ตัวอย่าง HTML ระหว่างสตรีมสด">
-            <div className="sali-summary-head">
-              <span className="sali-live-cursor" aria-hidden="true" />
-              <span>HTML / LIVE PREVIEW</span>
-            </div>
-            <div className="sali-summary-body break-words [overflow-wrap:anywhere]">
-              <Markdown text={message.content} live />
-            </div>
-          </section>
-        ) : null}
         {!live && message.content ? (
           <section className="sali-summary" aria-label="สรุปคำตอบของสลี่">
             <div className="sali-summary-head">
@@ -399,29 +388,32 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
               </span>
             </span>
           ))}
-          {liveText ? (
-            <span className="sali-flow-item sali-flow-current" aria-live="polite">
-              {visible.length ? <span className="sali-flow-arrow" aria-hidden="true">→</span> : null}
-              <span className="sali-flow-token sali-flow-live sali-flow-stream-text">
-                {liveText}<span className="sali-terminal-caret" />
-              </span>
-            </span>
-          ) : null}
           {live ? (
             <span className="sali-flow-item sali-flow-current" aria-live="polite">
-              {(visible.length || liveText) ? <span className="sali-flow-arrow" aria-hidden="true">→</span> : null}
+              {visible.length ? <span className="sali-flow-arrow" aria-hidden="true">→</span> : null}
               <span className="sali-flow-token sali-flow-live">กำลังประมวลผล<span className="sali-terminal-caret" /></span>
             </span>
           ) : null}
         </div>
 
         {live ? (
-          <div className="sali-devlog-terminal" aria-label="terminal logs code stream">
-            <span className="sali-devlog-prompt">›</span>
-            <span>terminal / logs / code stream</span>
-            <span className="sali-devlog-trail" aria-hidden="true" />
-            <span className="sali-terminal-caret" />
-          </div>
+          liveText ? (
+            <div className="sali-stream-output" aria-label="HTML live stream" aria-live="polite">
+              <div className="sali-stream-output-head">
+                <span className="sali-stream-output-tab">สตรีมสด</span>
+                <span>HTML / CODE</span>
+                <span className="sali-live-cursor" aria-hidden="true" />
+              </div>
+              <div className="sali-stream-output-body"><Markdown text={liveText} live /></div>
+            </div>
+          ) : (
+            <div className="sali-devlog-terminal" aria-label="terminal logs code stream">
+              <span className="sali-devlog-prompt">›</span>
+              <span>กำลังเตรียม HTML / code stream</span>
+              <span className="sali-devlog-trail" aria-hidden="true" />
+              <span className="sali-terminal-caret" />
+            </div>
+          )
         ) : (
           <div className="sali-devlog-complete" role="status">
             <div className="sali-complete-rule"><span>งานเสร็จแล้ว</span></div>
