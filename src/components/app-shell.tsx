@@ -330,7 +330,7 @@ export function AppShell({ search }: { search: Search }) {
           };
           pushActivity({ kind: "phase", phase, label: detail || labels[phase] });
         },
-        onText: text => { if (text.startsWith("\\n\\n```sandbox")) return; append(text); speakRealtime(text); },
+        onText: text => { if (text.startsWith("\\n\\n```sandbox")) return; append(text); },
         onSkillSaved: (path, saved) => pushActivity({ kind: "skill", path, status: saved ? "saved" : "failed" }),
         model: async (messages, onText) => {
           let failure = "";
@@ -369,7 +369,7 @@ ${message}`); toast.error(message); }
     } finally {
       flushReplyNow();
       await persistJournal();
-      finishVoice(); setBusyChat(false); setStreamingId(null);
+      finishVoice();\n      if (reply.trim() && !ac.signal.aborted) await speakNow(reply);\n      setBusyChat(false); setStreamingId(null);
     }
   }
 
