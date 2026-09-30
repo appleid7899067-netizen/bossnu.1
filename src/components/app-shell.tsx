@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Menu, Phone, X } from "lucide-react";
+import { Menu, Phone, X } from "lucide-react";\nimport { ProjectFilesView } from "@/components/project-files-view";
 import { Toaster, toast } from "sonner";
 import { AppBuilderView } from "@/components/app-builder-view";
 import { ChatThread, type SandboxRunView } from "@/components/chat-thread";
@@ -252,7 +252,7 @@ export function AppShell({ search }: { search: Search }) {
       }
       const agentSummary = await runAgentLoop({
         messages: history, signal: ac.signal, tools,
-        maxRuns: 6,
+        maxRuns: 11,
         execute,
         executeGithub,
         initialCall,
@@ -530,7 +530,7 @@ export function AppShell({ search }: { search: Search }) {
           <Button variant="ghost" size="icon-sm" aria-label="Voice mode" onClick={() => setCallOpen(true)}><Phone className="size-5" /></Button>
         </header>
 
-        {view === "maps" ? (
+        {view === "files" ? (\n          <ProjectFilesView workspaceId={agentWorkspaceIdFor(currentUser?.id, search.c ?? "default")} />\n        ) : view === "maps" ? (
           <MindMapView
             maps={store.maps}
             active={activeMap}
