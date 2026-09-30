@@ -14,7 +14,7 @@ const STARTER: BuilderProject = {
   updatedAt: Date.now(),
 };
 
-export function AppBuilderView({ project, workspaceId, onProject, onReset }: { project?: BuilderProject; workspaceId?: string; onProject: (project: BuilderProject) => void; onReset?: () => void }) {
+export function AppBuilderView({ project, workspaceId, onProject, onReset }: { project?: BuilderProject; workspaceId?: string; onProject: (project: BuilderProject, persist?: boolean) => void; onReset?: () => void }) {
   const current = project ?? STARTER;
   const [prompt, setPrompt] = useState("");
   const [selected, setSelected] = useState(current.entry);
@@ -45,7 +45,7 @@ export function AppBuilderView({ project, workspaceId, onProject, onReset }: { p
       const base = project ?? STARTER;
       const entry = files.some(file => file.path === base.entry) ? base.entry : (files.some(file => file.path === "index.html") ? "index.html" : files[0]?.path);
       if (!entry) return;
-      onProject({ ...base, files, entry, updatedAt: Date.now() });
+      onProject({ ...base, files, entry, updatedAt: Date.now() }, false);
       setSelected(entry);
     }).catch(() => undefined);
     return () => { cancelled = true; };
