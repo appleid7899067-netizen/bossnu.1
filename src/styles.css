@@ -300,10 +300,27 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .sali-devlog {
   margin-top: 0;
   margin-bottom: 12px;
-  font-family: "Fira Code", "JetBrains Mono", "IBM Plex Mono", "Noto Sans Thai", ui-monospace, monospace;
-  font-size: 9px;
-  line-height: 1.45;
+  padding: 16px;
+  border: 0;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--color-elevated) 94%, #202020);
+  font-family: ui-sans-serif, system-ui, "Noto Sans Thai", sans-serif;
+  font-size: 12px;
+  line-height: 1.55;
 }
+
+.sali-devlog .sali-devlog-head {
+  min-height: auto;
+  padding: 2px 2px 13px;
+  border: 0;
+  font-family: inherit;
+  font-size: 15px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.sali-devlog .sali-devlog-title { color: var(--color-fg); font-weight: 650; }
+.sali-devlog .sali-devlog-headline { display: none; }
 
 .sali-devlog-body {
   min-width: 0;
@@ -312,17 +329,19 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .sali-devlog-flow {
   display: flex;
   align-items: center;
-  width: max-content;
-  min-width: 100%;
-  min-height: 52px;
+  width: 100%;
+  min-height: 38px;
   box-sizing: border-box;
   gap: 0;
-  padding: 10px 14px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
   overflow-x: auto;
   overflow-y: hidden;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-bg) 48%, transparent);
   overscroll-behavior-x: contain;
   white-space: nowrap;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
 .sali-flow-item {
@@ -376,37 +395,62 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 }
 
 .sali-stream-output {
-  margin: 0 10px 10px;
+  margin: 0;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--color-border) 86%, transparent);
+  border: 1px solid #303030;
   border-radius: 16px;
   background: #121212;
   color: #eeeeee;
   box-shadow: 0 12px 30px rgba(0, 0, 0, .2);
 }
 
+.sali-stream-expanded {
+  position: fixed;
+  inset: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border-radius: 20px;
+  box-shadow: 0 30px 100px rgba(0, 0, 0, .72);
+}
+
+.sali-stream-expanded .sali-stream-log { max-height: none; flex: 1; }
+
 .sali-stream-output-head {
   display: flex;
-  min-height: 46px;
+  min-height: 54px;
   align-items: center;
+  justify-content: space-between;
   gap: 9px;
   padding: 7px 10px;
   border-bottom: 1px solid #2b2b2b;
   color: #999;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .04em;
 }
 
-.sali-stream-output-head .sali-live-cursor { margin-left: auto; }
+.sali-stream-tabs { display: flex; align-items: center; gap: 3px; }
+.sali-stream-tabs button {
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: #aaa;
+  font-size: 13px;
+  font-weight: 650;
+  transition: background .18s ease, color .18s ease;
+}
+.sali-stream-tabs button[data-active="true"] { background: #050505; color: #fff; }
 
-.sali-stream-output-tab {
+.sali-stream-actions { display: flex; align-items: center; gap: 2px; }
+.sali-stream-actions button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
   border-radius: 9px;
-  background: #050505;
-  padding: 7px 11px;
-  color: #fff;
-  font-size: 11px;
+  color: #929292;
+  transition: background .18s ease, color .18s ease;
 }
+.sali-stream-actions button:hover { background: #292929; color: #fff; }
+.sali-stream-actions svg { width: 17px; height: 17px; }
 
 .sali-stream-command {
   display: flex;
@@ -523,9 +567,15 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
   .sali-summary-body { padding: 20px 18px; }
   .sali-summary-body .assistant-prose { gap: 16px; font-size: 15px; line-height: 1.75; }
 
+  .sali-devlog {
+    padding: 18px;
+    border-radius: 24px;
+  }
+
   .sali-devlog-flow {
     min-height: 38px;
-    padding: 7px 8px;
+    margin-bottom: 14px;
+    padding: 8px 9px;
   }
 
   .sali-flow-arrow { padding: 0 5px; }
@@ -537,8 +587,9 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 
   .sali-flow-stream-text { max-width: 84vw; }
 
-  .sali-stream-output { margin: 0 8px 8px; border-radius: 15px; }
-  .sali-stream-log { min-height: 230px; max-height: 48vh; font-size: 10.5px; }
+  .sali-stream-output { margin: 0; border-radius: 16px; }
+  .sali-stream-log { min-height: 260px; max-height: 48vh; font-size: 11px; }
+  .sali-stream-command { font-size: 10.5px; }
 
   .sali-devlog-terminal {
     min-height: 23px;

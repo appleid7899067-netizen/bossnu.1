@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, Check, Copy, FileText, Pencil, RefreshCw, Trash2, Volume2 } from "lucide-react";
+import { ArrowDown, Check, Copy, Download, FileText, Maximize2, Minimize2, Pencil, RefreshCw, Trash2, Volume2 } from "lucide-react";
 import { formatBytes } from "@/lib/attachments";
 import { Markdown } from "@/components/markdown";
 import type { ChatActivity, ChatMessage } from "@/lib/types";
@@ -328,22 +328,52 @@ function ContextualReplyActions({ onAction }: { text: string; onAction: (action:
 
 function LiveExecutionLog({ command, output, fallback }: { command?: string; output?: string; fallback?: string }) {
   const logRef = useRef<HTMLPreElement>(null);
+  const [tab, setTab] = useState<"preview" | "code">("preview");
+  const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const text = output?.trimEnd() || fallback?.trimEnd() || "กำลังรอข้อมูลจาก Sandbox…";
+  const visibleText = tab === "code" && command ? command : text;
 
   useEffect(() => {
     const element = logRef.current;
-    if (element) element.scrollTop = element.scrollHeight;
-  }, [text]);
+    if (element && tab === "preview") element.scrollTop = element.scrollHeight;
+  }, [text, tab]);
+
+  async function copyLog() {
+    try {
+      await navigator.clipboard.writeText(visibleText);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      // Clipboard can be unavailable inside embedded previews.
+    }
+  }
+
+  function downloadLog() {
+    const blob = new Blob([visibleText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = tab === "code" ? "sali-command.sh" : "sali-live-output.log";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
-    <div className="sali-stream-output" aria-label="บันทึกการทำงานสด" aria-live="polite">
+    <div className={`sali-stream-output${expanded ? " sali-stream-expanded" : ""}`} aria-label="บันทึกการทำงานสด" aria-live="polite">
       <div className="sali-stream-output-head">
-        <span className="sali-stream-output-tab">Live logs</span>
-        <span>TERMINAL / OUTPUT</span>
-        <span className="sali-live-cursor" aria-hidden="true" />
+        <div className="sali-stream-tabs">
+          <button type="button" data-active={tab === "preview"} onClick={() => setTab("preview")}>ตัวอย่าง</button>
+          <button type="button" data-active={tab === "code"} onClick={() => setTab("code")}>โค้ด</button>
+        </div>
+        <div className="sali-stream-actions">
+          <button type="button" onClick={() => void copyLog()} aria-label="คัดลอก">{copied ? <Check /> : <Copy />}</button>
+          <button type="button" onClick={downloadLog} aria-label="ดาวน์โหลด"><Download /></button>
+          <button type="button" onClick={() => setExpanded(value => !value)} aria-label={expanded ? "ย่อ" : "ขยาย"}>{expanded ? <Minimize2 /> : <Maximize2 />}</button>
+        </div>
       </div>
-      {command ? <div className="sali-stream-command"><span>$</span>{command}</div> : null}
-      <pre ref={logRef} className="sali-stream-log"><code>{text}</code><span className="sali-terminal-caret" /></pre>
+      {tab === "preview" && command ? <div className="sali-stream-command"><span>$</span>{command}</div> : null}
+      <pre ref={logRef} className="sali-stream-log"><code>{visibleText}</code>{tab === "preview" ? <span className="sali-terminal-caret" /> : null}</pre>
     </div>
   );
 }
@@ -386,7 +416,7 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
   return (
     <section aria-label="SALI live stream" className="sali-devlog mb-3">
       <div className="sali-devlog-head">
-        <span className="sali-devlog-title">SALI / {live ? "LIVE" : "DONE"}</span>
+        <span className="sali-devlog-title">{live ? "กำลังทำงานให้คุณอยู่ค่ะ ✨" : "ทำงานเสร็จแล้วค่ะ ✨"}</span>
         <span className="sali-devlog-headline" aria-hidden="true" />
         {live ? <span className="sali-live-cursor" aria-label="กำลังทำงาน" /> : <span className="sali-summary-mark" aria-label="เสร็จแล้ว">✓</span>}
       </div>
