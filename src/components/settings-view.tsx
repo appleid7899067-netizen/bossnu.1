@@ -572,75 +572,33 @@ function ProfilesPanel() {
 
 /* ---------------------------------- Voice ---------------------------------- */
 
-function VoicePanel({ supported, settings, voices, puterVoices, onChange }: { supported: boolean; settings: VoiceSettings; voices: { name: string; lang: string }[]; puterVoices: PuterVoiceOption[]; onChange: (patch: Partial<VoiceSettings>) => void }) {
-  const thaiVoices = voices.filter((voice) => /^th(-|_)/i.test(voice.lang) || /thai/i.test(voice.name));
-  const options = thaiVoices.length ? thaiVoices : voices;
+function VoicePanel({ supported, settings, onChange }: { supported: boolean; settings: VoiceSettings; onChange: (patch: Partial<VoiceSettings>) => void }) {
   const testVoice = () => {
-    if (settings.source === "puter") {
-      void import("@/lib/ai/voice").then(async ({ speakNow }) => { await speakNow("สวัสดีค่ะ นี่คือเสียงสลี่จาก Puter กำลังทดสอบเสียงที่เลือกไว้ค่ะ"); });
-      return;
-    }
-    if (!supported) return;
-    window.speechSynthesis.cancel();
-    const samples: Record<string, string> = { cute: "สวัสดีค่ะที่รัก วันนี้เรามาคุยกันให้สนุกนะคะ", warm: "ไม่เป็นไรนะคะ ค่อยๆ เล่าให้สลี่ฟังได้เลย", calm: "หายใจเข้าช้าๆ แล้วพักผ่อนอย่างสบายใจนะคะ", bright: "อรุณสวัสดิ์ค่ะ วันนี้เราทำให้สำเร็จไปด้วยกันนะคะ", special: "ที่รักคะ สลี่อยู่ตรงนี้และพร้อมฟังคุณเสมอค่ะ", deep: "สรุปสำคัญคือ เราจะทำทีละขั้นและตรวจสอบผลให้เรียบร้อยค่ะ" };
-    const utterance = new SpeechSynthesisUtterance(samples[settings.mode] ?? samples.warm);
-    utterance.lang = "th-TH";
-    utterance.rate = settings.rate;
-    utterance.pitch = settings.pitch;
-    utterance.volume = settings.volume;
-    const voice = voices.find((item) => item.name === settings.voiceName) ?? thaiVoices[0];
-    if (voice) utterance.voice = window.speechSynthesis.getVoices().find((item) => item.name === voice.name) ?? null;
-    window.speechSynthesis.speak(utterance);
+    void import("@/lib/ai/voice").then(async ({ speakNow }) => {
+      await speakNow(settings.puterVoice === "ara"
+        ? "สวัสดีค่ะ นี่คือเสียง ARE จาก XAI กำลังทดสอบเสียงที่เลือกไว้ค่ะ"
+        : "สวัสดีค่ะ นี่คือเสียง EVE จาก XAI กำลังทดสอบเสียงที่เลือกไว้ค่ะ");
+    });
   };
 
-  return <Panel title="ตั้งค่าเสียงสลี่" icon={Volume2} hint="ค่าจะบันทึกในเครื่องทันที">
+  return <Panel title="ตั้งค่าเสียงสลี่" icon={Volume2} hint="ใช้ XAI Voice เท่านั้น">
     <div className="space-y-4">
-      {!supported ? <div className="rounded-xl border border-border bg-clay p-3 text-sm text-muted">เบราว์เซอร์นี้ยังไม่รองรับเสียงพูดแบบ Speech Synthesis</div> : null}
-      <Switch label="เปิดเสียงตอบกลับอัตโนมัติ" description="อ่านคำตอบออกเสียงระหว่างสตรีม" value={settings.enabled} onChange={(value) => onChange({ enabled: value })} />
+      <Switch label="เปิดเสียงตอบกลับอัตโนมัติ" description="อ่านคำตอบออกเสียงระหว่างสตรีม" value={settings.enabled} onChange={(value) => onChange({ enabled: value, source: "puter", puterProvider: "xai" })} />
       <div className="grid gap-2 sm:grid-cols-2">
-        <button type="button" onClick={() => onChange({ source: "device" })} className={cn("rounded-xl border p-3 text-left", settings.source === "device" ? "border-primary bg-primary/10" : "border-border bg-clay/60")}>
-          <span className="block text-sm font-medium">📱 เสียงจากเครื่อง</span>
-          <span className="mt-1 block text-xs text-muted">ไม่ใช้โควตา Puter</span>
-        </button>
-        <button type="button" onClick={() => onChange({ source: "puter" })} className={cn("rounded-xl border p-3 text-left", settings.source === "puter" ? "border-primary bg-primary/10" : "border-border bg-clay/60")}>
-          <span className="block text-sm font-medium">💜 Puter AI Voice</span>
-          <span className="mt-1 block text-xs text-muted">{puterVoices.length ? puterVoices.length + " เสียงที่ดึงได้" : "กำลังค้นหาเสียง..."}</span>
-        </button>
+        {[
+          { id: "eve", label: "EVE", description: "XAI Voice" },
+          { id: "ara", label: "ARE", description: "XAI Voice" },
+        ].map((voice) => (
+          <button key={voice.id} type="button"
+            onClick={() => onChange({ source: "puter", puterProvider: "xai", puterVoice: voice.id })}
+            className={cn("rounded-xl border p-3 text-left", settings.puterVoice === voice.id ? "border-primary bg-primary/10" : "border-border bg-clay/60")}>
+            <span className="block text-sm font-medium">💜 {voice.label}</span>
+            <span className="mt-1 block text-xs text-muted">{voice.description}</span>
+          </button>
+        ))}
       </div>
-
-      <div>
-        <p className="mb-2 text-sm font-medium">โหมดเสียง</p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {VOICE_MODES.map((mode) => (
-            <button key={mode.id} type="button" onClick={() => { applyVoiceMode(mode.id); onChange({ mode: mode.id, rate: mode.rate, pitch: mode.pitch }); }} className={cn("card-lift rounded-xl border p-3 text-left", settings.mode === mode.id ? "border-primary bg-primary/10 text-fg shadow-[0_0_0_3px_var(--accent-soft)]" : "border-border bg-clay/60 text-muted hover:text-fg")}>
-              <span className="text-sm font-medium">{mode.label}</span>
-              <span className="mt-1 block text-xs leading-relaxed opacity-75">{mode.description}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-      <SliderRow label="ความเร็ว" value={`${settings.rate.toFixed(2)}×`} min="0.7" max="1.3" step="0.01" current={settings.rate} onChange={(rate) => onChange({ rate })} />
-      <SliderRow label="โทนเสียง" value={settings.pitch.toFixed(2)} min="0.7" max="1.5" step="0.01" current={settings.pitch} onChange={(pitch) => onChange({ pitch })} />
-      <SliderRow label="ระดับเสียง" value={`${Math.round(settings.volume * 100)}%`} min="0.2" max="1" step="0.01" current={settings.volume} onChange={(volume) => onChange({ volume })} />
-      {settings.source === "puter" ? (
-        <label className="block text-sm text-muted">เสียง Puter
-          <select value={settings.puterVoice} onChange={(e) => {
-            const selected = puterVoices.find((voice) => voice.id === e.target.value);
-            onChange({ puterVoice: e.target.value, puterProvider: selected?.provider ?? settings.puterProvider });
-          }} className="mt-1 w-full rounded-xl border border-border bg-clay px-3 py-2.5 text-fg outline-none focus:border-primary/50">
-            <option value="">เลือกเสียง</option>
-            {puterVoices.map((voice) => <option key={voice.provider + ":" + voice.id} value={voice.id}>{voice.name} · {voice.provider} · {voice.language}</option>)}
-          </select>
-        </label>
-      ) : null}
-      {settings.source === "device" ? <label className="block text-sm text-muted">เสียงภาษาไทย
-        <select value={settings.voiceName} onChange={(e) => onChange({ voiceName: e.target.value })} className="mt-1 w-full rounded-xl border border-border bg-clay px-3 py-2.5 text-fg outline-none transition-all focus:border-primary/50 focus:shadow-[0_0_0_3px_var(--accent-soft)]">
-          <option value="">เลือกอัตโนมัติ</option>
-          {options.map((voice) => <option key={voice.name + voice.lang} value={voice.name}>{voice.name} · {voice.lang}</option>)}
-        </select>
-      </label> : null}
-      <button type="button" onClick={testVoice} disabled={!supported} className="accent-gradient w-full rounded-xl px-4 py-2.5 text-sm font-medium text-primary-fg shadow-lg transition-transform hover:scale-[1.01] active:scale-[.99] disabled:opacity-40">🔊 ทดลองเสียงสลี่</button>
-      <p className="text-xs leading-relaxed text-subtle">ค่าจะบันทึกในเครื่องทันที และมีผลกับเสียงระหว่างการตอบแบบสตรีมด้วย</p>
+      <p className="text-xs text-muted">ไม่มีรายการเสียงอื่น และไม่โหลด voice list 1000+ รายการ</p>
+      <button type="button" onClick={testVoice} disabled={!supported} className="accent-gradient w-full rounded-xl px-4 py-2.5 text-sm font-medium text-primary-fg shadow-lg transition-transform hover:scale-[1.01] active:scale-[.99] disabled:opacity-40">🔊 ทดลองเสียง {settings.puterVoice === "ara" ? "ARE" : "EVE"}</button>
     </div>
   </Panel>;
 }
