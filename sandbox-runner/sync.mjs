@@ -18,6 +18,10 @@ export const LIMITS = {
 };
 
 export const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex");
+export const sha256Buffer = (buffer) => createHash("sha256").update(buffer).digest("hex");
+const BINARY_PREFIX = "BOSSNU_BINARY_HEX:";
+function encodeBinary(buffer) { return BINARY_PREFIX + buffer.toString("hex"); }
+function decodeBinary(content) { if (typeof content !== "string" || !content.startsWith(BINARY_PREFIX)) return null; try { return Buffer.from(content.slice(BINARY_PREFIX.length), "hex"); } catch { return null; } }
 
 export function manifestHash(entries) {
   return sha256(entries.map((e) => `${e.path}\u0000${e.sha256}`).sort().join("\n"));
@@ -61,11 +65,11 @@ export async function snapshotWorkspace(root, limits = LIMITS) {
       if (files.length >= limits.maxFiles || totalBytes + info.size > limits.maxTotalBytes) { skipped.push({ path, reason: "budget", size: info.size }); continue; }
       const buffer = await readFile(full).catch(() => null);
       if (!buffer) { skipped.push({ path, reason: "unreadable" }); continue; }
-      if (buffer.includes(0)) { skipped.push({ path, reason: "binary", size: info.size }); continue; }
-      const content = buffer.toString("utf8");
-      if (Buffer.byteLength(content, "utf8") !== buffer.length) { skipped.push({ path, reason: "not-utf8", size: info.size }); continue; }
+      const text = buffer.toString("utf8");
+      const isUtf8 = !buffer.includes(0) && Buffer.byteLength(text, "utf8") === buffer.length;
+      const content = isUtf8 ? text : encodeBinary(buffer);
       totalBytes += buffer.length;
-      files.push({ path, content, sha256: sha256(content), size: buffer.length });
+      files.push({ path, content, sha256: sha256Buffer(buffer), size: buffer.length });
     }
   }
 
@@ -107,7 +111,8 @@ export async function reconcileSeed({ dir, fresh, files, base }) {
   for (const item of Array.isArray(files) ? files : []) {
     if (!item || typeof item.content !== "string") continue;
     const rel = projectRelative(item.path);
-    if (!rel || Buffer.byteLength(item.content, "utf8") > LIMITS.maxFileBytes) { report.rejected.push(String(item?.path)); continue; }
+    const decoded = decodeBinary(item.content);
+    if (!rel || (decoded ? decoded.length : Buffer.byteLength(item.content, "utf8")) > LIMITS.maxFileBytes) { report.rejected.push(String(item?.path)); continue; }
     neon.set(item.path, item.content);
   }
   const baseMap = base && typeof base === "object" && !Array.isArray(base) ? base : null;
@@ -116,8 +121,9 @@ export async function reconcileSeed({ dir, fresh, files, base }) {
   for (const path of [...all].sort()) {
     const target = join(dir, "project", projectRelative(path));
     const content = neon.get(path);
-    const n = content === undefined ? undefined : sha256(content);
-    const write = async () => { await mkdir(dirname(target), { recursive: true }); await writeFile(target, content, "utf8"); report.written.push(path); };
+    const decoded = content === undefined ? undefined : decodeBinary(content);
+    const n = content === undefined ? undefined : decoded ? sha256Buffer(decoded) : sha256(content);
+    const write = async () => { await mkdir(dirname(target), { recursive: true }); if (decoded) await writeFile(target, decoded); else await writeFile(target, content, "utf8"); report.written.push(path); };
     if (fresh) { if (content !== undefined) await write(); continue; }
     const d = await diskHash(target);
     if (!baseMap) { if (content !== undefined && d === undefined) await write(); continue; }
