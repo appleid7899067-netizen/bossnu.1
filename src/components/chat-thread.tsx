@@ -71,7 +71,7 @@ export function ChatThread({
 
   return (
     <div ref={scroller} onScroll={onScroll} className="chat-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
-      <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col gap-5 px-3 py-5 sm:px-5 sm:py-7 lg:px-7">
+      <div className="flex w-full min-w-0 flex-col gap-4 px-0 py-4 sm:gap-5 sm:py-5">
         {messages.length === 0 ? (
           <div className="flex min-h-[45vh] items-center justify-center text-center">
             <p className="text-sm text-muted">เริ่มคุยกับสลี่ได้เลยค่ะ</p>
