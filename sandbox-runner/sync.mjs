@@ -14,7 +14,7 @@ export const LIMITS = {
   maxPaths: Number(process.env.SYNC_MAX_PATHS) || 5000,
   maxFiles: Number(process.env.SYNC_MAX_FILES) || 800,
   maxFileBytes: Number(process.env.SYNC_MAX_FILE_BYTES) || 2 * 1024 * 1024,
-  maxTotalBytes: Number(process.env.SYNC_MAX_TOTAL_BYTES) || 20 * 1024 * 1024;
+  maxTotalBytes: Number(process.env.SYNC_MAX_TOTAL_BYTES) || 20 * 1024 * 1024,
 };
 
 export const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex");
