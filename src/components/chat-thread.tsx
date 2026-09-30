@@ -268,6 +268,41 @@ function MessageBubble({
 }
 
 
+function CopyLine({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  }
+  return <button type="button" onClick={() => void copy()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-fg" aria-label={copied ? "คัดลอกแล้ว" : "คัดลอกคำตอบ"} title={copied ? "คัดลอกแล้ว" : "คัดลอกคำตอบ"}>
+    {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+    {copied ? "คัดลอกแล้ว" : "คัดลอก"}
+  </button>;
+}
+
+function ListenLine({ text }: { text: string }) {
+  const [listening, setListening] = useState(false);
+  async function listen() {
+    if (listening) { stopVoice(); setListening(false); return; }
+    setListening(true);
+    try { await speakNow(text); } finally { setListening(false); }
+  }
+  return <button type="button" onClick={() => void listen()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-fg" aria-label={listening ? "หยุดอ่าน" : "ฟังคำตอบ"} title={listening ? "หยุดอ่าน" : "ฟังคำตอบ"}>
+    <Volume2 className="size-3.5" />{listening ? "หยุด" : "ฟัง"}
+  </button>;
+}
+
+function ContextualReplyActions({ onAction }: { text: string; onAction: (action: string) => void }) {
+  const actions = [{ id: "shorter", label: "สั้นลง" }, { id: "expand", label: "ขยาย" }, { id: "simplify", label: "อธิบายง่ายๆ" }];
+  return <div className="mt-3 flex items-center gap-1">
+    {actions.map((action) => <button key={action.id} type="button" onClick={() => onAction(action.id)} className="inline-flex h-8 items-center rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-fg" aria-label={action.label} title={action.label}>{action.label}</button>)}
+  </div>;
+}
+
+
 const PHASE_TITLES: Record<string, string> = {
   goal: "Goal • เป้าหมาย",
   plan: "Plan • วางแผน",
