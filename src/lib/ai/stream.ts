@@ -27,8 +27,9 @@ export async function ensurePuterSignedIn() {
 const CONTEXT_CHAR_BUDGET = 48_000;
 const CONTEXT_RECENT_MESSAGES = 18;
 const RETRY_DELAYS_MS = [350, 800, 1600];
-const DUAL_QWEN_MODEL = "qwen/qwen3-coder-flash";
-const DUAL_DEEPSEEK_MODEL = "deepseek/deepseek-v4-flash:free";
+const QWEN_ACTOR_MODEL = "qwen/qwen3-coder-flash";
+const QWEN_VERIFIER_MODEL = "qwen/qwen3.8-flash";
+const QWEN_REASONING_MODEL = "qwen/qwen3.7-max";
 
 function compactMessage(content: string, maxChars = 1_200) {
   const clean = content.replace(/\s+/g, " ").trim();
@@ -138,8 +139,9 @@ export async function streamChat(opts: {
     ].filter(Boolean).join("\n");
 
     const contextMessages = manageStreamContext(opts.messages);
-    const primaryModel = DUAL_QWEN_MODEL;
-    const verifierModel = DUAL_DEEPSEEK_MODEL;
+    const primaryModel = QWEN_ACTOR_MODEL;
+    const verifierModel = QWEN_VERIFIER_MODEL;
+    const reasoningModel = QWEN_REASONING_MODEL;
     let response: Awaited<ReturnType<typeof puter.ai.chat>>;
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -214,7 +216,46 @@ export async function streamChat(opts: {
       opts.onEvent({ type: "done", stopReason: "qwen_fallback_empty_verifier" });
       return;
     }
-    opts.onEvent({ type: "done", stopReason: "dual_model_verified" });
+
+    let finalResponse: Awaited<ReturnType<typeof puter.ai.chat>>;
+    try {
+      finalResponse = await puter.ai.chat(
+        [
+          { role: "system", content: "คุณคือ Qwen3.7 Max final reasoner ของ Sali. ตรวจคำตอบที่ผ่าน Qwen verifier อีกครั้งก่อนส่งให้ผู้ใช้ รักษาเจตนาเดิม ห้ามสร้างหลักฐานปลอม ห้ามอ้างว่ารันหรือแก้สิ่งใดถ้ายังไม่มีหลักฐาน และตอบเฉพาะคำตอบสุดท้ายที่ชัดเจน." },
+          { role: "user", content: "คำขอของผู้ใช้:\n" + latestUser + "\n\nQwen3 Coder:\n" + qwenDraft + "\n\nQwen3.8 Flash verification:\n" + verifiedText },
+        ],
+        {
+          model: reasoningModel,
+          stream: true,
+          temperature: opts.mode === "think" ? 0.35 : 0.45,
+          max_tokens: opts.mode === "think" ? 2600 : 1800,
+          reasoning_effort: opts.mode === "think" ? "medium" : "low",
+          normalize: true,
+        },
+      );
+    } catch {
+      opts.onEvent({ type: "text", text: verifiedText });
+      opts.onEvent({ type: "done", stopReason: "qwen_verifier_fallback" });
+      return;
+    }
+
+    let finalText = "";
+    for await (const part of finalResponse as AsyncIterable<unknown>) {
+      if (opts.signal?.aborted) return;
+      const chunk = readChunk(part);
+      if (chunk.eventType === "error") throw new Error(chunk.text || "Qwen3.7 Max stream error.");
+      if (chunk.reasoning) opts.onEvent({ type: "thinking", text: chunk.reasoning });
+      if (chunk.text) {
+        finalText += chunk.text;
+        opts.onEvent({ type: "text", text: chunk.text });
+      }
+    }
+    if (!finalText.trim()) {
+      opts.onEvent({ type: "text", text: verifiedText });
+      opts.onEvent({ type: "done", stopReason: "qwen_verifier_fallback_empty_final" });
+      return;
+    }
+    opts.onEvent({ type: "done", stopReason: "qwen_triple_verified" });
     return;
 
     let activeBlock: number | null = null;
