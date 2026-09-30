@@ -11,7 +11,7 @@ export const Route = createFileRoute("/api/github")({
         ok: true,
         configured: githubAgentConfigured(),
         repo: githubAgentRepo(),
-        actions: ["list", "read_file", "write_file", "delete_file", "create_branch", "create_pr"],
+        actions: ["list", "read_file", "write_file", "delete_file", "create_branch", "create_pr"], directCommitBranch: "main",
       }),
       POST: async ({ request }) => {
         if (!githubAgentConfigured()) {
@@ -22,9 +22,12 @@ export const Route = createFileRoute("/api/github")({
           const body = await request.json() as Record<string, unknown>;
           const action = str(body.action, 40) as GithubAgentCall["action"];
           const requestedBranch = str(body.branch, 120) || undefined;
-          const writeAction = ["write_file", "delete_file", "create_branch", "create_pr"].includes(action);
+          const writeAction = ["write_file", "delete_file", "create_branch"].includes(action);
+          const directRepoWrite = requestedBranch === "main" || requestedBranch === "master";
           const branch = writeAction
-            ? (user ? `sali/${user.id.slice(0, 20)}/${requestedBranch?.replace(/^sali\//, "") || "workspace"}` : requestedBranch)
+            ? (directRepoWrite
+              ? requestedBranch
+              : (user ? `sali/${user.id.slice(0, 20)}/${requestedBranch?.replace(/^sali\//, "") || "workspace"}` : requestedBranch))
             : requestedBranch;
           if (!["list", "read_file", "write_file", "delete_file", "create_branch", "create_pr"].includes(action)) {
             return Response.json({ ok: false, error: "GitHub action ไม่ถูกต้อง" }, { status: 400 });
