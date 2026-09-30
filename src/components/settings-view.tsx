@@ -582,6 +582,16 @@ function VoicePanel({ supported, settings, onChange }: { supported: boolean; set
         ))}
       </div>
       <p className="text-xs text-muted">ไม่มีรายการเสียงอื่น และไม่โหลด voice list 1000+ รายการ</p>
+      <SliderRow
+        label="ความเร็วเสียง"
+        value={`${settings.rate.toFixed(2)}×`}
+        min="0.75"
+        max="1.50"
+        step="0.05"
+        current={settings.rate}
+        onChange={(rate) => onChange({ rate })}
+      />
+      <p className="text-[11px] text-subtle">ปรับความเร็วการเล่นเสียง XAI โดยไม่เปลี่ยนเสียง EVE / ARE</p>
       <button type="button" onClick={testVoice} disabled={!supported} className="accent-gradient w-full rounded-xl px-4 py-2.5 text-sm font-medium text-primary-fg shadow-lg transition-transform hover:scale-[1.01] active:scale-[.99] disabled:opacity-40">🔊 ทดลองเสียง {settings.puterVoice === "ara" ? "ARE" : "EVE"}</button>
     </div>
   </Panel>;
