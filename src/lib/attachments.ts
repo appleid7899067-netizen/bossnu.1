@@ -3,6 +3,7 @@ import type { ChatAttachment, ChatMessage } from "@/lib/types";
 export const MAX_ATTACHMENTS = 4;
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 export const MAX_TOTAL_ATTACHMENT_BYTES = 50 * 1024 * 1024;
+export const MAX_MODEL_ATTACHMENT_CHARS = 40_000;
 
 const TEXT_EXTENSIONS = [
   "txt", "md", "markdown", "csv", "tsv", "json", "jsonl", "xml", "yaml", "yml", "toml", "ini", "env", "log",
@@ -62,12 +63,15 @@ export async function readAttachments(files: Iterable<File>, existing: ChatAttac
   return { added, errors };
 }
 
-/** What the model sees: the typed text followed by each file as a fenced block. */
+/** What the model sees. Large files are read locally but only a bounded window is sent to the model. */
 export function messageForModel(message: Pick<ChatMessage, "content" | "attachments">) {
   if (!message.attachments?.length) return message.content;
   const blocks = message.attachments.map((file) => {
-    const fence = file.content.includes("```") ? "````" : "```";
-    return `ไฟล์แนบ: ${file.name}\n${fence}${fileExtension(file.name)}\n${file.content}\n${fence}`;
+    const content = file.content.length <= MAX_MODEL_ATTACHMENT_CHARS
+      ? file.content
+      : file.content.slice(0, 24_000) + "\n\n[...ตัดเนื้อหากลางไฟล์เพื่อไม่ให้เกิน context...]\n\n" + file.content.slice(-16_000);
+    const fence = content.includes("```") ? "````" : "```";
+    return "ไฟล์แนบ: " + file.name + " (" + formatBytes(file.size) + ")\n" + fence + fileExtension(file.name) + "\n" + content + "\n" + fence;
   });
   return [message.content, ...blocks].filter(Boolean).join("\n\n");
 }
