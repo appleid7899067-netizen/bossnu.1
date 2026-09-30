@@ -218,203 +218,183 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 
 
 /* ---------- Sali developer-log UI ---------- */
-@keyframes sali-log-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 @keyframes sali-caret-blink {
   0%, 45% { opacity: 1; }
   46%, 100% { opacity: 0; }
 }
 
-.sali-summary {
+.sali-summary,
+.sali-devlog {
   width: 100%;
   max-width: 920px;
   margin-top: 8px;
+  box-sizing: border-box;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
-  border-radius: 14px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--color-elevated) 55%, transparent);
 }
-.sali-summary-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 26px;
-  padding: 7px 10px;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
-  color: var(--color-subtle);
-  font-family: "Fira Code", "JetBrains Mono", "IBM Plex Mono", "Noto Sans Thai", ui-monospace, monospace;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-.sali-summary-mark {
-  color: var(--color-success);
-  font-size: 11px;
-}
-.sali-summary-body {
-  min-width: 0;
-  padding: 10px 12px 11px;
-  overflow-wrap: anywhere;
-}
-.sali-log-output {
-  display: block;
-  width: 100%;
-  max-height: 220px;
-  margin: 7px 0 2px;
-  padding: 8px 9px;
-  overflow: auto;
-  box-sizing: border-box;
-  border: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-bg) 72%, transparent);
-  color: var(--color-muted);
-  font: inherit;
-  font-size: 9px;
-  line-height: 1.55;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-@media (max-width: 640px) {
-  .sali-summary-body { padding: 9px 10px 10px; }
-  .sali-log-output { max-height: 180px; font-size: 8.5px; }
-}
-.sali-devlog {
-  font-family: "Fira Code", "JetBrains Mono", "IBM Plex Mono", "Noto Sans Thai", ui-monospace, monospace;
-  font-size: 10px;
-  line-height: 1.5;
-  color: var(--color-muted);
-  width: 100%;
-  max-width: none;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--color-elevated) 64%, transparent);
-}
+
+.sali-summary-head,
 .sali-devlog-head {
   display: flex;
   align-items: center;
   gap: 7px;
   min-height: 25px;
-  margin: 0;
   padding: 6px 9px;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
-  background: color-mix(in srgb, var(--color-elevated) 82%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
   color: var(--color-subtle);
+  font-family: "Fira Code", "JetBrains Mono", "IBM Plex Mono", "Noto Sans Thai", ui-monospace, monospace;
   font-size: 8px;
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: .07em;
   text-transform: uppercase;
 }
-.sali-devlog-list {
+
+.sali-devlog-mark {
+  color: var(--color-primary);
+  font-weight: 900;
+}
+
+.sali-summary-mark {
+  color: var(--color-success);
+  font-size: 10px;
+}
+
+.sali-summary-body {
+  min-width: 0;
+  padding: 9px 11px 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overflow-wrap: anywhere;
+}
+
+.sali-devlog {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-family: "Fira Code", "JetBrains Mono", "IBM Plex Mono", "Noto Sans Thai", ui-monospace, monospace;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.sali-devlog-body {
+  min-width: 0;
+}
+
+.sali-devlog-flow {
   display: flex;
-  align-items: stretch;
-  gap: 7px;
-  margin: 0;
-  padding: 7px 9px 9px;
-  list-style: none;
-  max-width: 100%;
-  min-height: 48px;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+  gap: 0;
+  padding: 8px 10px;
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
+  white-space: nowrap;
   scrollbar-width: thin;
-  scroll-snap-type: x proximity;
 }
-.sali-log-line {
-  display: flex;
-  flex: 0 0 auto;
+
+.sali-flow-item {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 34px;
-  max-width: min(72vw, 620px);
-  padding: 6px 9px;
-  border: 1px solid color-mix(in srgb, var(--color-border) 58%, transparent);
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--color-bg) 48%, transparent);
-  scroll-snap-align: start;
-  animation: none;
-}
-.sali-log-time {
   flex: 0 0 auto;
+}
+
+.sali-flow-arrow {
+  flex: 0 0 auto;
+  padding: 0 7px;
   color: var(--color-subtle);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  font-size: 8px;
+  opacity: .72;
 }
-.sali-log-status {
-  flex: 0 0 auto;
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: .05em;
-}
-.sali-log-working { color: var(--color-primary); }
-.sali-log-ok { color: var(--color-success); }
-.sali-log-error { color: var(--color-danger); }
-.sali-log-text {
-  min-width: 0;
+
+.sali-flow-token {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
   max-width: min(58vw, 520px);
-  overflow-wrap: normal;
   color: var(--color-fg);
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sali-stream-source {
-  color: var(--color-primary);
-  font-weight: 800;
-  font-size: 8px;
-  letter-spacing: .06em;
+
+.sali-flow-phase {
+  font-weight: 700;
 }
-.sali-log-runtime {
-  margin-left: 5px;
+
+.sali-flow-live {
   color: var(--color-primary);
-  font-size: 8px;
-  white-space: nowrap;
+  font-weight: 650;
 }
-.sali-log-command {
-  display: inline;
-  margin-left: 5px;
+
+.sali-flow-ok {
+  color: var(--color-success);
+}
+
+.sali-flow-error {
+  color: var(--color-danger);
+}
+
+.sali-flow-stream-text {
+  max-width: min(76vw, 720px);
   overflow: hidden;
-  color: var(--color-muted);
-  font-size: 8px;
-  line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sali-log-detail {
-  display: inline;
-  margin-left: 5px;
-  overflow: hidden;
-  color: var(--color-subtle);
-  font-size: 8px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sali-log-current {
-  color: var(--color-primary);
-  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
-}
-.sali-streaming-text .sali-log-text {
-  max-width: min(82vw, 900px);
   text-overflow: clip;
 }
+
+.sali-flow-current {
+  flex: 0 0 auto;
+}
+
+.sali-devlog-terminal {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 25px;
+  padding: 5px 10px 7px;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  color: var(--color-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .sali-terminal-caret {
   display: inline-block;
-  width: .45em;
+  flex: 0 0 auto;
+  width: .42em;
   height: 1em;
   margin-left: 2px;
   vertical-align: -.12em;
   background: currentColor;
   animation: sali-caret-blink 1s steps(1) infinite;
 }
+
 @media (max-width: 640px) {
-  .sali-devlog { font-size: 9px; }
-  .sali-devlog-list { gap: 5px; padding: 6px 7px 8px; }
-  .sali-log-line { min-height: 31px; padding: 5px 7px; max-width: 88vw; }
-  .sali-log-text { max-width: 72vw; }
-  .sali-streaming-text .sali-log-text { max-width: 86vw; }
-  .sali-log-command, .sali-log-detail { font-size: 7.5px; }
+  .sali-summary,
+  .sali-devlog { max-width: 100%; border-radius: 10px; }
+
+  .sali-summary-body { padding: 8px 9px 9px; }
+
+  .sali-devlog-flow {
+    min-height: 38px;
+    padding: 7px 8px;
+  }
+
+  .sali-flow-arrow { padding: 0 5px; }
+
+  .sali-flow-token {
+    max-width: 72vw;
+    font-size: 8.5px;
+  }
+
+  .sali-flow-stream-text { max-width: 84vw; }
+
+  .sali-devlog-terminal {
+    min-height: 23px;
+    padding: 4px 8px 6px;
+    font-size: 8px;
+  }
 }
