@@ -57,15 +57,24 @@ export function claimsCompletion(text: string): boolean {
 
 export const MAX_GATE_REJECTIONS = 2;
 
-/** Message injected back to the model when it tries to finish without passing evidence. */
+/**
+ * Recovery directive injected after a failed run.
+ *
+ * A failed command is an unfinished engineering state, not a conversational
+ * turn. The next model action must inspect the real failure, change the
+ * workspace, rerun, and only then answer.
+ */
 export function gateMessage(reasons: string[], attempt: number, runsLeft: number) {
   return [
-    `VERIFICATION GATE (rejection ${attempt}/${MAX_GATE_REJECTIONS}): the last Sandbox run did NOT pass verification.`,
+    `REPAIR LOOP — VERIFICATION GATE (rejection ${attempt}/${MAX_GATE_REJECTIONS})`,
+    "The last Sandbox run failed. Treat this as an active repair task, not an answer turn.",
     ...reasons.map((r) => `- ${r}`),
-    "You must not tell the user the work is done/เสร็จแล้ว.",
+    "Required order: 1) inspect the failing file/error, 2) edit the workspace to fix the root cause, 3) run the repaired file/command again, 4) inspect the real exit code/output, 5) only after it passes may you answer.",
+    "Do not merely explain the error, suggest a fix, or ask the user to fix it. Perform the fix in Sandbox when a run is available.",
+    "Do not claim success from a command being issued or from text such as VERIFIED: true. Success requires the actual run evidence.",
     runsLeft > 0
-      ? `Fix the problem, then Run again with a sandbox block and Verify the real output (${runsLeft} run(s) left).`
-      : "No runs are left: explain honestly what is still failing and what the user can do next.",
+      ? `You have ${runsLeft} sandbox run(s) left. Use the next run for the repair and verification.`
+      : "No runs are left: explain honestly what is still failing and do not claim completion.",
   ].join("\n");
 }
 
