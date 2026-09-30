@@ -282,234 +282,88 @@ const PHASE_TITLES: Record<string, string> = {
 function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatActivity[]; live: boolean; liveText?: string }) {
   const visible = activities.slice(-80);
 
-  function timeOf(activity: ChatActivity) {
-    return new Date(activity.createdAt).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  }
-
   function phaseLabel(activity: Extract<ChatActivity, { kind: "phase" }>) {
     const labels: Record<string, string> = {
-      goal: "กำหนดเป้าหมาย",
-      plan: "วางแผนการทำงาน",
-      act: "ลงมือทำ",
-      run: "รัน Sandbox",
-      observe: "อ่านผลจริง",
-      verify: "ตรวจสอบหลักฐาน",
-      fix: "แก้ไขและรันใหม่",
-      answer: "เตรียมคำตอบ",
+      goal: "GOAL",
+      plan: "PLAN",
+      act: "ACT",
+      run: "RUN",
+      observe: "OBSERVE",
+      verify: "VERIFY",
+      fix: "FIX",
+      answer: "ANSWER",
     };
-    return activity.label.replace(/^[^•]+•\\s*/, "") || labels[activity.phase] || activity.phase;
+    return labels[activity.phase] || activity.phase.toUpperCase();
   }
 
-  function statusText(activity: Extract<ChatActivity, { kind: "command" }>) {
-    if (activity.status === "running") return "กำลังรัน";
-    if (activity.status === "success") return "สำเร็จ";
-    if (activity.status === "blocked") return "รออนุญาต";
-    if (activity.status === "aborted") return "หยุด";
-    return "ผิดพลาด";
+  function activityText(activity: ChatActivity) {
+    if (activity.kind === "phase") {
+      return phaseLabel(activity) + " " + activity.label.replace(/^[^•]+•\s*/, "").trim();
+    }
+    if (activity.kind === "command") {
+      const status = activity.status === "success" ? "✓" : activity.status === "running" ? "…" : "✕";
+      return status + " " + activity.runtime + " $" + activity.command;
+    }
+    if (activity.kind === "stream") {
+      return activity.source.toUpperCase() + " " + (activity.text || "กำลังรับข้อมูล…");
+    }
+    if (activity.kind === "files") {
+      return "EDIT " + activity.files.length + " ไฟล์";
+    }
+    return activity.status === "saved" ? "SKILL ✓ " + activity.path : "SKILL ✕ " + activity.path;
   }
 
   return (
-    <section aria-label="Developer log ของสลี่" className="sali-devlog mb-4">
+    <section aria-label="SALI live stream" className="sali-devlog mb-3">
       <div className="sali-devlog-head">
         <span className="sali-devlog-mark">›_</span>
-        <span>{live ? "SALI / WORKING" : "SALI / ACTIVITY LOG"}</span>
-        {live ? <span className="sali-live-cursor" aria-label="กำลังทำงาน" /> : null}
+        <span>{live ? "SALI / LIVE STREAM" : "SALI / STREAM"}</span>
+        {live ? <span className="sali-live-cursor" aria-label="กำลังทำงาน" /> : <span className="sali-summary-mark">✓</span>}
       </div>
 
-      <ol className="sali-devlog-list">
-        {visible.map((activity) => (
-          <li key={activity.id} className="sali-log-line">
-            <time className="sali-log-time">{timeOf(activity)}</time>
+      <div className="sali-devlog-body">
+        <div className="sali-devlog-flow" aria-live={live ? "polite" : "off"}>
+          {visible.map((activity, index) => (
+            <span key={activity.id} className="sali-flow-item">
+              {index > 0 ? <span className="sali-flow-arrow" aria-hidden="true">→</span> : null}
+              <span className={
+                activity.kind === "phase"
+                  ? "sali-flow-token sali-flow-phase"
+                  : activity.kind === "command"
+                    ? activity.status === "success" ? "sali-flow-token sali-flow-ok" : activity.status === "running" ? "sali-flow-token sali-flow-live" : "sali-flow-token sali-flow-error"
+                    : activity.kind === "stream"
+                      ? activity.status === "done" ? "sali-flow-token sali-flow-ok" : activity.status === "error" ? "sali-flow-token sali-flow-error" : "sali-flow-token sali-flow-live"
+                      : activity.kind === "files"
+                        ? "sali-flow-token sali-flow-ok"
+                        : activity.status === "saved" ? "sali-flow-token sali-flow-ok" : "sali-flow-token sali-flow-error"
+              }>
+                {activityText(activity)}
+              </span>
+            </span>
+          ))}
+          {liveText ? (
+            <span className="sali-flow-item sali-flow-current" aria-live="polite">
+              {visible.length ? <span className="sali-flow-arrow" aria-hidden="true">→</span> : null}
+              <span className="sali-flow-token sali-flow-live sali-flow-stream-text">
+                {liveText}<span className="sali-terminal-caret" />
+              </span>
+            </span>
+          ) : null}
+          {live ? (
+            <span className="sali-flow-item sali-flow-current" aria-live="polite">
+              {(visible.length || liveText) ? <span className="sali-flow-arrow" aria-hidden="true">→</span> : null}
+              <span className="sali-flow-token sali-flow-live">กำลังประมวลผล<span className="sali-terminal-caret" /></span>
+            </span>
+          ) : null}
+        </div>
 
-            {activity.kind === "phase" ? (
-              <>
-                <span className="sali-log-status sali-log-working">RUN</span>
-                <span className="sali-log-text">{phaseLabel(activity)}</span>
-              </>
-            ) : activity.kind === "command" ? (
-              <>
-                <span className={
-                  activity.status === "success"
-                    ? "sali-log-status sali-log-ok"
-                    : activity.status === "running"
-                      ? "sali-log-status sali-log-working"
-                      : "sali-log-status sali-log-error"
-                }>
-                  {activity.status === "success" ? "OK" : activity.status === "running" ? "RUN" : "ERR"}
-                </span>
-                <span className="sali-log-text">
-                  <span>{statusText(activity)} </span>
-                  <code className="sali-log-runtime">{activity.runtime}</code>
-                  <code className="sali-log-command">$ {activity.command}</code>
-                  {activity.output ? <pre className="sali-log-output">{activity.output}</pre> : null}
-                </span>
-              </>
-            ) : activity.kind === "stream" ? (
-              <>
-                <span className={
-                  activity.status === "done"
-                    ? "sali-log-status sali-log-ok"
-                    : activity.status === "error"
-                      ? "sali-log-status sali-log-error"
-                      : "sali-log-status sali-log-working"
-                }>
-                  {activity.status === "done" ? "OK" : activity.status === "error" ? "ERR" : "LIVE"}
-                </span>
-                <span className="sali-log-text">
-                  <span className="sali-stream-source">{activity.source.toUpperCase()}</span>
-                  {" "}{activity.text || "กำลังรับข้อมูล…"}
-                  {typeof activity.chars === "number" ? <span className="sali-log-runtime">{activity.chars.toLocaleString()} chars</span> : null}
-                  {activity.status === "running" ? <span className="sali-terminal-caret" /> : null}
-                </span>
-              </>
-            ) : activity.kind === "files" ? (
-              <>
-                <span className="sali-log-status sali-log-ok">EDIT</span>
-                <span className="sali-log-text">
-                  แก้ไขไฟล์ {activity.files.length} รายการ
-                  <span className="sali-log-detail">{activity.files.slice(0, 6).map(file => file.path).join(" • ")}</span>
-                </span>
-              </>
-            ) : (
-              <>
-                <span className={
-                  activity.status === "saved"
-                    ? "sali-log-status sali-log-ok"
-                    : "sali-log-status sali-log-error"
-                }>
-                  {activity.status === "saved" ? "OK" : "ERR"}
-                </span>
-                <span className="sali-log-text">
-                  {activity.status === "saved" ? "บันทึกทักษะที่ทดสอบผ่าน" : "ไม่บันทึกทักษะ"}
-                  <span className="sali-log-detail">{activity.path}</span>
-                </span>
-              </>
-            )}
-          </li>
-        ))}
-        {liveText ? (
-          <li className="sali-log-line sali-log-current sali-log-streaming-text" aria-live="polite">
-            <span className="sali-log-status sali-log-working">LIVE</span>
-            <span className="sali-log-text whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{liveText}<span className="sali-terminal-caret" /></span>
-          </li>
-        ) : null}
         {live ? (
-          <li className="sali-log-line sali-log-current" aria-live="polite">
-            <time className="sali-log-time">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
-            <span className="sali-log-status sali-log-working">RUN</span>
-            <span className="sali-log-text">กำลังประมวลผล <span className="sali-terminal-caret" /></span>
-          </li>
+          <div className="sali-devlog-terminal" aria-label="terminal logs code stream">
+            <span>&gt; terminal / logs / code stream</span>
+            <span className="sali-terminal-caret" />
+          </div>
         ) : null}
-      </ol>
-    </section>
-  );
-}
-
-function ThinkingBlock({ text, live }: { text: string; live: boolean }) {
-  if (!text) return null;
-  return (
-    <div className="mb-2">
-      <div className="text-[11px] font-medium text-muted">กำลังคิด<span className="thinking-dots">...</span></div>
-      <p className="mt-1.5 border-l border-border pl-2.5 text-[11px] leading-[1.5] text-muted">{text}</p>
-    </div>
-  );
-}
-
-function CopyLine({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  return (
-    <button
-      type="button"
-      className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-fg"
-      onClick={async () => {
-        await navigator.clipboard.writeText(text);
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1400);
-      }}
-    >
-      {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-      {copied ? "คัดลอกแล้ว" : "คัดลอก"}
-    </button>
-  );
-}
-
-function ListenLine({ text }: { text: string }) {
-  const [speaking, setSpeaking] = useState(false);
-  return (
-    <button type="button"
-      className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-fg disabled:opacity-40"
-      onClick={async () => {
-        if (speaking) { stopVoice(); setSpeaking(false); return; }
-        setSpeaking(true);
-        try { await speakNow(text); } finally { setSpeaking(false); }
-      }}
-      aria-label={speaking ? "หยุดเสียง" : "ฟังคำตอบ"} title={speaking ? "หยุดเสียง" : "ฟังคำตอบ"}
-    >
-      <Volume2 className="size-3.5" />
-      {speaking ? "กำลังอ่าน" : "ฟัง"}
-    </button>
-  );
-}
-
-function getContextualReplyActions(text: string): string[] {
-  const q = text.toLowerCase();
-  const actions: string[] = [];
-  const add = (label: string) => { if (!actions.includes(label)) actions.push(label); };
-  if (/html|css|javascript|typescript|react|next\.js|โค้ด|code|component|function|api|json/.test(q)) {
-    add("ดูโค้ดส่วนนี้"); add("แก้ต่อจากคำตอบ"); add("ทดสอบโค้ด");
-  }
-  if (/error|bug|บั๊ก|ผิดพลาด|exception|ล้มเหลว|แก้ไข/.test(q)) {
-    add("วิเคราะห์ Error ต่อ"); add("แก้แล้วตรวจสอบ"); add("ดู Log");
-  }
-  if (/สูตร|อาหาร|เมนู|ทำกิน|วัตถุดิบ|recipe|food|calorie|แคลอรี/.test(q)) {
-    add("ขอสูตรแบบละเอียด"); add("คำนวณปริมาณให้"); add("แนะนำเมนูอื่น");
-  }
-  if (/งาน|ประชุม|โปรเจกต์|project|task|แผนงาน|เอกสาร|report|รายงาน|อีเมล/.test(q)) {
-    add("สรุปให้เป็นรายการ"); add("จัดลำดับงานต่อ"); add("ลงมือทำต่อ");
-  }
-  if (/github|repo|commit|branch|pull request|\bpr\b|render|deploy|deployment/.test(q)) {
-    add("ตรวจ Repo ต่อ"); add("แก้ไฟล์ต่อ"); add("ตรวจ Deploy");
-  }
-  if (/วิเคราะห์|ข้อมูล|ตาราง|csv|excel|กราฟ|สถิติ|data|analysis/.test(q)) {
-    add("สรุปข้อมูลให้"); add("ทำเป็นตาราง"); add("วิเคราะห์ต่อ");
-  }
-  if (/สรุป|อธิบาย|หมายถึง|คืออะไร|รายละเอียด|เปรียบเทียบ|ข้อดี|ข้อเสีย|compare|explain/.test(q)) {
-    add("ขยายรายละเอียด"); add("สรุปสั้นๆ");
-  }
-  if (!actions.length && text.trim()) {
-    add("ขยายรายละเอียด"); add("สรุปคำตอบ"); add("ลงมือทำต่อ");
-  }
-  return actions.slice(0, 4);
-}
-
-function ContextualReplyActions({ text, onAction }: { text: string; onAction: (action: string) => void }) {
-  const actions = getContextualReplyActions(text);
-  if (!actions.length) return null;
-  return (
-    <div className="mt-2 flex w-full flex-wrap gap-1.5">
-      {actions.map((action) => (
-        <button key={action} type="button" onClick={() => onAction(action)}
-          className="inline-flex h-8 items-center rounded-full border border-border/70 bg-elevated/60 px-3 text-[11px] font-medium text-muted transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-fg">
-          {action}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function SandboxHtmlPreview({ html }: { html: string }) {
-  return (
-    <section className="ml-10 w-full max-w-[720px] overflow-hidden rounded-2xl border border-border bg-white shadow-sm sm:ml-11">
-      <div className="flex h-9 items-center justify-between border-b border-border bg-elevated px-3 text-xs font-medium text-muted">
-        <span>🌐 Sandbox • Live Preview</span>
-        <span className="text-success">แยกกรอบปลอดภัย</span>
       </div>
-      <iframe title="Sandbox HTML preview" sandbox="allow-scripts" srcDoc={html} className="h-[min(55vh,520px)] w-full bg-white" />
     </section>
   );
 }
