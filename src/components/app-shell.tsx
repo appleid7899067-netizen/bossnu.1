@@ -500,7 +500,8 @@ ${message}`); toast.error(message); }
     const previousPaths = new Set((previous?.files ?? []).map(file => `project/${file.path}`));
     const nextPaths = new Set(project.files.map(file => `project/${file.path}`));
     try {
-      if (!persist) { store.setBuilderProject(project); return; }\n      // Builder, Project Files and Sandbox share one canonical workspace.
+      if (!persist) { store.setBuilderProject(project); return; }
+      // Builder, Project Files and Sandbox share one canonical workspace.
       await Promise.all(project.files.map(file => fetch("/api/workspace", {
         method: "POST",
         headers: { "content-type": "application/json" },
