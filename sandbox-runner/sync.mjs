@@ -12,9 +12,9 @@ export const SNAPSHOT_VERSION = 1;
 export const SYNC_SKIP = new Set(["node_modules", ".git", ".next", "dist", "build", "coverage", ".cache", "target", "__pycache__", ".venv"]);
 export const LIMITS = {
   maxPaths: Number(process.env.SYNC_MAX_PATHS) || 5000,
-  maxFiles: Number(process.env.SYNC_MAX_FILES) || 400,
-  maxFileBytes: Number(process.env.SYNC_MAX_FILE_BYTES) || 200_000,
-  maxTotalBytes: Number(process.env.SYNC_MAX_TOTAL_BYTES) || 6_000_000,
+  maxFiles: Number(process.env.SYNC_MAX_FILES) || 800,
+  maxFileBytes: Number(process.env.SYNC_MAX_FILE_BYTES) || 2 * 1024 * 1024,
+  maxTotalBytes: Number(process.env.SYNC_MAX_TOTAL_BYTES) || 20 * 1024 * 1024;
 };
 
 export const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex");
