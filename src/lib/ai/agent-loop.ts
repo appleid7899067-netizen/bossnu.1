@@ -353,7 +353,7 @@ export async function runAgentLoop(opts: {
       // Push an immediate visible heartbeat before the sandbox call. The
       // executor can take several seconds before its first terminal event,
       // so the chat must never look frozen during Run.
-      opts.onText(`\\n> 💻 Run ${count}/${max} • กำลังส่งคำสั่งเข้า Sandbox...\\n`);
+      opts.onText(`\n> 💻 Run ${count}/${max} • กำลังส่งคำสั่งเข้า Sandbox...\n`);
 
       let result: ToolResult;
       try {
@@ -365,11 +365,10 @@ export async function runAgentLoop(opts: {
 
       core.setPhase("observe");
       opts.onPhase?.("observe", "👀 Observe • Sandbox ตอบกลับแล้ว กำลังอ่านผลจริง...");
-      opts.onText("\\n> 👀 Observe • ได้ผลจาก Sandbox แล้ว กำลังตรวจหลักฐาน...\\n");
+      opts.onText("\n> 👀 Observe • ได้ผลจาก Sandbox แล้ว กำลังตรวจหลักฐาน...\n");
       const observed = modelResult(call, result);
       core.remember(`run-${count}`, observed, "run");
       if (workspace) await safely(() => workspace.remember(`run-${count}`, observed, "run"), undefined);
-      opts.onPhase?.("observe", "👀 Observe • กำลังอ่านผลจาก Sandbox");
       opts.onText(terminalTranscript(call, result));
       if (opts.signal.aborted) return finish("aborted");
 
