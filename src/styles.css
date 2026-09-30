@@ -215,3 +215,119 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .view-enter { animation: pop-in 300ms cubic-bezier(0.22,1,0.36,1) both; }
 
 @media (prefers-reduced-motion: reduce) { .brand-orbit,.brand-spark,.work-live,.work-dots i { animation:none; } }
+
+
+/* ---------- Sali developer-log UI ---------- */
+@keyframes sali-log-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes sali-caret-blink {
+  0%, 45% { opacity: 1; }
+  46%, 100% { opacity: 0; }
+}
+.sali-devlog {
+  font-family: "Fira Code", "JetBrains Mono", "IBM Plex Mono", "Noto Sans Thai", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--color-muted);
+  max-width: 920px;
+}
+.sali-devlog-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  margin-bottom: 5px;
+  color: var(--color-subtle);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.sali-devlog-mark {
+  color: var(--color-primary);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+.sali-live-cursor {
+  width: 5px;
+  height: 12px;
+  margin-left: 1px;
+  background: var(--color-primary);
+  animation: sali-caret-blink 1s steps(1) infinite;
+}
+.sali-devlog-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-left: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+}
+.sali-log-line {
+  display: grid;
+  grid-template-columns: 58px 38px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 8px;
+  min-height: 25px;
+  padding: 3px 0 3px 9px;
+  animation: sali-log-in 180ms ease-out both;
+}
+.sali-log-time {
+  color: var(--color-subtle);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sali-log-status {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+.sali-log-working { color: var(--color-primary); }
+.sali-log-ok { color: var(--color-success); }
+.sali-log-error { color: var(--color-danger); }
+.sali-log-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-fg);
+}
+.sali-log-runtime {
+  margin-left: 5px;
+  color: var(--color-primary);
+  font-size: 9px;
+}
+.sali-log-command {
+  display: block;
+  margin-top: 1px;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: 9px;
+  line-height: 1.55;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sali-log-detail {
+  display: block;
+  margin-top: 1px;
+  overflow: hidden;
+  color: var(--color-subtle);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sali-log-current {
+  color: var(--color-primary);
+}
+.sali-terminal-caret {
+  display: inline-block;
+  width: .45em;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -.12em;
+  background: currentColor;
+  animation: sali-caret-blink 1s steps(1) infinite;
+}
+@media (max-width: 640px) {
+  .sali-log-line { grid-template-columns: 50px 34px minmax(0, 1fr); column-gap: 6px; padding-left: 7px; }
+  .sali-devlog { font-size: 10px; }
+  .sali-log-command, .sali-log-detail { font-size: 8.5px; }
+}
