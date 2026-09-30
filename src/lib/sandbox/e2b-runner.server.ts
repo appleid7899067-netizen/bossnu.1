@@ -17,37 +17,23 @@ export function e2bConfigured() {
   return Boolean(process.env.E2B_API_KEY?.trim());
 }
 
-function metadataKey(workspace: string) {
-  return workspace.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 100);
-}
-
-function chatSandboxId() {
+export function e2bSandboxId() {
   return process.env.E2B_SANDBOX_ID?.trim() || DEFAULT_CHAT_SANDBOX_ID;
 }
 
-async function connectChatSandbox(): Promise<SandboxType | null> {
-  const sandboxId = chatSandboxId();
-  if (!sandboxId) return null;
+async function connectChatSandbox(): Promise<SandboxType> {
+  const sandboxId = e2bSandboxId();
   try {
     const sandbox = await Sandbox.connect(sandboxId, { timeoutMs: DEFAULT_TIMEOUT_MS });
     await sandbox.commands.run(`mkdir -p ${PROJECT}`, { timeoutMs: 30_000 });
     return sandbox;
   } catch (error) {
-    console.warn(`[E2B] connect ${sandboxId} failed; falling back to workspace discovery`, error);
-    return null;
+    const detail = error instanceof Error ? error.message : String(error);
+    // Never silently run on another machine when the user pinned an E2B ID.
+    // A clear failure is safer than making the chat appear connected while it
+    // actually executes in a newly-created sandbox.
+    throw new Error(`เชื่อม E2B Sandbox ${sandboxId} ไม่สำเร็จ: ${detail}`);
   }
-}
-
-async function findExisting(workspace: string): Promise<SandboxType | null> {
-  const paginator = Sandbox.list({
-    query: { metadata: { bossnu_workspace: metadataKey(workspace) } },
-    order: "desc",
-    limit: 10,
-  });
-  const items = await paginator.nextItems();
-  const found = items.find((item) => item.metadata?.bossnu_workspace === metadataKey(workspace));
-  if (!found) return null;
-  return Sandbox.connect(found.sandboxId, { timeoutMs: DEFAULT_TIMEOUT_MS });
 }
 
 async function getSandbox(workspace?: string): Promise<{ sandbox: SandboxType; persistent: boolean }> {
@@ -57,19 +43,7 @@ async function getSandbox(workspace?: string): Promise<{ sandbox: SandboxType; p
     // machine, so commands, installed packages, and project files survive
     // across messages instead of starting in a fresh sandbox.
     const connected = await connectChatSandbox();
-    if (connected) return { sandbox: connected, persistent: true };
-    const existing = await findExisting(workspace);
-    if (existing) return { sandbox: existing, persistent: true };
-    const sandbox = await Sandbox.create({
-      timeoutMs: DEFAULT_TIMEOUT_MS,
-      lifecycle: { onTimeout: "pause" },
-      metadata: {
-        bossnu_workspace: metadataKey(workspace),
-        bossnu_role: "sali-agent",
-      },
-    });
-    await sandbox.commands.run(`mkdir -p ${PROJECT}`, { timeoutMs: 30_000 });
-    return { sandbox, persistent: true };
+    return { sandbox: connected, persistent: true };
   }
   const sandbox = await Sandbox.create({ timeoutMs: 10 * 60 * 1000 });
   await sandbox.commands.run(`mkdir -p ${PROJECT}`, { timeoutMs: 30_000 });

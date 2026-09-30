@@ -221,8 +221,14 @@ export function AppShell({ search }: { search: Search }) {
           workspace: workspaceId, type: call.language, signal: ac.signal, allowDangerous: true,
           onEvent: event => {
             if (ac.signal.aborted) return;
-            if (event.type === "output") {
+            if (event.type === "status" && event.message) {
+              output = (output + `${output ? "\n" : ""}› ${event.message}\n`).slice(-64000);
+              scheduleOutput();
+            } else if (event.type === "output") {
               output = (output + event.text).slice(-64000);
+              scheduleOutput();
+            } else if (event.type === "error") {
+              output = (output + `${output ? "\n" : ""}✕ ${event.error}\n`).slice(-64000);
               scheduleOutput();
             }
           },
