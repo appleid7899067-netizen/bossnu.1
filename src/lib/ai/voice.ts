@@ -41,15 +41,13 @@ export type VoiceSettings = {
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   enabled: true,
   mode: "warm",
-  // Browser/device speech synthesis is the single playback path.
-  // Keep "source" for backwards-compatible saved settings.
   source: "device",
   rate: 1,
   pitch: 1,
   volume: 1,
   voiceName: "",
-  puterProvider: "xai",
-  puterVoice: "eve",
+  puterProvider: "",
+  puterVoice: "",
   puterModel: "",
 };
 
@@ -64,7 +62,17 @@ function loadSettings() {
   if (typeof window === "undefined") return;
   try {
     const raw = window.localStorage.getItem("bossnu-voice-settings");
-    if (raw) settings = { ...DEFAULT_VOICE_SETTINGS, ...JSON.parse(raw), source: "puter", puterProvider: "xai", puterVoice: ["eve", "ara"].includes(JSON.parse(raw).puterVoice) ? JSON.parse(raw).puterVoice : "eve" };
+    if (raw) {
+      const saved = JSON.parse(raw) as Partial<VoiceSettings>;
+      settings = {
+        ...DEFAULT_VOICE_SETTINGS,
+        ...saved,
+        source: "device",
+        puterProvider: "",
+        puterVoice: "",
+        puterModel: "",
+      };
+    }
   } catch {
     settings = DEFAULT_VOICE_SETTINGS;
   }
@@ -102,68 +110,6 @@ function cleanSpeechText(value: string) {
 }
 
 
-
-type PuterVoice = { id: string; name?: string; provider?: string; description?: string; language?: { name?: string; code?: string }; supported_models?: string[]; supported_engines?: string[] };
-
-type PuterAI = {
-  txt2speech: ((text: string, options?: Record<string, unknown>) => Promise<HTMLAudioElement>) & {
-    listVoices?: (options?: Record<string, unknown>) => Promise<PuterVoice[]>;
-  };
-};
-
-type PuterGlobal = { ai?: PuterAI };
-
-function getPuter(): PuterGlobal | null {
-  if (typeof window === "undefined") return null;
-  return (window as Window & { puter?: PuterGlobal }).puter ?? null;
-}
-
-export type PuterVoiceOption = { id: string; name: string; provider: string; language: string; description: string };
-
-export async function getPuterVoices(): Promise<PuterVoiceOption[]> {
-  const puter = getPuter();
-  const listVoices = puter?.ai?.txt2speech?.listVoices;
-  if (!listVoices) return [];
-  try {
-    const voices = await listVoices({ provider: "all" });
-    return voices
-      .filter((voice) => !voice.language?.code || /^th(-|_)/i.test(voice.language.code) || /thai/i.test(voice.language?.name ?? ""))
-      .map((voice) => ({ id: voice.id, name: voice.name ?? voice.id, provider: voice.provider ?? "unknown", language: voice.language?.code ?? "auto", description: voice.description ?? "" }));
-  } catch {
-    return [];
-  }
-}
-
-async function speakPuter(text: string) {
-  const puter = getPuter();
-  if (!puter?.ai?.txt2speech || !settings.enabled) return false;
-  try {
-    const options: Record<string, unknown> = {
-      provider: settings.puterProvider,
-      voice: settings.puterVoice,
-      language: "th-TH",
-    };
-    if (settings.puterModel) options.model = settings.puterModel;
-    if (settings.puterProvider === "xai") options.language = "th";
-    const audio = await puter.ai.txt2speech(cleanSpeechText(text).slice(0, 2999), options);
-    activeAudio = audio;
-    audio.volume = settings.volume;
-    // xAI TTS does not expose a speed option in Puter. Apply playback speed
-    // locally to the returned audio without changing the selected XAI voice.
-    audio.playbackRate = Math.max(0.75, Math.min(1.5, settings.rate));
-    await audio.play();
-    await new Promise<void>((resolve) => {
-      const done = () => { audio.removeEventListener("ended", done); audio.removeEventListener("error", done); resolve(); };
-      audio.addEventListener("ended", done, { once: true });
-      audio.addEventListener("error", done, { once: true });
-    });
-    if (activeAudio === audio) activeAudio = null;
-    return true;
-  } catch {
-    if (activeAudio) activeAudio = null;
-    return false;
-  }
-}
 
 function createDeviceUtterance(text: string) {
   const utterance = new SpeechSynthesisUtterance(text);
@@ -204,13 +150,6 @@ async function speakDevice(text: string) {
   return true;
 }
 
-async function speakChunk(text: string, token: number) {
-  const cleaned = cleanSpeechText(text);
-  if (!cleaned || token !== generation || !settings.enabled) return;
-  // XAI voice is mandatory. Never fall back to browser SpeechSynthesis.
-  await speakDevice(cleaned);
-}
-
 function takeChunk(final = false) {
   const match = pending.match(/^(.{40,260}?[.!?。！？\n])(?:\s+|$)/);
   if (match) {
@@ -226,29 +165,22 @@ function takeChunk(final = false) {
 }
 
 async function drain(final = false) {
-  if (draining) return;
-  draining = true;
   const token = generation;
-  try {
-    while (settings.enabled && token === generation) {
+  if (!settings.enabled || !hasSpeech || speaking) return;
+  while (settings.enabled && token === generation) {
     const chunk = takeChunk(final);
     if (!chunk) break;
-      await speakChunk(chunk, token);
-      final = false;
-    }
-  } finally {
-    draining = false;
+    await speakDevice(cleanSpeechText(chunk));
+    final = false;
   }
 }
 
 export function isVoiceSupported() {
-  // Puter XAI TTS is the primary voice path. Browser SpeechSynthesis is not
-  // considered a valid fallback because it produces the device/browser voice.
-  return !!getPuter()?.ai?.txt2speech;
+  return hasSpeech;
 }
 
 export function getVoiceSettings(): VoiceSettings {
-  return { ...settings };
+  return { ...settings, source: "device", puterProvider: "", puterVoice: "", puterModel: "" };
 }
 
 export function getAvailableVoices(): { name: string; lang: string }[] {
@@ -258,12 +190,18 @@ export function getAvailableVoices(): { name: string; lang: string }[] {
 
 export function applyVoiceMode(mode: VoiceMode) {
   const preset = VOICE_MODES.find((item) => item.id === mode) ?? VOICE_MODES[1];
-  // Keep XAI/Puter locked. Voice modes only tune UI preferences now.
-  updateVoiceSettings({ mode, rate: preset.rate, pitch: preset.pitch, source: "puter", puterProvider: "xai" });
+  updateVoiceSettings({ mode, rate: preset.rate, pitch: preset.pitch, source: "device", puterProvider: "", puterVoice: "", puterModel: "" });
 }
 
 export function updateVoiceSettings(patch: Partial<VoiceSettings>) {
-  settings = { ...settings, ...patch };
+  settings = {
+    ...settings,
+    ...patch,
+    source: "device",
+    puterProvider: "",
+    puterVoice: "",
+    puterModel: "",
+  };
   saveSettings();
   if (!settings.enabled) stopVoice();
 }
@@ -276,45 +214,29 @@ export function isVoiceEnabled() {
   return settings.enabled;
 }
 
-export function speakRealtime(text: string) {
-  if (!settings.enabled) return;
-  // Keep only a bounded speech buffer so long streams cannot grow memory
-  // while TTS is still generating/playing previous chunks.
-  pending = (pending + text).slice(-12000);
-  void drain(false);
-}
+/** Streaming text is intentionally silent. The final summary is spoken once. */
+export function speakRealtime(_text: string) {}
 
 export function isVoiceSpeaking() {
   return speaking || (!!activeAudio && !activeAudio.paused);
 }
 
 export function finishVoice() {
-  if (!settings.enabled) {
-    pending = "";
-    return;
-  }
-  void drain(true);
+  pending = "";
 }
 
 export async function speakNow(text: string) {
   const cleaned = cleanSpeechText(text);
-  if (!cleaned || !settings.enabled) return false;
-
-  // Cancel queued stream fragments. Playback itself must come from Puter XAI,
-  // never from browser SpeechSynthesis.
+  if (!cleaned || !settings.enabled || !hasSpeech) return false;
   generation += 1;
   pending = "";
-  return speakPuter(cleaned);
+  window.speechSynthesis.cancel();
+  return speakDevice(cleaned);
 }
 
 export function stopVoice() {
   generation += 1;
   pending = "";
-  if (activeAudio) {
-    activeAudio.pause();
-    activeAudio.currentTime = 0;
-    activeAudio = null;
-  }
   speaking = false;
   if (hasSpeech) window.speechSynthesis.cancel();
 }
