@@ -208,7 +208,7 @@ export async function streamChat(opts: {
     // Single-model mode: the user's selected Puter model is the only model call.
     // Verification for Sandbox/GitHub remains in the agent loop via real tool evidence.
     const primaryModel = selectedModel;
-    let response: Awaited<ReturnType<typeof puter.ai.chat>>;
+    let response: AsyncIterable<unknown> | undefined;
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -222,7 +222,7 @@ export async function streamChat(opts: {
             reasoning_effort: opts.mode === "think" ? "medium" : "low",
             normalize: true,
           },
-        );
+        ) as unknown as AsyncIterable<unknown>;
         lastError = undefined;
         break;
       } catch (error) {

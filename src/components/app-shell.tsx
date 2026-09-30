@@ -357,14 +357,14 @@ export function AppShell({ search }: { search: Search }) {
           },
         });
         if (!failure) updateStreamLog(streamLogId, "puter", "done", "สตรีมจบ • รับ " + streamChars.toLocaleString() + " ตัวอักษร", streamChars);
-        if (!reply && !ac.signal.aborted && agentSummary.status !== "verified") append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
+        if (!reply && !ac.signal.aborted) append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
         return;
       }
       if (detection.webPreview && detection.code && ["html", "javascript", "css", "tailwind"].includes(detection.runtime)) {
         setSandboxRun({ runtime: detection.runtime, label: detection.label, command: "browser sandbox", status: "Preview พร้อมแล้ว", previewHtml: sandboxPreviewDocument(detection.runtime, detection.code) });
         append("แสดง Live Preview ในแชตแล้วค่ะ\\n\\n");
       }
-      const agentSummary = await runAgentLoop({
+      await runAgentLoop({
         messages: history, signal: ac.signal, tools,
         maxRuns: 11,
         execute,

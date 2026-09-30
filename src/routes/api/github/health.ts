@@ -36,7 +36,7 @@ export const Route = createFileRoute("/api/github/health")({
             ok: true,
             repo: listed.repo,
             branch: listed.branch,
-            fileCount: listed.files.length,
+            fileCount: listed.files?.length ?? 0,
           };
 
           const marker = JSON.stringify({

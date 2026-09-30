@@ -80,7 +80,8 @@ test("gate: failing run + 'done' answer is rejected, loop fixes, runs again and 
   // The premature "done" never reached the user; the verified one did.
   assert.equal(output.split("เสร็จแล้วค่ะ").length - 1, 1);
   assert.ok(output.trimEnd().endsWith("เสร็จแล้วค่ะ"));
-  assert.match(output, /แก้แล้ว รันใหม่/);
+  // Repair plans and raw tool traffic stay in the activity feed, not final prose.
+  assert.ok(!output.includes("แก้แล้ว รันใหม่"));
 });
 
 test("gate: model that keeps claiming done gets an honest unverified answer", async () => {
@@ -166,9 +167,16 @@ test("loop: verified project runs persist a reusable skill in Agent Workspace", 
   assert.match(skill, /Neon sync: verified=true, complete=true/);
   assert.match(skill, /Manifest: manifest-test/);
   assert.match(skill, /project\/index\.html/);
-  assert.deepEqual(log.filter(l => !l.startsWith("remember:latest")), [
-    "context", "start", "remember:run-1", `write:${skillPath}`, `remember:verified skill ${skillPath}`, "task:done",
-  ]);
+  const durableLog = log.filter(l => !l.startsWith("remember:latest"));
+  assert.equal(durableLog[0], "context");
+  assert.equal(durableLog[1], "start");
+  assert.ok(durableLog.some(l => l.startsWith("remember:semantic:goal:")));
+  assert.ok(durableLog.some(l => l.startsWith("remember:episode:") && l.endsWith(":goal")));
+  assert.ok(durableLog.includes("remember:run-1"));
+  assert.ok(durableLog.includes(`write:${skillPath}`));
+  assert.ok(durableLog.includes(`remember:verified skill ${skillPath}`));
+  assert.ok(durableLog.some(l => l.startsWith("remember:learning:")));
+  assert.equal(durableLog.at(-1), "task:done");
 });
 
 test("loop: unverified sync never becomes a reusable skill", async () => {
@@ -196,12 +204,12 @@ test("loop: unverified sync never becomes a reusable skill", async () => {
   assert.equal(files.size, 0);
 });
 
-test("loop: maxRuns is clamped to 8", async () => {
+test("loop: maxRuns is clamped to 11", async () => {
   let runs = 0;
   const summary = await runAgentLoop({
     messages: [], signal: new AbortController().signal, tools: true, maxRuns: 99,
     model: async (_m, emit) => emit(block), execute: async () => { runs++; return { status: "success", exitCode: 0 }; }, onText: () => {},
   });
-  assert.equal(runs, 8);
+  assert.equal(runs, 11);
   assert.equal(summary.status, "limit");
 });

@@ -70,6 +70,9 @@ export function ProjectFilesView({ workspaceId }: { workspaceId: string }) {
       channel?.removeEventListener("message", onBroadcast);
       channel?.close();
     };
+    // Event handlers deliberately reload the latest server snapshot; recreating
+    // the subscription for each selected file would cause duplicate requests.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
 
   const selected = files.find(file => file.path === selectedPath) ?? null;

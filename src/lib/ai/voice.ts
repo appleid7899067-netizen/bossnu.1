@@ -60,11 +60,7 @@ const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
 };
 
 let settings: VoiceSettings = DEFAULT_VOICE_SETTINGS;
-let pending = "";
 let speaking = false;
-let generation = 0;
-let activeAudio: HTMLAudioElement | null = null;
-let draining = false;
 
 function loadSettings() {
   if (typeof window === "undefined") return;
@@ -133,7 +129,7 @@ function createDeviceUtterance(text: string) {
 async function speakDevice(text: string) {
   if (!hasSpeech || !settings.enabled || !text.trim()) return false;
   const synth = window.speechSynthesis;
-  try { synth.resume(); } catch {}
+  try { synth.resume(); } catch { /* Some mobile engines throw while already resumed. */ }
   const utterance = createDeviceUtterance(text);
   speaking = true;
   await new Promise<void>((resolve) => {
@@ -149,38 +145,13 @@ async function speakDevice(text: string) {
     try {
       synth.speak(utterance);
       window.setTimeout(() => {
-        try { synth.resume(); } catch {}
+        try { synth.resume(); } catch { /* Best-effort wake-up for mobile speech engines. */ }
       }, 40);
     } catch {
       done();
     }
   });
   return true;
-}
-
-function takeChunk(final = false) {
-  const match = pending.match(/^(.{40,260}?[.!?。！？\n])(?:\s+|$)/);
-  if (match) {
-    pending = pending.slice(match[0].length);
-    return match[1];
-  }
-  if (final && pending.trim()) {
-    const tail = pending.trim();
-    pending = "";
-    return tail;
-  }
-  return "";
-}
-
-async function drain(final = false) {
-  const token = generation;
-  if (!settings.enabled || !hasSpeech || speaking) return;
-  while (settings.enabled && token === generation) {
-    const chunk = takeChunk(final);
-    if (!chunk) break;
-    await speakDevice(cleanSpeechText(chunk));
-    final = false;
-  }
 }
 
 export function isVoiceSupported() {
@@ -223,28 +194,26 @@ export function isVoiceEnabled() {
 }
 
 /** Streaming text is intentionally silent. The final summary is spoken once. */
-export function speakRealtime(_text: string) {}
+export function speakRealtime(_text: string) {
+  // Intentionally deferred until the final response to prevent overlapping speech.
+}
 
 export function isVoiceSpeaking() {
-  return speaking || (!!activeAudio && !activeAudio.paused);
+  return speaking;
 }
 
 export function finishVoice() {
-  pending = "";
+  // Streaming speech has no buffered chunks to flush.
 }
 
 export async function speakNow(text: string) {
   const cleaned = cleanSpeechText(text);
   if (!cleaned || !settings.enabled || !hasSpeech) return false;
-  generation += 1;
-  pending = "";
   window.speechSynthesis.cancel();
   return speakDevice(cleaned);
 }
 
 export function stopVoice() {
-  generation += 1;
-  pending = "";
   speaking = false;
   if (hasSpeech) window.speechSynthesis.cancel();
 }

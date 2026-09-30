@@ -12,7 +12,7 @@ async function tmp() { return mkdtemp(join(tmpdir(), 'runner-sync-')); }
 async function put(dir, rel, content) { await mkdir(join(dir, rel, '..'), { recursive: true }); await writeFile(join(dir, rel), content); }
 const exists = (dir, rel) => readFile(join(dir, rel), 'utf8').then(() => true, () => false);
 
-test('snapshot: full listing with hashes, skips node_modules, binary, symlinks and oversize files', async t => {
+test('snapshot: full listing with hashes, preserves binary, skips node_modules, symlinks and oversize files', async t => {
   const dir = await tmp(); t.after(() => rm(dir, { recursive: true, force: true }));
   await put(dir, 'project/index.js', 'console.log(1)');
   await put(dir, 'project/src/a.ts', 'export const a = 1');
@@ -22,9 +22,10 @@ test('snapshot: full listing with hashes, skips node_modules, binary, symlinks a
   await symlink('index.js', join(dir, 'project/link.js'));
   const snap = await snapshotWorkspace(dir, { maxPaths: 100, maxFiles: 100, maxFileBytes: 40, maxTotalBytes: 1e6 });
   assert.equal(snap.complete, true);
-  assert.deepEqual(snap.files.map(f => f.path), ['project/index.js', 'project/src/a.ts']);
+  assert.deepEqual(snap.files.map(f => f.path), ['project/index.js', 'project/logo.png', 'project/src/a.ts']);
   assert.equal(snap.files[0].sha256, sha256('console.log(1)'));
-  assert.deepEqual(Object.fromEntries(snap.skipped.map(s => [s.path, s.reason])), { 'project/big.txt': 'too-large', 'project/link.js': 'symlink', 'project/logo.png': 'binary' });
+  assert.match(snap.files[1].content, /^BOSSNU_BINARY_HEX:/);
+  assert.deepEqual(Object.fromEntries(snap.skipped.map(s => [s.path, s.reason])), { 'project/big.txt': 'too-large', 'project/link.js': 'symlink' });
   assert.ok(!snap.paths.some(p => p.includes('node_modules')));
 });
 

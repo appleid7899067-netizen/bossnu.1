@@ -11,7 +11,7 @@ function config() {
 
 function safeBranch(value: string | undefined) {
   const branch = value?.trim() || "sali/agent";
-  if (!/^[A-Za-z0-9._\/-]{1,120}$/.test(branch) || branch.startsWith("-") || branch.includes("..")) {
+  if (!/^[A-Za-z0-9._/-]{1,120}$/.test(branch) || branch.startsWith("-") || branch.includes("..")) {
     throw new Error("ชื่อ branch ไม่ปลอดภัย");
   }
   return branch;

@@ -337,6 +337,11 @@ const TONE_PRESETS: { label: string; tone: string }[] = [
 
 function PersonalityPanel({ save }: { save: (patch: Partial<PersonalitySettings>) => void }) {
   const personality = useAppStore((s) => s.personality);
+  const addMemory = useAppStore((s) => s.addMemory);
+  const rememberSaliSettings = () => {
+    addMemory(`ตั้งค่าบุคลิกผู้ช่วย: ชื่อ ${personality.name}; โทน ${personality.tone}; ภาษาไทยเป็นหลัก ${personality.thaiFirst ? "ใช่" : "ไม่"}; ลงมือทำก่อน ${personality.actFirst ? "ใช่" : "ไม่"}`);
+    toast.success("บันทึกบุคลิกเข้าความจำสลี่แล้ว");
+  };
   return <div className="grid gap-4 md:grid-cols-2">
     <Panel title="บุคลิกหลัก" icon={Sparkles}>
       <label className="block text-sm text-muted">ชื่อผู้ช่วย
@@ -360,7 +365,8 @@ function PersonalityPanel({ save }: { save: (patch: Partial<PersonalitySettings>
             >{preset.label}</button>
           ))}
         </div>
-        <textarea value={personality.tone} onChange={e => save({ tone: e.target.value })} rows={4} className="w-full resize-none rounded-xl border border-border bg-clay px-3 py-2.5 outline-none transition-all focus:border-primary/50 focus:bg-surface focus:shadow-[0_0_0_3px_var(--accent-soft)]" />\n      <Button className="mt-3 w-full" onClick={() => void rememberSaliSettings()}><Brain className="size-4" />บันทึกเข้าความจำสลี่</Button>
+        <textarea value={personality.tone} onChange={e => save({ tone: e.target.value })} rows={4} className="w-full resize-none rounded-xl border border-border bg-clay px-3 py-2.5 outline-none transition-all focus:border-primary/50 focus:bg-surface focus:shadow-[0_0_0_3px_var(--accent-soft)]" />
+        <Button className="mt-3 w-full" onClick={rememberSaliSettings}><Brain className="size-4" />บันทึกเข้าความจำสลี่</Button>
       </div>
     </Panel>
     <Panel title="พฤติกรรม" icon={UserRound}>
