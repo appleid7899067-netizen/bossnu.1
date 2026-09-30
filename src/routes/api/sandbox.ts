@@ -44,7 +44,7 @@ import {
 import { runnerAuthHeaders, runnerConfig } from "@/lib/sandbox/runner-config.server";
 import { createVerifiedSkill, e2bConfigured, runE2B } from "@/lib/sandbox/e2b-runner.server";
 
-const MAX_BODY_BYTES = 256 * 1024;
+const MAX_BODY_BYTES = Number(process.env.SANDBOX_MAX_BODY_BYTES) || 16 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
 // Response helpers
