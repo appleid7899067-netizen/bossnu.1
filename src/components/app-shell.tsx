@@ -371,7 +371,10 @@ ${message}`); toast.error(message); }
       await persistJournal();
       finishVoice();
       if (reply.trim() && !ac.signal.aborted) await speakNow(reply);
-      setBusyChat(false); setStreamingId(null);
+      setBusyChat(false);
+      setStreamingId(null);
+    }
+  }
 
   function stopChat() {
     abortRef.current?.abort();
