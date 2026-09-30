@@ -10,12 +10,13 @@ import {
   rememberWorkspace,
   updateWorkspaceTask,
   upsertWorkspaceFile,
+  appendWorkspaceFile,
 } from "@/lib/ai/boss-workspace";
 import { syncStatus } from "@/lib/workspace/sync.server";
 
 type Body = {
   workspaceId?: string;
-  action?: "list" | "project-list" | "read" | "write" | "delete" | "context" | "task" | "remember" | "sync-status";
+  action?: "list" | "project-list" | "read" | "write" | "delete" | "context" | "task" | "remember" | "journal" | "sync-status";
   path?: string;
   content?: string;
   goal?: string;
@@ -88,6 +89,17 @@ export const Route = createFileRoute("/api/workspace")({
             await ensureBossWorkspace(workspaceId);
             await rememberWorkspace(workspaceId, key, body.value.slice(0, 8000), str(body.source, 40) || "conversation");
             return Response.json({ ok: true });
+          }
+          if (action === "journal") {
+            const date = new Date().toISOString().slice(0, 10);
+            const entry = str(body.value, 120000);
+            if (!entry) return bad("journal ต้องมี value");
+            await ensureBossWorkspace(workspaceId);
+            const safeEntry = entry.replace(/(?:api[_ -]?key|token|secret|password|authorization)\\s*[:=]\\s*[^\\s,;]+/gi, "$1: [REDACTED]");
+            const path = "project/.sali/memory/daily/" + date + ".md";
+            await appendWorkspaceFile(workspaceId, path, safeEntry.endsWith("\\n") ? safeEntry : safeEntry + "\\n");
+            await appendWorkspaceFile(workspaceId, "project/.sali/memory/INDEX.md", "- " + date + " → " + path + "\\n", 120000);
+            return Response.json({ ok: true, path });
           }
           if (action === "sync-status") {
             return Response.json({ ok: true, sync: await syncStatus(workspaceId, Number(body.limit) || 10) });
