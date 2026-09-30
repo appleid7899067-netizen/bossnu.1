@@ -614,9 +614,7 @@ ${message}`); toast.error(message); }
                 contextualActions={quickActions}
                 toolActions={roomTools}
                 quickPrompts={store.quickPrompts}
-                onInsertPrompt={(prompt) => setDraft((prev) => [prev.trim(), prompt].filter(Boolean).join(prev.trim() ? "
-
-" : ""))}
+                onInsertPrompt={(prompt) => setDraft((prev) => [prev.trim(), prompt].filter(Boolean).join(prev.trim() ? "\\n\\n" : ""))}
                 activeTool={activeTool}
                 onToolAction={(tool) => {
                   setActiveTool(tool);
