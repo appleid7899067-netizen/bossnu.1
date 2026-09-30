@@ -51,7 +51,26 @@ export function ProjectFilesView({ workspaceId }: { workspaceId: string }) {
     } finally { setLoading(false); }
   }
 
-  useEffect(() => { void load(true); }, [workspaceId]);
+  useEffect(() => {
+    void load(true);
+    const onWorkspaceChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ workspaceId?: string }>).detail;
+      if (detail?.workspaceId && detail.workspaceId !== workspaceId) return;
+      void load(false);
+    };
+    window.addEventListener("bossnu:workspace-changed", onWorkspaceChanged);
+    const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("bossnu-workspace") : null;
+    const onBroadcast = (event: MessageEvent<{ workspaceId?: string }>) => {
+      if (event.data?.workspaceId && event.data.workspaceId !== workspaceId) return;
+      void load(false);
+    };
+    channel?.addEventListener("message", onBroadcast);
+    return () => {
+      window.removeEventListener("bossnu:workspace-changed", onWorkspaceChanged);
+      channel?.removeEventListener("message", onBroadcast);
+      channel?.close();
+    };
+  }, [workspaceId]);
 
   const selected = files.find(file => file.path === selectedPath) ?? null;
   const kind = mediaKind(selected);
@@ -93,6 +112,12 @@ export function ProjectFilesView({ workspaceId }: { workspaceId: string }) {
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || "บันทึกไฟล์ไม่สำเร็จ");
       setFiles(current => current.map(file => file.path === selected.path ? { ...file, content: draft, updatedAt: new Date().toISOString() } : file));
+      window.dispatchEvent(new CustomEvent("bossnu:workspace-changed", { detail: { workspaceId, path: selected.path } }));
+      if (typeof BroadcastChannel !== "undefined") {
+        const channel = new BroadcastChannel("bossnu-workspace");
+        channel.postMessage({ workspaceId, path: selected.path });
+        channel.close();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "บันทึกไฟล์ไม่สำเร็จ");
     } finally { setSaving(false); }
