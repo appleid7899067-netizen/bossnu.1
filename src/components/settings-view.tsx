@@ -12,7 +12,7 @@ import { ACCENTS } from "@/lib/use-appearance";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { getAvailableVoices, getPuterVoices, getVoiceSettings, isVoiceSupported, updateVoiceSettings, applyVoiceMode, VOICE_MODES, type VoiceSettings, type PuterVoiceOption } from "@/lib/ai/voice";
+import { getVoiceSettings, isVoiceSupported, updateVoiceSettings, type VoiceSettings } from "@/lib/ai/voice";
 
 const SANDBOX_LANGUAGES = [
   { id: "python", label: "Python", file: "main.py" },
@@ -77,20 +77,6 @@ export function SettingsView({ workspaceId = "default" }: { workspaceId?: string
   const [sandboxPreview, setSandboxPreview] = useState(false);
   const skills = store.agentSkills;
   const enabledCount = useMemo(() => skills.filter(s => s.enabled).length, [skills]);
-
-  useEffect(() => {
-    if (!isVoiceSupported()) return;
-    const refresh = () => setVoiceList(getAvailableVoices());
-    refresh();
-    window.speechSynthesis.addEventListener("voiceschanged", refresh);
-    return () => window.speechSynthesis.removeEventListener("voiceschanged", refresh);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    void getPuterVoices().then((voices) => { if (!cancelled) setPuterVoiceList(voices); });
-    return () => { cancelled = true; };
-  }, []);
 
   const changeVoice = (patch: Partial<VoiceSettings>) => {
     const next = { ...voiceSettings, ...patch };
