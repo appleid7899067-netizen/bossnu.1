@@ -203,11 +203,8 @@ async function speakDevice(text: string) {
 async function speakChunk(text: string, token: number) {
   const cleaned = cleanSpeechText(text);
   if (!cleaned || token !== generation || !settings.enabled) return;
-  if (settings.source === "puter") {
-    const ok = await speakPuter(cleaned);
-    if (ok) return;
-  }
-  await speakDevice(cleaned);
+  // XAI voice is mandatory. Never fall back to browser SpeechSynthesis.
+  await speakPuter(cleaned);
 }
 
 function takeChunk(final = false) {
@@ -235,7 +232,9 @@ async function drain(final = false) {
 }
 
 export function isVoiceSupported() {
-  return hasSpeech;
+  // Puter XAI TTS is the primary voice path. Browser SpeechSynthesis is not
+  // considered a valid fallback because it produces the device/browser voice.
+  return !!getPuter()?.ai?.txt2speech;
 }
 
 export function getVoiceSettings(): VoiceSettings {
@@ -249,7 +248,8 @@ export function getAvailableVoices(): { name: string; lang: string }[] {
 
 export function applyVoiceMode(mode: VoiceMode) {
   const preset = VOICE_MODES.find((item) => item.id === mode) ?? VOICE_MODES[1];
-  updateVoiceSettings({ mode, rate: preset.rate, pitch: preset.pitch, source: "device" });
+  // Keep XAI/Puter locked. Voice modes only tune UI preferences now.
+  updateVoiceSettings({ mode, rate: preset.rate, pitch: preset.pitch, source: "puter", puterProvider: "xai" });
 }
 
 export function updateVoiceSettings(patch: Partial<VoiceSettings>) {
@@ -286,21 +286,13 @@ export function finishVoice() {
 
 export async function speakNow(text: string) {
   const cleaned = cleanSpeechText(text);
-  if (!cleaned || !settings.enabled || !hasSpeech) return false;
+  if (!cleaned || !settings.enabled) return false;
 
-  // A direct browser utterance is the reliable final fallback on mobile.
-  // Cancel any queued stream fragments first so the answer is never silent
-  // and never spoken twice by stale browser utterances.
+  // Cancel queued stream fragments. Playback itself must come from Puter XAI,
+  // never from browser SpeechSynthesis.
   generation += 1;
   pending = "";
-  const synth = window.speechSynthesis;
-  try { synth.cancel(); } catch {}
-  await new Promise((resolve) => window.setTimeout(resolve, 30));
-  if (settings.source === "puter") {
-    const ok = await speakPuter(cleaned);
-    if (ok) return true;
-  }
-  return speakDevice(cleaned);
+  return speakPuter(cleaned);
 }
 
 export function stopVoice() {
