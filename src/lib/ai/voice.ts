@@ -58,6 +58,7 @@ let pending = "";
 let speaking = false;
 let generation = 0;
 let activeAudio: HTMLAudioElement | null = null;
+let draining = false;
 
 function loadSettings() {
   if (typeof window === "undefined") return;
@@ -147,6 +148,9 @@ async function speakPuter(text: string) {
     const audio = await puter.ai.txt2speech(cleanSpeechText(text).slice(0, 2999), options);
     activeAudio = audio;
     audio.volume = settings.volume;
+    // xAI TTS does not expose a speed option in Puter. Apply playback speed
+    // locally to the returned audio without changing the selected XAI voice.
+    audio.playbackRate = Math.max(0.75, Math.min(1.5, settings.rate));
     await audio.play();
     await new Promise<void>((resolve) => {
       const done = () => { audio.removeEventListener("ended", done); audio.removeEventListener("error", done); resolve(); };
@@ -222,12 +226,18 @@ function takeChunk(final = false) {
 }
 
 async function drain(final = false) {
+  if (draining) return;
+  draining = true;
   const token = generation;
-  while (settings.enabled && token === generation) {
+  try {
+    while (settings.enabled && token === generation) {
     const chunk = takeChunk(final);
     if (!chunk) break;
-    await speakChunk(chunk, token);
-    final = false;
+      await speakChunk(chunk, token);
+      final = false;
+    }
+  } finally {
+    draining = false;
   }
 }
 
@@ -268,7 +278,9 @@ export function isVoiceEnabled() {
 
 export function speakRealtime(text: string) {
   if (!settings.enabled) return;
-  pending += text;
+  // Keep only a bounded speech buffer so long streams cannot grow memory
+  // while TTS is still generating/playing previous chunks.
+  pending = (pending + text).slice(-12000);
   void drain(false);
 }
 
