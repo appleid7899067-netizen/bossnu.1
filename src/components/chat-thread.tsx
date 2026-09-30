@@ -414,7 +414,7 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
   }
 
   return (
-    <section aria-label="SALI live stream" className="sali-devlog mb-3">
+    <section aria-label="SALI live stream" className={`sali-devlog mb-3${live ? " sali-devlog-live" : " sali-devlog-done"}`}>
       <div className="sali-devlog-head">
         <span className="sali-devlog-title">{live ? "กำลังทำงานให้คุณอยู่ค่ะ ✨" : "ทำงานเสร็จแล้วค่ะ ✨"}</span>
         <span className="sali-devlog-headline" aria-hidden="true" />

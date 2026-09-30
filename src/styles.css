@@ -596,4 +596,90 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
     padding: 4px 8px 6px;
     font-size: 8px;
   }
+
+  /* Mobile work stream: a calm, readable activity transcript like a native
+     assistant conversation. Avoid nested cards and horizontal ticker UI. */
+  .sali-devlog-live {
+    margin: 0;
+    padding: 10px 20px 18px;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .sali-devlog-live .sali-devlog-head { display: none; }
+
+  .sali-devlog-live .sali-devlog-flow {
+    display: flex;
+    width: 100%;
+    min-height: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    border-radius: 0;
+    background: transparent;
+    white-space: normal;
+  }
+
+  .sali-devlog-live .sali-flow-item {
+    display: block;
+    width: 100%;
+    padding: 9px 0;
+  }
+
+  .sali-devlog-live .sali-flow-arrow { display: none; }
+
+  .sali-devlog-live .sali-flow-token {
+    display: block;
+    min-height: 0;
+    max-width: none;
+    overflow: visible;
+    color: var(--color-fg);
+    font-family: ui-sans-serif, system-ui, "Noto Sans Thai", sans-serif;
+    font-size: 15px;
+    font-weight: 450;
+    line-height: 1.65;
+    text-overflow: initial;
+    white-space: normal;
+  }
+
+  .sali-devlog-live .sali-flow-live { color: var(--color-muted); }
+  .sali-devlog-live .sali-flow-ok { color: var(--color-fg); }
+  .sali-devlog-live .sali-flow-error { color: var(--color-danger); }
+
+  .sali-devlog-live .sali-stream-output {
+    margin: 2px 0 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .sali-devlog-live .sali-stream-output-head { display: none; }
+
+  .sali-devlog-live .sali-stream-command {
+    padding: 9px 0;
+    border: 0;
+    color: var(--color-muted);
+    background: transparent;
+    font-size: 13px;
+  }
+
+  .sali-devlog-live .sali-stream-log {
+    min-height: 0;
+    max-height: 42vh;
+    padding: 9px 0 16px;
+    color: var(--color-fg);
+    background: transparent;
+    font-family: ui-sans-serif, system-ui, "Noto Sans Thai", sans-serif;
+    font-size: 14px;
+    line-height: 1.75;
+    contain: none;
+  }
 }
