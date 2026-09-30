@@ -43,7 +43,7 @@ const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   mode: "warm",
   // Browser/device speech synthesis is the single playback path.
   // Keep "source" for backwards-compatible saved settings.
-  source: "puter",
+  source: "device",
   rate: 1,
   pitch: 1,
   volume: 1,
@@ -208,7 +208,7 @@ async function speakChunk(text: string, token: number) {
   const cleaned = cleanSpeechText(text);
   if (!cleaned || token !== generation || !settings.enabled) return;
   // XAI voice is mandatory. Never fall back to browser SpeechSynthesis.
-  await speakPuter(cleaned);
+  await speakDevice(cleaned);
 }
 
 function takeChunk(final = false) {
