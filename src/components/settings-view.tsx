@@ -201,7 +201,7 @@ printf %s ${quote(sandboxInput)} > stdin.txt
           {tab === "appearance" ? <AppearancePanel /> : null}
           {tab === "personality" ? <PersonalityPanel save={save} /> : null}
           {tab === "prompts" ? <PromptsPanel /> : null}
-          {tab === "voice" ? <VoicePanel supported={isVoiceSupported()} settings={voiceSettings} voices={voiceList} puterVoices={puterVoiceList} onChange={changeVoice} /> : null}
+          {tab === "voice" ? <VoicePanel supported={isVoiceSupported()} settings={voiceSettings} onChange={changeVoice} /> : null}
           {tab === "skills" ? <SkillsPanel /> : null}
           {tab === "agents" ? <AgentsPanel newAgent={newAgent} setNewAgent={setNewAgent} /> : null}
           {tab === "memory" ? <MemoryPanel newMemory={newMemory} setNewMemory={setNewMemory} /> : null}
