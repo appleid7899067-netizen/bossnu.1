@@ -285,6 +285,15 @@ export async function runAgentLoop(opts: {
       const verified = Boolean(lastVerdict?.passed);
       if (workspace && raw.trim()) await safely(() => workspace.remember("latest-answer", raw, "conversation"), undefined);
       opts.onPhase?.("answer", verified ? "💬 Answer • ตอบผลที่ตรวจแล้ว" : "💬 Answer • ตอบผลการสนทนา");
+      // A successful Sandbox run can legitimately leave the model with no
+      // final prose (for example when the terminal result itself is the
+      // evidence). Never let the UI interpret that verified state as a
+      // failed/empty answer. Emit a deterministic answer from the evidence
+      // gate so the verified result reaches the user.
+      if (verified && !raw.trim()) {
+        const evidence = lastVerdict?.reasons.length ? lastVerdict.reasons.join(" • ") : "exit 0 และหลักฐาน Workspace ผ่าน Verification";
+        opts.onText("\n> ✅ ตรวจสอบเสร็จแล้วค่ะ\n> " + evidence + "\n");
+      }
       return finish(verified ? "verified" : "answered");
     }
 
