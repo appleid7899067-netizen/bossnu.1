@@ -16,7 +16,7 @@ import { syncStatus } from "@/lib/workspace/sync.server";
 
 type Body = {
   workspaceId?: string;
-  action?: "list" | "project-list" | "read" | "write" | "delete" | "context" | "task" | "remember" | "journal" | "sync-status";
+  action?: "list" | "project-list" | "read" | "write" | "delete" | "context" | "task" | "remember" | "recall" | "journal" | "sync-status";
   path?: string;
   content?: string;
   goal?: string;
