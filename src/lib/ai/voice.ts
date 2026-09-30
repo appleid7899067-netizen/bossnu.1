@@ -1,6 +1,6 @@
 const hasSpeech = typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 
-export type VoiceMode = "cute" | "warm" | "calm" | "bright" | "special" | "deep" | "energetic" | "gentle" | "professional" | "story";
+export type VoiceMode = "cute" | "warm" | "calm" | "bright" | "special" | "deep" | "energetic" | "gentle" | "professional" | "story" | "anime" | "bigSister" | "youngHero" | "butler" | "robot" | "villain" | "wizard" | "news";
 
 type VoiceProfile = {
   id: VoiceMode;
@@ -22,7 +22,15 @@ export const VOICE_MODES: VoiceProfile[] = [
   { id: "energetic", label: "⚡ พลังงานสูง", description: "คึกคัก กระฉับกระเฉง", voice: "device", rate: 1.1, pitch: 1.0, instructions: "Speak Thai with energetic confidence and momentum. Sound lively and capable, never rushed or shouty." },
   { id: "gentle", label: "🌸 ละมุนใจ", description: "อ่อนโยน นุ่มนวล", voice: "device", rate: 0.93, pitch: 1.04, instructions: "Speak Thai gently with a soft, caring adult voice. Smooth phrasing, natural warmth, and delicate expression." },
   { id: "professional", label: "🎙️ มืออาชีพ", description: "ชัด สุขุม น่าเชื่อถือ", voice: "device", rate: 0.96, pitch: 0.92, instructions: "Speak Thai clearly and professionally with calm confidence. Precise diction, balanced pacing, and natural authority." },
-  { id: "story", label: "📖 เล่าเรื่อง", description: "มีมิติ น่าฟัง", voice: "device", rate: 0.97, pitch: 0.98, instructions: "Speak Thai as an engaging storyteller. Use natural rhythm, expressive emphasis, and varied pacing without overacting." },
+  { id: "story", label: "📖 นักเล่านิทาน", description: "มีมิติ ชวนติดตาม", voice: "device", rate: 0.92, pitch: 0.96, instructions: "Speak Thai as an engaging storyteller. Use natural rhythm, expressive emphasis, and varied pacing without overacting." },
+  { id: "anime", label: "🌟 สาวอนิเมะ", description: "เสียงสูง สดใส ตื่นเต้น", voice: "device", rate: 1.16, pitch: 1.3, instructions: "Speak Thai like a cheerful anime heroine, bright and expressive but still intelligible." },
+  { id: "bigSister", label: "👩 พี่สาวใจดี", description: "อบอุ่น เอ็นดู ดูแลเก่ง", voice: "device", rate: 0.94, pitch: 1.08, instructions: "Speak Thai like a kind and caring older sister, warm, patient, and reassuring." },
+  { id: "youngHero", label: "🦸 พระเอกวัยรุ่น", description: "มั่นใจ คล่องแคล่ว มีพลัง", voice: "device", rate: 1.08, pitch: 0.92, instructions: "Speak Thai like a confident young hero, energetic, clear, and optimistic." },
+  { id: "butler", label: "🤵 พ่อบ้านสุภาพ", description: "สุขุม เนี้ยบ นอบน้อม", voice: "device", rate: 0.88, pitch: 0.82, instructions: "Speak Thai like an elegant, composed butler with precise diction and respectful warmth." },
+  { id: "robot", label: "🤖 หุ่นยนต์ AI", description: "เป็นจังหวะ ชัด ล้ำสมัย", voice: "device", rate: 0.9, pitch: 0.72, instructions: "Speak Thai like a futuristic assistant robot, measured, precise, and subtly mechanical." },
+  { id: "villain", label: "🦹 จอมวายร้าย", description: "ต่ำ ช้า ลึกลับ น่าเกรงขาม", voice: "device", rate: 0.78, pitch: 0.66, instructions: "Speak Thai like a theatrical but controlled villain, low, deliberate, and mysterious." },
+  { id: "wizard", label: "🧙 จอมเวทชรา", description: "ขรึม ลุ่มลึก มีมนตร์ขลัง", voice: "device", rate: 0.8, pitch: 0.74, instructions: "Speak Thai like a wise old wizard, thoughtful, resonant, and gently dramatic." },
+  { id: "news", label: "📰 ผู้ประกาศข่าว", description: "เป็นทางการ ชัดถ้อยชัดคำ", voice: "device", rate: 1, pitch: 0.9, instructions: "Speak Thai like a professional news anchor with crisp diction, steady rhythm, and authority." },
 ];
 
 export type VoiceSettings = {

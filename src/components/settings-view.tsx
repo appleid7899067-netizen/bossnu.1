@@ -590,7 +590,7 @@ function VoicePanel({ supported, settings, onChange }: { supported: boolean; set
       />
       <div>
         <div className="mb-2 flex items-end justify-between gap-3">
-          <div><p className="text-sm font-medium">เลือกโทนการพูด</p><p className="mt-0.5 text-xs text-muted">แต่ละโทนจะปรับความเร็วและระดับสูง–ต่ำให้อัตโนมัติ</p></div>
+          <div><p className="text-sm font-medium">เลือกเสียงและคาแรกเตอร์</p><p className="mt-0.5 text-xs text-muted">มีทั้งโทนธรรมชาติและเสียงตัวละคร ปรับจังหวะกับระดับเสียงให้อัตโนมัติ</p></div>
           <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary">{VOICE_MODES.length} โทน</span>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
