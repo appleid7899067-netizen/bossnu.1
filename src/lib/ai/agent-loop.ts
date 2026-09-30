@@ -236,6 +236,9 @@ export async function runAgentLoop(opts: {
       core.context(goal),
       `Run budget: ${Math.max(0, max - count)} of ${max} sandbox runs left.`,
       "Rule: use tools when needed, observe their real output, fix failures, and do not claim completion before verification.",
+      gating
+        ? "REPAIR MODE IS ACTIVE: the next model response MUST contain at least one executable <run> action. That action must perform the repair/edit in the workspace, then a later <run> must execute the repaired target and verify the real result. Prose alone is rejected."
+        : "",
       "Learning rule: previous workspace memories are experience, not truth. Reuse successful approaches only after checking current evidence; when a previous attempt failed, deliberately change the approach instead of repeating the same action.",
       "Never report a task as complete merely because a command was issued. Completion requires the evidence gate for tool-based work.",
       requireWorkspace ? "Verification requires: exit 0 AND workspaceSync.verified AND workspaceSync.complete (Neon read-back matches the sandbox)." : "",
