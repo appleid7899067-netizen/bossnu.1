@@ -1,4 +1,4 @@
-import { RunScanner, modelResult, terminalTranscript, type GithubCall } from "./sandbox-tool.ts";
+import { RunScanner, modelResult, type GithubCall } from "./sandbox-tool.ts";
 import type { RunCall, ToolResult } from "./sandbox-tool.ts";
 import { CowAgentCore, buildCowPlan } from "./cow-agent-core.ts";
 import { selectSkills } from "../skills/index.ts";
