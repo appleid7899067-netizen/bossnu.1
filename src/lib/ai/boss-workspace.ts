@@ -3,7 +3,7 @@ import { BOSS_WORKSPACE_DEFAULT_FILES } from "./boss-workspace-layout";
 export { BOSS_WORKSPACE_DEFAULT_FILES, BOSS_WORKSPACE_TREE, formatWorkspaceContext } from "./boss-workspace-layout";
 
 const MAX_PATH = 300;
-const MAX_CONTENT = Number(process.env.WORKSPACE_MAX_FILE_BYTES) || 2 * 1024 * 1024;
+const MAX_CONTENT = Number(process.env.WORKSPACE_MAX_FILE_BYTES) || 4 * 1024 * 1024;
 const VERIFIED_SKILL_PREFIX = "skills/verified/";
 const PERSISTENT_SKILL_PREFIX = "project/skills/verified/";
 
