@@ -1,7 +1,6 @@
-import { genericOAuthClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { runPreSignInSignOut, runSignOut } from "../../../scripts/sign-out-plan.mjs";
-import { GROK_PROVIDERS } from "./providers";
+import { AUTH_PROVIDERS } from "./providers";
 
 /**
  * Better Auth client for this React SPA (browser-side).
@@ -18,7 +17,6 @@ import { GROK_PROVIDERS } from "./providers";
  * the visitor stays signed in.
  */
 export const authClient = createAuthClient({
-  plugins: [genericOAuthClient()],
   fetchOptions: {
     onRequest(ctx) {
       const token = getBearerToken();
@@ -38,7 +36,7 @@ export const authClient = createAuthClient({
 export const authEnabled = true;
 
 /** The upstream providers to render sign-in buttons for. */
-export { GROK_PROVIDERS };
+export { AUTH_PROVIDERS };
 
 // ── Live-preview bearer token ────────────────────────────────────────────────
 // The embedded preview iframe has partitioned cookies, so we keep the session's
@@ -143,8 +141,8 @@ export async function signIn(
     return;
   }
 
-  const { data, error } = await authClient.signIn.oauth2({
-    providerId,
+  const { data, error } = await authClient.signIn.social({
+    provider: providerId as "google",
     callbackURL,
     errorCallbackURL,
   });
