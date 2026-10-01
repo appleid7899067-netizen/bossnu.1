@@ -562,10 +562,13 @@ export async function handlePost(request: Request, emit?: StreamEmit): Promise<R
   const wantedSkill = skillId ?? (type === "skill" ? cmd : undefined);
   let skill: SkillContent | undefined;
   if (wantedSkill) {
-    const loaded = await loadSkill(wantedSkill, reference);
+    const workspaceLoaded = workspaceSeed?.ok
+      ? loadWorkspaceSkill(workspaceSeed.files, wantedSkill, reference)
+      : null;
+    const loaded = workspaceLoaded?.ok ? workspaceLoaded : await loadSkill(wantedSkill, reference);
     if (!loaded.ok) return fail(loaded.status, loaded.error, { steps });
     skill = loaded.skill;
-    steps.push(`โหลดสกิล ${skill.name}`);
+    steps.push(workspaceLoaded?.ok ? `โหลดสกิลจาก Workspace ${skill.name}` : `โหลดสกิล ${skill.name}`);
   }
   if (loadOnly) {
     if (!skill) return fail(400, "ต้องระบุ skill");
