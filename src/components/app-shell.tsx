@@ -23,7 +23,8 @@ import { isRunnerRuntime } from "@/types/sandbox";
 import { streamChat } from "@/lib/ai/stream";
 import { finishVoice, getVoiceSettings, setVoiceEnabled, speakNow, stopVoice } from "@/lib/ai/voice";
 import type { Search } from "@/lib/search";
-import { useAppStore } from "@/lib/store";
+import { exportCloudState, useAppStore } from "@/lib/store";
+import { loadCloudState, saveCloudState } from "@/lib/workspace/cloud-state";
 import type { ChatActivity, ChatAttachment, ChatMode, MindMapData } from "@/lib/types";
 type PendingActivity = ChatActivity extends infer Activity ? Activity extends ChatActivity ? Omit<Activity, "id" | "createdAt"> : never : never;
 import { messageForModel } from "@/lib/attachments";
@@ -71,6 +72,10 @@ export function AppShell({ search }: { search: Search }) {
   useAppearance();
 
 
+  const cloudWorkspaceRef = useRef<string | null>(null);
+  const cloudReadyRef = useRef(false);
+  const cloudTimerRef = useRef<number | null>(null);
+
   useEffect(() => {
     const unsub = useAppStore.persist.onFinishHydration(() => {
       useAppStore.getState().setHydrated();
@@ -79,6 +84,55 @@ export function AppShell({ search }: { search: Search }) {
     if (useAppStore.persist.hasHydrated()) useAppStore.getState().setHydrated();
     return unsub;
   }, []);
+
+  // Neon Workspace is the source of truth. localStorage remains only as a
+  // small browser cache so refresh is fast and clearing site data cannot erase
+  // the real project/chat state.
+  useEffect(() => {
+    const userId = currentUser?.id?.trim();
+    if (!userId || !store.hydrated) return;
+    const workspaceId = agentWorkspaceIdFor(userId, "default");
+    let alive = true;
+    cloudWorkspaceRef.current = workspaceId;
+    cloudReadyRef.current = false;
+
+    const boot = async () => {
+      try {
+        const result = await loadCloudState(workspaceId);
+        if (!alive) return;
+        if (!result.found) {
+          // One-time migration: move the existing browser state to Neon.
+          await saveCloudState(workspaceId);
+        }
+        if (!alive) return;
+        cloudReadyRef.current = true;
+        toast.success(result.found ? "☁️ Workspace จาก Neon โหลดแล้ว" : "☁️ ย้ายข้อมูลจาก Browser เข้า Workspace แล้ว");
+      } catch (error) {
+        cloudReadyRef.current = false;
+        toast.error(error instanceof Error ? error.message : "เชื่อม Workspace ไม่สำเร็จ");
+      }
+    };
+    void boot();
+
+    const unsubscribe = useAppStore.subscribe(() => {
+      if (!alive || !cloudReadyRef.current || cloudWorkspaceRef.current !== workspaceId) return;
+      if (cloudTimerRef.current !== null) window.clearTimeout(cloudTimerRef.current);
+      cloudTimerRef.current = window.setTimeout(() => {
+        cloudTimerRef.current = null;
+        void saveCloudState(workspaceId).catch((error) => {
+          console.error("[workspace] state sync failed", error);
+        });
+      }, 1200);
+    });
+
+    return () => {
+      alive = false;
+      unsubscribe();
+      if (cloudTimerRef.current !== null) window.clearTimeout(cloudTimerRef.current);
+      cloudTimerRef.current = null;
+      cloudReadyRef.current = false;
+    };
+  }, [currentUser?.id, store.hydrated]);
 
   const view = search.view;
   const activeChat = useMemo(
