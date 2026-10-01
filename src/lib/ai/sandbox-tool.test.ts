@@ -72,12 +72,12 @@ test("model results preserve errors and identify untrusted data", () => {
   const text = modelResult(call, { status: "error", stderr: "failure", exitCode: 1 });
   assert.match(text, /UNTRUSTED/); assert.match(text, /failure/); assert.match(text, /"exitCode":1/);
 });
-test("loop returns actual output to model before final answer", async () => {
+test("loop returns actual output to the model while keeping tool traffic out of final prose", async () => {
   let turns = 0, runs = 0, output = "";
   await runAgentLoop({ messages: [{ role: "user", content: "test" }], signal: new AbortController().signal, tools: true,
     model: async (messages, emit) => { if (!turns++) emit(block); else { assert.match(messages.at(-1)!.content, /actual result/); emit("done"); } },
     execute: async () => { runs++; return { status: "success", stdout: "actual result", exitCode: 0 }; }, onText: s => output += s });
-  assert.equal(runs, 1); assert.match(output, /actual result/); assert.ok(output.endsWith("done")); assert.ok(!output.includes("<run"));
+  assert.equal(runs, 1); assert.ok(output.endsWith("done")); assert.ok(!output.includes("<run")); assert.ok(!output.includes("actual result"));
 });
 test("Python Safe block auto-runs, then waits for and observes its real result", async () => {
   let turns = 0, runs = 0;
@@ -91,10 +91,10 @@ test("Python Safe block auto-runs, then waits for and observes its real result",
   });
   assert.equal(runs, 1);
 });
-test("loop caps executions at six", async () => {
+test("loop caps executions at eleven", async () => {
   let runs = 0;
   await runAgentLoop({ messages: [], signal: new AbortController().signal, tools: true, model: async (_, emit) => emit(block), execute: async () => { runs++; return { status: "success" }; }, onText: () => {} });
-  assert.equal(runs, 6);
+  assert.equal(runs, 11);
 });
 test("disabled tools and abort never execute", async () => {
   for (const tools of [false, true]) {

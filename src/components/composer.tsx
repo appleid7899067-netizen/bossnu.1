@@ -203,6 +203,24 @@ export function Composer({
             ))}
           </ul>
         ) : null}
+        {toolActions?.length ? (
+          <div className="no-scrollbar flex items-center gap-1 overflow-x-auto px-1 pb-2 sm:hidden" aria-label="เลือกประเภทรัน">
+            {toolActions.map((tool) => (
+              <button
+                key={tool.id}
+                type="button"
+                aria-pressed={activeTool === tool.id}
+                onClick={() => onToolAction?.(tool.id)}
+                className={cn(
+                  "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                  activeTool === tool.id ? "bg-bg text-fg shadow-[var(--shadow-border)]" : "text-muted hover:text-fg",
+                )}
+              >
+                {tool.label.split("•")[0]?.replace(/^[^\p{L}\p{N}]+/u, "").trim()}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <textarea
           ref={ref}
           value={value}
@@ -255,7 +273,7 @@ export function Composer({
             </>
           ) : null}
           {toolActions?.length ? (
-            <div ref={toolsRef} className="relative shrink-0">
+            <div ref={toolsRef} className="relative hidden shrink-0 sm:block">
               <button
                 type="button"
                 aria-label="เลือกเครื่องมือ"

@@ -93,7 +93,7 @@ export function detectSandboxInput(input: string): SandboxDetection {
   }
 
   // Code-only payloads are execution intent even without words like "run".
-  if (/^\`{3,}[\s\S]*\`{3,}$/.test(value)) {
+  if (/^`{3,}[\s\S]*`{3,}$/.test(value)) {
     return { runtime: "node", label: "Code", code: value, confidence: "high", webPreview: false, dangerous: false };
   }
   if (/^(?:print\s*\(|def\s+\w+\s*\(|class\s+\w+\s*[:(]|import\s+\w+|from\s+\w+\s+import\s+)/m.test(value)) {

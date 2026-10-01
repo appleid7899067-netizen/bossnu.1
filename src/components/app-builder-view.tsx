@@ -81,6 +81,8 @@ export function AppBuilderView({ project, workspaceId, onProject, onReset }: { p
       channel?.removeEventListener("message", onBroadcast);
       channel?.close();
     };
+    // Subscribe once per workspace; onProject identity changes with parent renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
   const selectedFile = current.files.find((f) => f.path === selected) ?? current.files[0];
   const html = useMemo(() => buildPreview(current), [current]);

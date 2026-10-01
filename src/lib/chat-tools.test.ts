@@ -26,9 +26,9 @@ test("attachments: size, type and count limits are enforced with readable errors
 
 test("attachments: the model sees files as fenced blocks after the typed text", () => {
   const text = messageForModel({ content: "review this", attachments: [{ name: "app.js", size: 9, content: "let a = 1" }] });
-  assert.equal(text, "review this\n\nไฟล์แนบ: app.js\n```js\nlet a = 1\n```");
+  assert.equal(text, "review this\n\nไฟล์แนบ: app.js (9 B)\n```js\nlet a = 1\n```");
   const nested = messageForModel({ content: "", attachments: [{ name: "README.md", size: 9, content: "```x```" }] });
-  assert.ok(nested.startsWith("ไฟล์แนบ: README.md\n````md\n"));
+  assert.ok(nested.startsWith("ไฟล์แนบ: README.md (9 B)\n````md\n"));
   assert.equal(messageForModel({ content: "plain" }), "plain");
 });
 

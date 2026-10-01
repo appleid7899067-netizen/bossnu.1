@@ -226,13 +226,14 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .sali-summary,
 .sali-devlog {
   width: 100%;
-  max-width: 920px;
+  max-width: none;
   margin-top: 8px;
   box-sizing: border-box;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--color-elevated) 55%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-elevated) 88%, var(--color-bg));
+  box-shadow: 0 12px 32px color-mix(in srgb, #000 14%, transparent);
 }
 
 .sali-summary-head,
@@ -256,6 +257,33 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
   font-weight: 900;
 }
 
+.sali-devlog-title {
+  flex: 0 0 auto;
+  color: var(--color-primary);
+  font-weight: 850;
+}
+
+.sali-devlog-headline,
+.sali-devlog-trail {
+  height: 1px;
+  flex: 1 1 auto;
+  background: color-mix(in srgb, var(--color-border) 80%, transparent);
+}
+
+.sali-live-cursor {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 14%, transparent);
+  animation: sali-live-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes sali-live-pulse {
+  50% { opacity: .45; transform: scale(.78); }
+}
+
 .sali-summary-mark {
   color: var(--color-success);
   font-size: 10px;
@@ -272,10 +300,27 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .sali-devlog {
   margin-top: 0;
   margin-bottom: 12px;
-  font-family: "Fira Code", "JetBrains Mono", "IBM Plex Mono", "Noto Sans Thai", ui-monospace, monospace;
-  font-size: 9px;
-  line-height: 1.45;
+  padding: 16px;
+  border: 0;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--color-elevated) 94%, #202020);
+  font-family: ui-sans-serif, system-ui, "Noto Sans Thai", sans-serif;
+  font-size: 12px;
+  line-height: 1.55;
 }
+
+.sali-devlog .sali-devlog-head {
+  min-height: auto;
+  padding: 2px 2px 13px;
+  border: 0;
+  font-family: inherit;
+  font-size: 15px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.sali-devlog .sali-devlog-title { color: var(--color-fg); font-weight: 650; }
+.sali-devlog .sali-devlog-headline { display: none; }
 
 .sali-devlog-body {
   min-width: 0;
@@ -284,17 +329,19 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .sali-devlog-flow {
   display: flex;
   align-items: center;
-  width: max-content;
-  min-width: 100%;
-  min-height: 42px;
+  width: 100%;
+  min-height: 38px;
   box-sizing: border-box;
   gap: 0;
+  margin-bottom: 12px;
   padding: 8px 10px;
   overflow-x: auto;
   overflow-y: hidden;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-bg) 48%, transparent);
   overscroll-behavior-x: contain;
   white-space: nowrap;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
 .sali-flow-item {
@@ -314,7 +361,7 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
   display: inline-flex;
   align-items: center;
   min-height: 22px;
-  max-width: min(58vw, 520px);
+  max-width: min(68vw, 760px);
   color: var(--color-fg);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -338,7 +385,7 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 }
 
 .sali-flow-stream-text {
-  max-width: min(76vw, 720px);
+  max-width: min(82vw, 980px);
   overflow: hidden;
   text-overflow: clip;
 }
@@ -347,18 +394,156 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
   flex: 0 0 auto;
 }
 
+.sali-stream-output {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid #303030;
+  border-radius: 16px;
+  background: #121212;
+  color: #eeeeee;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .2);
+}
+
+.sali-stream-expanded {
+  position: fixed;
+  inset: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border-radius: 20px;
+  box-shadow: 0 30px 100px rgba(0, 0, 0, .72);
+}
+
+.sali-stream-expanded .sali-stream-log { max-height: none; flex: 1; }
+
+.sali-stream-output-head {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #2b2b2b;
+  color: #999;
+}
+
+.sali-stream-tabs { display: flex; align-items: center; gap: 3px; }
+.sali-stream-tabs button {
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: #aaa;
+  font-size: 13px;
+  font-weight: 650;
+  transition: background .18s ease, color .18s ease;
+}
+.sali-stream-tabs button[data-active="true"] { background: #050505; color: #fff; }
+
+.sali-stream-actions { display: flex; align-items: center; gap: 2px; }
+.sali-stream-actions button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 9px;
+  color: #929292;
+  transition: background .18s ease, color .18s ease;
+}
+.sali-stream-actions button:hover { background: #292929; color: #fff; }
+.sali-stream-actions svg { width: 17px; height: 17px; }
+
+.sali-stream-command {
+  display: flex;
+  gap: 9px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #252525;
+  color: #c7c7c7;
+  font-family: "Fira Code", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.sali-stream-command span { color: #3dd6aa; font-weight: 800; }
+
+.sali-stream-log {
+  min-height: 190px;
+  max-height: min(52vh, 520px);
+  margin: 0;
+  overflow: auto;
+  padding: 15px 14px 22px;
+  color: #e5e7eb;
+  background: linear-gradient(180deg, #111, #0b0b0b);
+  font-family: "Fira Code", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.72;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  contain: content;
+}
+
 .sali-devlog-terminal {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
-  min-height: 25px;
+  min-height: 28px;
   padding: 5px 10px 7px;
   border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
   color: var(--color-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.sali-devlog-prompt {
+  color: var(--color-primary);
+  font-weight: 900;
+}
+
+.sali-devlog-complete {
+  padding: 3px 10px 8px;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+}
+
+.sali-complete-rule {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--color-success);
+  font-size: 8px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.sali-complete-rule::before,
+.sali-complete-rule::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: color-mix(in srgb, var(--color-success) 28%, var(--color-border));
+}
+
+.sali-complete-result {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-top: 6px;
+  color: var(--color-muted);
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+
+.sali-complete-result b { color: var(--color-subtle); font-weight: 500; }
+
+.sali-complete-badge {
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--color-success) 42%, transparent);
+  border-radius: 4px;
+  color: var(--color-success);
+  font-size: 8px;
+  font-weight: 800;
 }
 
 .sali-terminal-caret {
@@ -374,13 +559,23 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 
 @media (max-width: 640px) {
   .sali-summary,
-  .sali-devlog { max-width: 100%; border-radius: 10px; }
+  .sali-devlog { max-width: 100%; border-radius: 18px; }
 
-  .sali-summary-body { padding: 8px 9px 9px; }
+  .sali-summary { border-color: color-mix(in srgb, var(--color-border) 65%, transparent); }
+  .sali-summary .sali-summary-head { display: none; }
+  .sali-summary.sali-live-html-card .sali-summary-head { display: flex; }
+  .sali-summary-body { padding: 20px 18px; }
+  .sali-summary-body .assistant-prose { gap: 16px; font-size: 15px; line-height: 1.75; }
+
+  .sali-devlog {
+    padding: 18px;
+    border-radius: 24px;
+  }
 
   .sali-devlog-flow {
     min-height: 38px;
-    padding: 7px 8px;
+    margin-bottom: 14px;
+    padding: 8px 9px;
   }
 
   .sali-flow-arrow { padding: 0 5px; }
@@ -392,9 +587,99 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 
   .sali-flow-stream-text { max-width: 84vw; }
 
+  .sali-stream-output { margin: 0; border-radius: 16px; }
+  .sali-stream-log { min-height: 260px; max-height: 48vh; font-size: 11px; }
+  .sali-stream-command { font-size: 10.5px; }
+
   .sali-devlog-terminal {
     min-height: 23px;
     padding: 4px 8px 6px;
     font-size: 8px;
+  }
+
+  /* Mobile work stream: a calm, readable activity transcript like a native
+     assistant conversation. Avoid nested cards and horizontal ticker UI. */
+  .sali-devlog-live {
+    margin: 0;
+    padding: 10px 20px 18px;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .sali-devlog-live .sali-devlog-head { display: none; }
+
+  .sali-devlog-live .sali-devlog-flow {
+    display: flex;
+    width: 100%;
+    min-height: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    border-radius: 0;
+    background: transparent;
+    white-space: normal;
+  }
+
+  .sali-devlog-live .sali-flow-item {
+    display: block;
+    width: 100%;
+    padding: 9px 0;
+  }
+
+  .sali-devlog-live .sali-flow-arrow { display: none; }
+
+  .sali-devlog-live .sali-flow-token {
+    display: block;
+    min-height: 0;
+    max-width: none;
+    overflow: visible;
+    color: var(--color-fg);
+    font-family: ui-sans-serif, system-ui, "Noto Sans Thai", sans-serif;
+    font-size: 15px;
+    font-weight: 450;
+    line-height: 1.65;
+    text-overflow: initial;
+    white-space: normal;
+  }
+
+  .sali-devlog-live .sali-flow-live { color: var(--color-muted); }
+  .sali-devlog-live .sali-flow-ok { color: var(--color-fg); }
+  .sali-devlog-live .sali-flow-error { color: var(--color-danger); }
+
+  .sali-devlog-live .sali-stream-output {
+    margin: 2px 0 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .sali-devlog-live .sali-stream-output-head { display: none; }
+
+  .sali-devlog-live .sali-stream-command {
+    padding: 9px 0;
+    border: 0;
+    color: var(--color-muted);
+    background: transparent;
+    font-size: 13px;
+  }
+
+  .sali-devlog-live .sali-stream-log {
+    min-height: 0;
+    max-height: 42vh;
+    padding: 9px 0 16px;
+    color: var(--color-fg);
+    background: transparent;
+    font-family: ui-sans-serif, system-ui, "Noto Sans Thai", sans-serif;
+    font-size: 14px;
+    line-height: 1.75;
+    contain: none;
   }
 }

@@ -17,7 +17,7 @@ import {
   type SkillContent,
 } from "@/types/sandbox";
 import { runnerAuthHeaders, runnerConfig } from "@/lib/sandbox/runner-config.server";
-import { e2bConfigured, runE2B } from "@/lib/sandbox/e2b-runner.server";
+import { e2bConfigured, e2bSandboxId, runE2B } from "@/lib/sandbox/e2b-runner.server";
 
 const MAX_BODY_BYTES = 256 * 1024;
 
@@ -101,7 +101,7 @@ async function handle(request: Request): Promise<Response> {
         return publicRunnerResult(result, evidence);
       };
       try {
-        send({ type: "status", status: "queued", message: e2bConfigured() ? "ส่งงานเข้า E2B Sandbox" : "รับคำสั่ง Sandbox" });
+        send({ type: "status", status: "queued", message: e2bConfigured() ? `กำลังเชื่อม E2B ${e2bSandboxId()}` : "E2B_API_KEY ไม่พร้อม — ใช้ Sandbox สำรอง" });
         if (e2bConfigured()) {
           try {
             const executed = await runE2B(runtime, command, workspace, stdin, (stream, text) => {

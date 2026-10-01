@@ -32,7 +32,7 @@ export function SaliCallView({ history, onClose, onSaveMessage }: {
   }, [active]);
   useEffect(() => () => {
     activeRef.current = false;
-    try { recognitionRef.current?.stop(); } catch {}
+    try { recognitionRef.current?.stop(); } catch { /* Speech recognition may already be stopped or unavailable. */ }
     if (recognitionTimerRef.current) window.clearTimeout(recognitionTimerRef.current);
     stopVoice();
   }, []);
@@ -69,13 +69,13 @@ export function SaliCallView({ history, onClose, onSaveMessage }: {
       if (activeRef.current && !muted && !processingRef.current) recognitionTimerRef.current = window.setTimeout(startRecognition, 700);
     };
     recognitionRef.current = rec;
-    try { rec.start(); } catch {}
+    try { rec.start(); } catch { /* Speech recognition may already be stopped or unavailable. */ }
   }
 
   async function handleUserSpeech(text: string) {
     if (!activeRef.current || processingRef.current) return;
     processingRef.current = true;
-    try { recognitionRef.current?.stop(); } catch {}
+    try { recognitionRef.current?.stop(); } catch { /* Speech recognition may already be stopped or unavailable. */ }
     addMessage("user", text);
     setStatus("สลี่กำลังคิดคำตอบ…");
     setSpeaking(true);
@@ -119,12 +119,12 @@ export function SaliCallView({ history, onClose, onSaveMessage }: {
   async function toggleCall() {
     if (active) {
       setActive(false); activeRef.current = false;
-      try { recognitionRef.current?.stop(); } catch {}
+      try { recognitionRef.current?.stop(); } catch { /* Speech recognition may already be stopped or unavailable. */ }
       stopVoice(); setListening(false); setSpeaking(false); setStatus("จบการสนทนาแล้ว");
       return;
     }
     setActive(true); activeRef.current = true; setSeconds(0); setStatus("กำลังเชื่อมต่อ…"); stopVoice();
-    try { recognitionRef.current?.stop(); } catch {}
+    try { recognitionRef.current?.stop(); } catch { /* Speech recognition may already be stopped or unavailable. */ }
     const greeting = "สวัสดีค่ะ สลี่พร้อมคุยแล้วนะคะ พูดกับสลี่ได้เลย";
     addMessage("assistant", greeting);
     await new Promise((resolve) => setTimeout(resolve, 250));

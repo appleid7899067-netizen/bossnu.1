@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, Check, Copy, FileText, Pencil, RefreshCw, Trash2, Volume2 } from "lucide-react";
+import { ArrowDown, Check, Copy, Download, FileText, Maximize2, Minimize2, Pencil, RefreshCw, Trash2, Volume2 } from "lucide-react";
 import { formatBytes } from "@/lib/attachments";
 import { Markdown } from "@/components/markdown";
 import type { ChatActivity, ChatMessage } from "@/lib/types";
@@ -190,7 +190,7 @@ function MessageBubble({
             </button>
           </div>
           <div className="min-w-0">
-            <div className="rounded-[20px] rounded-br-md bg-primary/[0.08] px-3.5 py-2.5 text-[12px] leading-[1.5] shadow-[var(--shadow-border)] ring-1 ring-primary/10">
+            <div className="rounded-[20px] rounded-br-md bg-primary/[0.08] px-3.5 py-2.5 text-[12px] leading-[1.5] shadow-[var(--shadow-border)] ring-1 ring-primary/10 max-md:bg-primary max-md:text-primary-fg max-md:ring-primary/40">
               {message.attachments?.length ? (
                 <ul className="mb-2 flex flex-wrap gap-1.5">
                   {message.attachments.map((file, index) => (
@@ -216,8 +216,8 @@ function MessageBubble({
   return (
     <div className="lumina-rise group w-full">
       <div className="min-w-0 w-full break-words text-[13px] pl-0 sm:pl-0 leading-[1.6] [overflow-wrap:anywhere] sm:text-[12.5px] sm:leading-[1.55]">
-        {message.activities?.length ? <ActivityFeed activities={message.activities} live={live} liveText={live ? message.content : ""} /> : null}
-        {empty && !message.activities?.length ? (
+        {(live || message.activities?.length) ? <ActivityFeed activities={message.activities ?? []} live={live} liveText={live ? message.content : ""} /> : null}
+        {empty && !live && !message.activities?.length ? (
           <p className="text-sm font-medium text-muted">กำลังดำเนินการ...</p>
         ) : null}
         {!live && message.content ? (
@@ -296,7 +296,9 @@ function CopyLine({ text }: { text: string }) {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
-    } catch {}
+    } catch {
+      // Clipboard access can be unavailable in embedded or non-secure contexts.
+    }
   }
   return <button type="button" onClick={() => void copy()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-fg" aria-label={copied ? "คัดลอกแล้ว" : "คัดลอกคำตอบ"} title={copied ? "คัดลอกแล้ว" : "คัดลอกคำตอบ"}>
     {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
@@ -324,19 +326,61 @@ function ContextualReplyActions({ onAction }: { text: string; onAction: (action:
 }
 
 
-const PHASE_TITLES: Record<string, string> = {
-  goal: "Goal • เป้าหมาย",
-  plan: "Plan • วางแผน",
-  act: "Act • ลงมือทำ",
-  run: "Run • รัน Sandbox",
-  observe: "Observe • อ่านผล",
-  verify: "Verify • ตรวจสอบ",
-  fix: "Fix • แก้แล้วลองใหม่",
-  answer: "Answer • ตอบในแชต",
-};
+function LiveExecutionLog({ command, output, fallback }: { command?: string; output?: string; fallback?: string }) {
+  const logRef = useRef<HTMLPreElement>(null);
+  const [tab, setTab] = useState<"preview" | "code">("preview");
+  const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const text = output?.trimEnd() || fallback?.trimEnd() || "กำลังรอข้อมูลจาก Sandbox…";
+  const visibleText = tab === "code" && command ? command : text;
+
+  useEffect(() => {
+    const element = logRef.current;
+    if (element && tab === "preview") element.scrollTop = element.scrollHeight;
+  }, [text, tab]);
+
+  async function copyLog() {
+    try {
+      await navigator.clipboard.writeText(visibleText);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      // Clipboard can be unavailable inside embedded previews.
+    }
+  }
+
+  function downloadLog() {
+    const blob = new Blob([visibleText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = tab === "code" ? "sali-command.sh" : "sali-live-output.log";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className={`sali-stream-output${expanded ? " sali-stream-expanded" : ""}`} aria-label="บันทึกการทำงานสด" aria-live="polite">
+      <div className="sali-stream-output-head">
+        <div className="sali-stream-tabs">
+          <button type="button" data-active={tab === "preview"} onClick={() => setTab("preview")}>ตัวอย่าง</button>
+          <button type="button" data-active={tab === "code"} onClick={() => setTab("code")}>โค้ด</button>
+        </div>
+        <div className="sali-stream-actions">
+          <button type="button" onClick={() => void copyLog()} aria-label="คัดลอก">{copied ? <Check /> : <Copy />}</button>
+          <button type="button" onClick={downloadLog} aria-label="ดาวน์โหลด"><Download /></button>
+          <button type="button" onClick={() => setExpanded(value => !value)} aria-label={expanded ? "ย่อ" : "ขยาย"}>{expanded ? <Minimize2 /> : <Maximize2 />}</button>
+        </div>
+      </div>
+      {tab === "preview" && command ? <div className="sali-stream-command"><span>$</span>{command}</div> : null}
+      <pre ref={logRef} className="sali-stream-log"><code>{visibleText}</code>{tab === "preview" ? <span className="sali-terminal-caret" /> : null}</pre>
+    </div>
+  );
+}
 
 function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatActivity[]; live: boolean; liveText?: string }) {
   const visible = activities.slice(-80);
+  const latestCommand = [...visible].reverse().find((activity): activity is Extract<ChatActivity, { kind: "command" }> => activity.kind === "command");
 
   function phaseLabel(activity: Extract<ChatActivity, { kind: "phase" }>) {
     const labels: Record<string, string> = {
@@ -370,11 +414,11 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
   }
 
   return (
-    <section aria-label="SALI live stream" className="sali-devlog mb-3">
+    <section aria-label="SALI live stream" className={`sali-devlog mb-3${live ? " sali-devlog-live" : " sali-devlog-done"}`}>
       <div className="sali-devlog-head">
-        <span className="sali-devlog-mark">›_</span>
-        <span>{live ? "SALI / LIVE STREAM" : "SALI / STREAM"}</span>
-        {live ? <span className="sali-live-cursor" aria-label="กำลังทำงาน" /> : <span className="sali-summary-mark">✓</span>}
+        <span className="sali-devlog-title">{live ? "กำลังทำงานให้คุณอยู่ค่ะ ✨" : "ทำงานเสร็จแล้วค่ะ ✨"}</span>
+        <span className="sali-devlog-headline" aria-hidden="true" />
+        {live ? <span className="sali-live-cursor" aria-label="กำลังทำงาน" /> : <span className="sali-summary-mark" aria-label="เสร็จแล้ว">✓</span>}
       </div>
 
       <div className="sali-devlog-body">
@@ -397,28 +441,33 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
               </span>
             </span>
           ))}
-          {liveText ? (
-            <span className="sali-flow-item sali-flow-current" aria-live="polite">
-              {visible.length ? <span className="sali-flow-arrow" aria-hidden="true">→</span> : null}
-              <span className="sali-flow-token sali-flow-live sali-flow-stream-text">
-                {liveText}<span className="sali-terminal-caret" />
-              </span>
-            </span>
-          ) : null}
           {live ? (
             <span className="sali-flow-item sali-flow-current" aria-live="polite">
-              {(visible.length || liveText) ? <span className="sali-flow-arrow" aria-hidden="true">→</span> : null}
+              {visible.length ? <span className="sali-flow-arrow" aria-hidden="true">→</span> : null}
               <span className="sali-flow-token sali-flow-live">กำลังประมวลผล<span className="sali-terminal-caret" /></span>
             </span>
           ) : null}
         </div>
 
         {live ? (
-          <div className="sali-devlog-terminal" aria-label="terminal logs code stream">
-            <span>&gt; terminal / logs / code stream</span>
-            <span className="sali-terminal-caret" />
+          latestCommand || liveText ? (
+            <LiveExecutionLog command={latestCommand?.command} output={latestCommand?.output} fallback={liveText} />
+          ) : (
+            <div className="sali-devlog-terminal" aria-label="terminal logs code stream">
+              <span className="sali-devlog-prompt">›</span>
+              <span>กำลังเตรียม HTML / code stream</span>
+              <span className="sali-devlog-trail" aria-hidden="true" />
+              <span className="sali-terminal-caret" />
+            </div>
+          )
+        ) : (
+          <div className="sali-devlog-complete" role="status">
+            <div className="sali-complete-rule"><span>งานเสร็จแล้ว</span></div>
+            <div className="sali-complete-result">
+              <span>แก้ไขเรียบร้อย</span><b>→</b><span>ตรวจสอบแล้ว</span><b>→</b><span>ผลลัพธ์พร้อมใช้งาน</span><span className="sali-complete-badge">OK</span>
+            </div>
           </div>
-        ) : null}
+        )}
       </div>
     </section>
   );

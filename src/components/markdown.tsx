@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Copy, Maximize2, Minimize2 } from "lucide-react";
+import { Check, Copy, Download, Maximize2, Minimize2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { fenceBareSvg } from "@/lib/markdown-format";
@@ -202,19 +202,37 @@ function CodeBlock({ code, lang, live, showPreview = true }: { code: string; lan
       window.setTimeout(() => setCopied(false), 1500);
     } catch { /* Clipboard may be unavailable in embedded previews. */ }
   }
+  function downloadCode() {
+    const extensions: Record<string, string> = { javascript: "js", typescript: "ts", python: "py", bash: "sh", shell: "sh" };
+    const extension = extensions[value] || value || "txt";
+    const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `sali-code.${extension}`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
   return (
-    <div className={cn("overflow-hidden rounded-2xl border border-[#24395f] bg-[#0d1830] text-[#e8efff]", isWeb && live ? "html-live" : "")}>
-      <div className="flex min-h-12 items-center justify-between gap-3 border-b border-[#24395f] bg-[#101d38] px-4 py-2 text-xs text-[#a9badb]">
-        <span>{isTooLong ? "Text" : (lang || "Code")}</span>
+    <div className={cn("overflow-hidden rounded-2xl border border-[#2b2b2b] bg-[#121212] text-[#eeeeee] shadow-[0_12px_30px_rgba(0,0,0,.22)]", isWeb && live ? "html-live" : "")}>
+      <div className="flex min-h-12 items-center justify-between gap-2 border-b border-[#2b2b2b] bg-[#171717] px-2.5 py-1.5 text-xs text-[#a9a9a9]">
         <div className="flex items-center gap-1">
-          {isWeb ? <button type="button" onClick={() => setPreview((v) => !v)} className="rounded-lg px-2.5 py-1.5 text-xs hover:bg-white/10">{preview ? "‹ Code" : "▶ Preview"}</button> : null}
-          <button type="button" onClick={() => void copyCode()} aria-label="Copy code" title="Copy code" className="grid size-8 place-items-center rounded-lg hover:bg-white/10">{copied ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}</button>
-          <button type="button" onClick={() => setExpanded((v) => !v)} aria-label={expanded ? "Collapse code" : "Expand code"} title={expanded ? "Collapse" : "Expand"} className="grid size-8 place-items-center rounded-lg hover:bg-white/10">{expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}</button>
+          {isWeb ? (
+            <>
+              <button type="button" onClick={() => setPreview(true)} className={cn("rounded-lg px-3 py-2 font-medium transition", preview ? "bg-black text-white" : "hover:bg-white/10 hover:text-white")}>ตัวอย่าง</button>
+              <button type="button" onClick={() => setPreview(false)} className={cn("rounded-lg px-3 py-2 font-medium transition", !preview ? "bg-black text-white" : "hover:bg-white/10 hover:text-white")}>โค้ด</button>
+            </>
+          ) : <span className="px-2 font-medium">{isTooLong ? "Text" : (lang || "Code")}</span>}
+        </div>
+        <div className="flex items-center gap-0.5">
+          <button type="button" onClick={() => void copyCode()} aria-label="คัดลอกโค้ด" title="คัดลอก" className="grid size-9 place-items-center rounded-lg hover:bg-white/10 hover:text-white">{copied ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}</button>
+          <button type="button" onClick={downloadCode} aria-label="ดาวน์โหลดโค้ด" title="ดาวน์โหลด" className="grid size-9 place-items-center rounded-lg hover:bg-white/10 hover:text-white"><Download className="size-4" /></button>
+          <button type="button" onClick={() => setExpanded((v) => !v)} aria-label={expanded ? "ย่อโค้ด" : "ขยายโค้ด"} title={expanded ? "ย่อ" : "ขยาย"} className="grid size-9 place-items-center rounded-lg hover:bg-white/10 hover:text-white">{expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}</button>
         </div>
       </div>
       {isTooLong ? (
         <div className="bg-[#171717]">
-          <div className="flex items-center justify-between border-b border-[#24395f] px-4 py-2 text-[11px] text-[#9ca3af]"><span>Long text</span><span>{code.length.toLocaleString()} characters</span></div>
+          <div className="flex items-center justify-between border-b border-[#2b2b2b] px-4 py-2 text-[11px] text-[#9ca3af]"><span>Long text</span><span>{code.length.toLocaleString()} characters</span></div>
           <pre className={cn("overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-[#e8efff]", expanded ? "max-h-[75vh]" : "max-h-[320px]")}><code>{code}</code></pre>
         </div>
       ) : preview && isWeb && showPreview && value !== "css" && value !== "tailwind" && value !== "tailwindcss" ? (
@@ -222,7 +240,7 @@ function CodeBlock({ code, lang, live, showPreview = true }: { code: string; lan
       ) : (
         <pre className={cn("overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-[#e8efff]", expanded ? "max-h-[75vh]" : "max-h-[320px]")}><code>{code}</code></pre>
       )}
-      {isWeb ? <div className="flex items-center justify-between border-t border-[#24395f] px-4 py-2 text-[10px] text-[#9ca3af]"><span>{value === "css" ? "CSS • Sandbox Style" : value.startsWith("tailwind") ? "Tailwind CSS • Sandbox" : "HTML • Sandboxed Preview"}</span><span>Isolated preview</span></div> : null}
+      {isWeb ? <div className="flex items-center justify-between border-t border-[#2b2b2b] px-4 py-2 text-[10px] text-[#9ca3af]"><span>{value === "css" ? "CSS • Sandbox Style" : value.startsWith("tailwind") ? "Tailwind CSS • Sandbox" : "HTML • Sandboxed Preview"}</span><span>Isolated preview</span></div> : null}
     </div>
   );
 }
@@ -241,10 +259,20 @@ export function Markdown({
     (_, lang, code) => `\n\`\`\`${lang}\n${code.trim()}\n\`\`\`\n`,
   );
   const cleanedText = normalizedRuns.replace(/\*{3,}/g, "").replace(/\/\/nn\//gi, "");
-  // Keep the DOM shape stable while tokens stream in. Promoting an unfinished
-  // table or code fence to a richer element mid-stream can confuse hydration
-  // and DOM reconciliation in mobile browsers.
   if (live) {
+    // Render an unfinished HTML fence as a real sandboxed preview while tokens
+    // are still arriving. Non-HTML streaming remains plain text to keep the
+    // DOM stable and avoid rebuilding rich Markdown on every token.
+    const openHtml = /```(html|htm)\s*\n((?:(?!```)[\s\S])*)$/i.exec(cleanedText);
+    if (openHtml) {
+      const prose = cleanedText.slice(0, openHtml.index).trim();
+      return (
+        <div className={cn("assistant-prose flex min-w-0 max-w-full flex-col gap-3 text-[13px] leading-[1.7] tracking-[-0.01em] [overflow-wrap:anywhere]", className)}>
+          {prose ? <MdBlock text={prose} /> : null}
+          <CodeBlock code={openHtml[2]} lang={openHtml[1]} live />
+        </div>
+      );
+    }
     return <div className={cn("assistant-prose min-w-0 max-w-full whitespace-pre-wrap break-words text-[13px] leading-[1.7] tracking-[-0.01em] [overflow-wrap:anywhere]", className)}>{cleanedText}</div>;
   }
   const parts = splitFences(cleanedText);

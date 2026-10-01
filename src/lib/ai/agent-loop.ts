@@ -2,6 +2,7 @@ import { RunScanner, modelResult, type GithubCall } from "./sandbox-tool.ts";
 import type { RunCall, ToolResult } from "./sandbox-tool.ts";
 import { CowAgentCore, buildCowPlan } from "./cow-agent-core.ts";
 import { selectSkills } from "../skills/index.ts";
+import { failureSignature, parseFailureMemory, type FailureMemory } from "./memory-ledger.ts";
 import {
   MAX_GATE_REJECTIONS,
   claimsCompletion,
@@ -32,7 +33,8 @@ export type AgentWorkspace = {
   context(goal: string): Promise<string>;
   startTask(goal: string, taskId: string): Promise<void>;
   updateTask(taskId: string, status: "done" | "failed" | "running", attempts: number): Promise<void>;
-  remember(key: string, value: string, kind: "conversation" | "run"): Promise<void>;
+  remember(key: string, value: string, kind: "conversation" | "run" | "semantic" | "episode"): Promise<void>;
+  recall?(query: string, limit?: number): Promise<Array<{ key: string; value: string; source: string; updatedAt: string }>>;
   writeFile(path: string, content: string): Promise<void>;
 };
 
@@ -161,7 +163,13 @@ export async function runAgentLoop(opts: {
 
   opts.onPhase?.("goal", "🎯 เป้าหมาย • รับคำสั่งจากผู้ใช้");
   opts.onText(`\n> 🎯 เป้าหมาย: ${goal.slice(0, 300)}\n`);
+  const environmentHash = "bossnu-sandbox-v1";
   const workspaceContext = workspace ? await safely(() => workspace.context(goal), "Persistent Workspace โหลดไม่สำเร็จ") : "ไม่มี Persistent Workspace";
+  const memoryRows = workspace?.recall ? await safely(() => workspace.recall!(goal, 24), []) : [];
+  const priorFailures = memoryRows
+    .filter(row => row.key.startsWith("failure:"))
+    .map(row => parseFailureMemory(row.value))
+    .filter((item): item is FailureMemory => item !== null);
   if (workspace) {
     await safely(() => workspace.startTask(goal, core.task.id), undefined);
     await safely(() => workspace.remember("semantic:goal:" + core.task.id, JSON.stringify({ statement: goal.slice(0, 4000), source: "user", confidence: 1, environmentHash, createdAt: Date.now() }), "semantic"), undefined);
@@ -359,7 +367,6 @@ export async function runAgentLoop(opts: {
         opts.onPhase?.("fix", "🐛 Fix • Failure Ledger บล็อก strategy เดิม");
         opts.onText("\n> 🚫 Strategy ถูก blacklist จาก Failure Ledger: " + candidateSignature + "\n> เปลี่ยนวิธีแล้วค่อย Run ใหม่ค่ะ\n");
         messages.push({ role: "user", content: "BLACKLISTED STRATEGY: " + candidateSignature + "\nDo not execute this same action. Use a materially different runtime/command/approach and verify it." });
-        lastFailedStrategy = strategyHash([call.language, call.command]);
         continue;
       }
       count++;

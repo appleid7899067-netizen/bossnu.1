@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Menu, Phone, X } from "lucide-react";
+import { Menu, MoreHorizontal, Phone, Volume2, VolumeX, X } from "lucide-react";
 import { ProjectFilesView } from "@/components/project-files-view";
 import { Toaster, toast } from "sonner";
 import { AppBuilderView } from "@/components/app-builder-view";
 import { ChatThread, type SandboxRunView } from "@/components/chat-thread";
 import { Composer } from "@/components/composer";
 import { Discover } from "@/components/discover";
-import { LuminaWordmark } from "@/components/lumina-mark";
 import { MindMapView } from "@/components/mind-map-view";
 import { Sidebar } from "@/components/sidebar";
 import { StudioView } from "@/components/studio-view";
@@ -64,7 +63,7 @@ export function AppShell({ search }: { search: Search }) {
   } | null>(null);
   const [voiceEnabled, setVoiceEnabledState] = useState(() => (typeof window === "undefined" ? true : getVoiceSettings().enabled));
   const [callOpen, setCallOpen] = useState(false);
-  const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [activeTool, setActiveTool] = useState<string | null>("auto");
   const abortRef = useRef<AbortController | null>(null);
 
   // Applies persisted theme / accent / font scale / motion to <html>.
@@ -123,7 +122,7 @@ export function AppShell({ search }: { search: Search }) {
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-    setDraft(""); setAttachments([]); setActiveTool(null); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
+    setDraft(""); setAttachments([]); setActiveTool("auto"); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
     stopVoice(); go({ view: "chat", c: id });
     let reply = "";
     let queuedReply = "";
@@ -185,28 +184,57 @@ export function AppShell({ search }: { search: Search }) {
       streamLogTimers.set(activityId, window.setTimeout(() => flushStreamLog(activityId), 150));
     };
     const tools = executionRequested;
+    const notifyProjectChanged = (path?: string) => {
+      window.dispatchEvent(new CustomEvent("bossnu:workspace-changed", { detail: { workspaceId, path } }));
+      if (typeof BroadcastChannel !== "undefined") {
+        const channel = new BroadcastChannel("bossnu-workspace");
+        channel.postMessage({ workspaceId, path });
+        channel.close();
+      }
+    };
     const execute = async (call: RunCall) => {
       ac.signal.throwIfAborted();
       let output = "";
+      let outputTimer: number | null = null;
       const startedAt = Date.now();
       const activityId = uid("activity");
       const currentActivities = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
       store.patchAssistant(id, assistantId, { activities: [...currentActivities, { id: activityId, kind: "command" as const, runtime: call.language, command: call.command.slice(0, 5000), status: "running", output: "", createdAt: startedAt }].slice(-120) });
       const historyId = store.addCommandHistory({ command: call.command, runtime: call.language, status: "running" });
       setSandboxRun({ runtime: call.language, label: "Sandbox Terminal", command: call.command, status: "running", output });
+      // Terminal output can arrive in hundreds of tiny chunks per second.
+      // Batch visual updates so mobile React rendering stays responsive while
+      // preserving the complete output buffer for the final result.
+      const flushOutput = () => {
+        if (outputTimer !== null) window.clearTimeout(outputTimer);
+        outputTimer = null;
+        const visibleOutput = output.slice(-6000);
+        setSandboxRun(current => current ? { ...current, output: output.slice(-64000) } : current);
+        patchActivity(activityId, { output: visibleOutput });
+      };
+      const scheduleOutput = () => {
+        if (outputTimer !== null) return;
+        outputTimer = window.setTimeout(flushOutput, 120);
+      };
       try {
         const result = await sandboxClient.executeStream(call.command, {
           workspace: workspaceId, type: call.language, signal: ac.signal, allowDangerous: true,
           onEvent: event => {
             if (ac.signal.aborted) return;
-            if (event.type === "output") {
+            if (event.type === "status" && event.message) {
+              output = (output + `${output ? "\n" : ""}› ${event.message}\n`).slice(-64000);
+              scheduleOutput();
+            } else if (event.type === "output") {
               output = (output + event.text).slice(-64000);
-              setSandboxRun(current => current ? { ...current, output } : current);
-              patchActivity(activityId, { output: output.slice(-6000) });
+              scheduleOutput();
+            } else if (event.type === "error") {
+              output = (output + `${output ? "\n" : ""}✕ ${event.error}\n`).slice(-64000);
+              scheduleOutput();
             }
           },
         });
         ac.signal.throwIfAborted();
+        flushOutput();
         store.updateCommandHistory(historyId, result.status === "success" ? "success" : "error");
         const resultOutput = result.output || output || result.error || "";
         setSandboxRun(current => current ? { ...current, status: result.status, output: resultOutput, previewUrl: result.previewUrl } : current);
@@ -219,7 +247,10 @@ export function AppShell({ search }: { search: Search }) {
             ...(sync.deletedFiles ?? []).map(path => ({ path, action: "deleted" as const })),
             ...(sync.renamed ?? []).map(item => ({ path: item.to, from: item.from, action: "renamed" as const })),
           ];
-          if (files.length) pushActivity({ kind: "files", files: files.slice(0, 80) });
+          if (files.length) {
+            pushActivity({ kind: "files", files: files.slice(0, 80) });
+            notifyProjectChanged(files[0]?.path);
+          }
         }
         if (result.status === "success" && result.exitCode === 0 && result.workspaceSync?.verified && result.workspaceSync.complete) {
           const safeCommand = redactSensitiveCommand(call.command);
@@ -227,6 +258,8 @@ export function AppShell({ search }: { search: Search }) {
         }
         return result;
       } catch (error) {
+        if (outputTimer !== null) window.clearTimeout(outputTimer);
+        outputTimer = null;
         store.updateCommandHistory(historyId, ac.signal.aborted ? "aborted" : "error");
         const message = error instanceof Error ? error.message : String(error);
         setSandboxRun(current => current ? { ...current, status: ac.signal.aborted ? "aborted" : "error", output: message } : current);
@@ -247,6 +280,29 @@ export function AppShell({ search }: { search: Search }) {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) {
         return { status: "error", error: data.error || `GitHub HTTP ${response.status}` };
+      }
+
+      // Keep GitHub work and the in-app Project Files workspace in lockstep.
+      // A file read/write is mirrored under project/ so it can be opened,
+      // edited, previewed, and used by the next Sandbox run immediately.
+      if (["read_file", "write_file", "delete_file"].includes(call.action) && call.path) {
+        const projectPath = call.path.startsWith("project/") ? call.path : `project/${call.path.replace(/^\/+/, "")}`;
+        const githubResult = (data.result ?? {}) as { content?: string };
+        const content = call.action === "read_file" ? githubResult.content : call.content;
+        const syncResponse = await fetch("/api/workspace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(call.action === "delete_file"
+            ? { workspaceId, action: "delete", path: projectPath }
+            : { workspaceId, action: "write", path: projectPath, content: content ?? "" }),
+          signal: ac.signal,
+        });
+        const syncData = await syncResponse.json().catch(() => ({}));
+        if (!syncResponse.ok || !syncData.ok) {
+          return { status: "error", error: syncData.error || "GitHub สำเร็จ แต่ Sync เข้าไฟล์โปรเจ็คไม่สำเร็จ" };
+        }
+        notifyProjectChanged(projectPath);
+        pushActivity({ kind: "files", files: [{ path: projectPath, action: call.action === "delete_file" ? "deleted" : call.action === "read_file" ? "added" : "modified" }] });
       }
       return { status: "success", output: JSON.stringify(data.result).slice(-30000), exitCode: 0, durationMs: 0 };
     };
@@ -301,14 +357,14 @@ export function AppShell({ search }: { search: Search }) {
           },
         });
         if (!failure) updateStreamLog(streamLogId, "puter", "done", "สตรีมจบ • รับ " + streamChars.toLocaleString() + " ตัวอักษร", streamChars);
-        if (!reply && !ac.signal.aborted && agentSummary.status !== "verified") append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
+        if (!reply && !ac.signal.aborted) append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
         return;
       }
       if (detection.webPreview && detection.code && ["html", "javascript", "css", "tailwind"].includes(detection.runtime)) {
         setSandboxRun({ runtime: detection.runtime, label: detection.label, command: "browser sandbox", status: "Preview พร้อมแล้ว", previewHtml: sandboxPreviewDocument(detection.runtime, detection.code) });
         append("แสดง Live Preview ในแชตแล้วค่ะ\\n\\n");
       }
-      const agentSummary = await runAgentLoop({
+      await runAgentLoop({
         messages: history, signal: ac.signal, tools,
         maxRuns: 11,
         execute,
@@ -542,12 +598,22 @@ ${message}`); toast.error(message); }
 
   const quickActions = contextualActions(draft);
   const roomTools = [
-    { id: "auto", label: "✨ Auto • ให้ Boss เลือกเครื่องมือ" },
-    { id: "sandbox", label: "💻 Sandbox • รัน / ทดสอบโค้ด" },
-    { id: "web", label: "🌐 Web • ค้นข้อมูลสด" },
-    { id: "github", label: "🐙 GitHub • ตรวจ / แก้ Repo" },
-    { id: "builder", label: "🧱 AI Builder • สร้างแอป" },
+    { id: "auto", label: "Auto • เลือกให้อัตโนมัติ" },
+    { id: "node", label: "Node • JavaScript" },
+    { id: "python", label: "Python • python3" },
+    { id: "bash", label: "Bash • Shell" },
+    { id: "html", label: "HTML • Live Preview" },
+    { id: "json", label: "JSON • Validate" },
   ];
+  const commandForTool = (text: string) => {
+    const value = text.trim();
+    if (!value || !activeTool || activeTool === "auto") return text;
+    if (activeTool === "node") return `node - <<'NODE'\n${value}\nNODE`;
+    if (activeTool === "python") return `python3 - <<'PY'\n${value}\nPY`;
+    if (activeTool === "html") return `\`\`\`html\n${value}\n\`\`\``;
+    if (activeTool === "json") return `\`\`\`json\n${value}\n\`\`\``;
+    return value;
+  };
   const showDiscover = view === "chat" && !activeChat?.messages.length;
 
   return (
@@ -630,17 +696,22 @@ ${message}`); toast.error(message); }
       ) : null}
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between border-b border-border bg-bg/80 px-3 backdrop-blur-md md:hidden">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={drawer ? "Close menu" : "Open menu"}
-            onClick={() => setDrawer((v) => !v)}
-          >
-            {drawer ? <X className="size-5" /> : <Menu className="size-5" />}
+        <header className="flex min-h-16 items-center gap-2 border-b border-border bg-bg/90 px-3 py-2 backdrop-blur-md md:hidden">
+          <Button variant="ghost" size="icon-sm" aria-label={drawer ? "ปิดเมนู" : "เปิดเมนู"} onClick={() => setDrawer((v) => !v)}>
+            {drawer ? <X className="size-6" /> : <Menu className="size-6" />}
           </Button>
-          <LuminaWordmark compact />
-          <Button variant="ghost" size="icon-sm" aria-label="Voice mode" onClick={() => setCallOpen(true)}><Phone className="size-5" /></Button>
+          <div className="grid size-10 shrink-0 place-items-center rounded-full bg-[conic-gradient(from_210deg,#7c3aed,#f8fafc,#a855f7,#4f46e5,#7c3aed)] p-[3px] shadow-[0_0_18px_rgba(139,92,246,.35)]">
+            <div className="size-full rounded-full bg-bg/80" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px] font-semibold">{store.personality.name || "สลี่"}</p>
+            <p className="truncate text-[11px] text-muted">สร้างโดย AI • พร้อมช่วยงาน</p>
+          </div>
+          <Button variant="ghost" size="icon-sm" aria-label="โหมดโทรคุย" onClick={() => setCallOpen(true)}><Phone className="size-5" /></Button>
+          <Button variant="ghost" size="icon-sm" aria-label={voiceEnabled ? "ปิดเสียงตอบกลับ" : "เปิดเสียงตอบกลับ"} onClick={() => { const next = !voiceEnabled; setVoiceEnabledState(next); setVoiceEnabled(next); }}>
+            {voiceEnabled ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
+          </Button>
+          <Button variant="ghost" size="icon-sm" aria-label="ตั้งค่าเพิ่มเติม" onClick={() => setAgentSettingsOpen(true)}><MoreHorizontal className="size-5" /></Button>
         </header>
 
         {view === "files" ? (
@@ -715,7 +786,7 @@ ${message}`); toast.error(message); }
                 modelOptions={PUTER_MODELS}
                 onModelChange={store.setSelectedModel}
                 onChange={setDraft}
-                onSubmit={() => void send(draft, activeChat?.id, undefined, false, attachments)}
+                onSubmit={() => void send(commandForTool(draft), activeChat?.id, undefined, false, attachments)}
                 attachments={attachments}
                 onAttachments={setAttachments}
                 inputRef={composerRef}
@@ -729,15 +800,8 @@ ${message}`); toast.error(message); }
                 activeTool={activeTool}
                 onToolAction={(tool) => {
                   setActiveTool(tool);
-                  const prompts: Record<string, string> = {
-                    auto: "ทำงานแบบ Auto ให้ Boss เลือกเครื่องมือที่เหมาะสม",
-                    sandbox: "ใช้ Sandbox เพื่อรันและทดสอบงานนี้จริง",
-                    web: "ค้นข้อมูลสดจากเว็บและตรวจแหล่งข้อมูล",
-                    github: "ตรวจและทำงานกับ GitHub/Repo ที่เกี่ยวข้อง",
-                    builder: "ใช้โหมด AI Builder เพื่อสร้างหรือปรับแอปแบบครบวงจร",
-                  };
-                  const hint = prompts[tool];
-                  if (hint && !draft.trim()) setDraft(hint);
+                  // Runtime tabs only choose how the next message is wrapped;
+                  // they never replace the user's draft with hidden prompts.
                 }}
             voiceEnabled={voiceEnabled}
             onToggleVoice={() => {

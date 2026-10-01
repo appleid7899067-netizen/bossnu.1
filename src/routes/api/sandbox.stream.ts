@@ -12,10 +12,6 @@ function corsHeaders(): Record<string, string> {
   };
 }
 
-function sse(value: unknown): Uint8Array {
-  return new TextEncoder().encode(`data: ${JSON.stringify(value)}\n\n`);
-}
-
 /**
  * True SSE execution stream.
  *
@@ -25,12 +21,10 @@ function sse(value: unknown): Uint8Array {
  */
 async function handle(request: Request): Promise<Response> {
   const encoder = new TextEncoder();
-  let controllerRef: ReadableStreamDefaultController<Uint8Array> | undefined;
   let closed = false;
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      controllerRef = controller;
       const send = (value: unknown) => {
         if (!closed) controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`));
       };
@@ -70,14 +64,13 @@ async function handle(request: Request): Promise<Response> {
     },
     cancel() {
       closed = true;
-      controllerRef = undefined;
     },
   });
 
   return new Response(stream, { status: 200, headers: corsHeaders() });
 }
 
-export const Route = createFileRoute("/api/sandbox.stream")({
+export const Route = createFileRoute("/api/sandbox/stream")({
   server: {
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: corsHeaders() }),
