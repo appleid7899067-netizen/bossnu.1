@@ -23,7 +23,7 @@ function NavItem({ active, icon: Icon, label, onClick }: { active: boolean; icon
 
 export function Sidebar({ view, onView, conversations, maps, activeChatId, activeMapId, onNewChat, onOpenChat, onDeleteChat, onOpenMap, onRenameChat, onTogglePin, onExportChat, onSignOut, searchRef }: {
   view: AppView; onView: (view: AppView) => void; conversations: Conversation[]; maps: SavedMap[]; activeChatId: string | null; activeMapId: string | null;
-  onNewChat: () => void; onOpenChat: (id: string) => void; onDeleteChat: (id: string) => void; onOpenMap: (id: string) => void; commandHistory: CommandHistoryItem[]; onRunCommand: (command: string) => void;
+  onNewChat: () => void; onOpenChat: (id: string) => void; onDeleteChat: (id: string) => void; onClearChatHistory?: () => void; onOpenMap: (id: string) => void; commandHistory: CommandHistoryItem[]; onRunCommand: (command: string) => void;
   onRenameChat?: (id: string, title: string) => void; onTogglePin?: (id: string) => void; onExportChat?: (id: string) => void; onSignOut?: () => void; searchRef?: RefObject<HTMLInputElement | null>;
 }) {
   const store = useAppStore();
@@ -61,7 +61,7 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
     </div>
     <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-3 pb-4 no-scrollbar">
       {view === "maps" ? <ListBlock title="Saved maps" empty="Maps you build will live here." items={maps.map((m) => ({ id: m.id, label: m.data.topic, active: m.id === activeMapId, onOpen: () => onOpenMap(m.id) }))} />
-        : <ChatList conversations={conversations} activeChatId={view === "chat" ? activeChatId : null} searchRef={searchRef} onOpenChat={onOpenChat} onDeleteChat={onDeleteChat} onRenameChat={onRenameChat} onTogglePin={onTogglePin} onExportChat={onExportChat} />}
+        : <ChatList conversations={conversations} activeChatId={view === "chat" ? activeChatId : null} searchRef={searchRef} onOpenChat={onOpenChat} onDeleteChat={onDeleteChat} onClearChatHistory={onClearChatHistory} onRenameChat={onRenameChat} onTogglePin={onTogglePin} onExportChat={onExportChat} />}
     </div>
     {onSignOut ? (
       <div className="border-t border-border px-3 py-3">
@@ -76,12 +76,13 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
 
 function ChatList({ conversations, activeChatId, searchRef, onOpenChat, onDeleteChat, onRenameChat, onTogglePin, onExportChat }: {
   conversations: Conversation[]; activeChatId: string | null; searchRef?: RefObject<HTMLInputElement | null>;
-  onOpenChat: (id: string) => void; onDeleteChat: (id: string) => void; onRenameChat?: (id: string, title: string) => void; onTogglePin?: (id: string) => void; onExportChat?: (id: string) => void;
+  onOpenChat: (id: string) => void; onDeleteChat: (id: string) => void; onClearChatHistory?: () => void; onRenameChat?: (id: string, title: string) => void; onTogglePin?: (id: string) => void; onExportChat?: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const [menuId, setMenuId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
   const q = query.trim().toLowerCase();
   const filtered = useMemo(() => {
     const matches = q
@@ -143,6 +144,7 @@ function ChatList({ conversations, activeChatId, searchRef, onOpenChat, onDelete
       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-subtle" aria-hidden="true" />
       <input ref={searchRef} type="search" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") { setQuery(""); e.currentTarget.blur(); } }} placeholder="ค้นหาแชต…  (Ctrl K)" aria-label="ค้นหาแชต" className="h-9 w-full rounded-lg bg-elevated pr-2 pl-8 text-sm text-fg outline-none placeholder:text-subtle transition-shadow focus:ring-1 focus:ring-primary/40" />
     </label>
+    {onClearChatHistory && conversations.length > 0 ? (confirmClearAll ? <div className="mb-3 flex items-center gap-1 rounded-lg bg-danger/10 px-2 py-1.5 text-xs"><span className="mr-auto truncate text-fg">ลบประวัติทั้งหมด?</span><button type="button" onClick={() => setConfirmClearAll(false)} className="rounded-md px-2 py-1 text-muted hover:bg-hover hover:text-fg">ยกเลิก</button><button type="button" onClick={() => { onClearChatHistory(); setConfirmClearAll(false); }} className="rounded-md bg-danger px-2 py-1 font-medium text-white">ลบทั้งหมด</button></div> : <button type="button" onClick={() => setConfirmClearAll(true)} className="mb-3 flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium text-danger transition-colors hover:bg-danger/10"><Trash2 className="size-3.5 shrink-0" />ลบประวัติข้อความทั้งหมด</button>) : null}
     {conversations.length === 0 ? <p className="px-2 text-sm leading-relaxed text-muted">Your conversations stay on this device.</p>
       : filtered.length === 0 ? <p className="px-2 text-sm leading-relaxed text-muted">ไม่พบแชตที่ตรงกับ “{query.trim()}”</p>
       : <>
