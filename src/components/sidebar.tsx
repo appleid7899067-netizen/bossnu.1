@@ -63,6 +63,14 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
       {view === "maps" ? <ListBlock title="Saved maps" empty="Maps you build will live here." items={maps.map((m) => ({ id: m.id, label: m.data.topic, active: m.id === activeMapId, onOpen: () => onOpenMap(m.id) }))} />
         : <ChatList conversations={conversations} activeChatId={view === "chat" ? activeChatId : null} searchRef={searchRef} onOpenChat={onOpenChat} onDeleteChat={onDeleteChat} onRenameChat={onRenameChat} onTogglePin={onTogglePin} onExportChat={onExportChat} />}
     </div>
+    {onSignOut ? (
+      <div className="border-t border-border px-3 py-3">
+        <button type="button" onClick={onSignOut} className="flex h-10 w-full items-center gap-2.5 rounded-xl px-3 text-sm font-medium text-muted transition-colors hover:bg-danger/10 hover:text-danger">
+          <LogOut className="size-4 shrink-0" strokeWidth={1.8} />
+          ออกจากระบบ
+        </button>
+      </div>
+    ) : null}
   </aside>;
 }
 
