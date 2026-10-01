@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type RefObject } from "react";
-import { Bot, Download, FileStack, GitBranch, ImageIcon, MessageSquare, MoreHorizontal, Pencil, Pin, PinOff, Plus, Search, Settings, SquareTerminal, Trash2 } from "lucide-react";
+import { Bot, Download, FileStack, GitBranch, ImageIcon, LogOut, MessageSquare, MoreHorizontal, Pencil, Pin, PinOff, Plus, Search, Settings, SquareTerminal, Trash2 } from "lucide-react";
 import type { CommandHistoryItem } from "@/lib/types";
 import { LuminaWordmark } from "@/components/lumina-mark";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ function NavItem({ active, icon: Icon, label, onClick }: { active: boolean; icon
 export function Sidebar({ view, onView, conversations, maps, activeChatId, activeMapId, onNewChat, onOpenChat, onDeleteChat, onOpenMap, onRenameChat, onTogglePin, onExportChat, searchRef }: {
   view: AppView; onView: (view: AppView) => void; conversations: Conversation[]; maps: SavedMap[]; activeChatId: string | null; activeMapId: string | null;
   onNewChat: () => void; onOpenChat: (id: string) => void; onDeleteChat: (id: string) => void; onOpenMap: (id: string) => void; commandHistory: CommandHistoryItem[]; onRunCommand: (command: string) => void;
-  onRenameChat?: (id: string, title: string) => void; onTogglePin?: (id: string) => void; onExportChat?: (id: string) => void; searchRef?: RefObject<HTMLInputElement | null>;
+  onRenameChat?: (id: string, title: string) => void; onTogglePin?: (id: string) => void; onExportChat?: (id: string) => void; onSignOut?: () => void; searchRef?: RefObject<HTMLInputElement | null>;
 }) {
   const store = useAppStore();
   return <aside className="flex h-full min-h-0 w-[260px] shrink-0 flex-col border-r border-border bg-bg">
