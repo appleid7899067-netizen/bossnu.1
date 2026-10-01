@@ -217,6 +217,32 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 @media (prefers-reduced-motion: reduce) { .brand-orbit,.brand-spark,.work-live,.work-dots i { animation:none; } }
 
 
+/* Sali thinking activity: compact, light, and animated only while work is live. */
+@keyframes sali-thinking-text {
+  0%, 100% { opacity: .46; transform: translate3d(0, 0, 0); }
+  50% { opacity: .92; transform: translate3d(2px, 0, 0); }
+}
+
+.sali-devlog-live .sali-flow-token {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.sali-devlog-live .sali-flow-current .sali-flow-token {
+  animation: sali-thinking-text 1.7s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+
+.sali-devlog-live .sali-flow-current .sali-terminal-caret {
+  width: .34em;
+  animation: sali-caret-blink .9s steps(1) infinite;
+}
+
+.sali-devlog-live .sali-flow-item:not(.sali-flow-current) .sali-flow-token {
+  opacity: .62;
+}
+
 /* ---------- Sali developer-log UI ---------- */
 @keyframes sali-caret-blink {
   0%, 45% { opacity: 1; }
