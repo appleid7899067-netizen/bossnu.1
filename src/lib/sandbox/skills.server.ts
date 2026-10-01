@@ -231,7 +231,7 @@ export function loadWorkspaceSkill(
 export function listWorkspaceSkills(files: Array<{ path: string; content: string }>): SkillInfo[] {
   const ids = new Set<string>();
   for (const file of files) {
-    const match = file.path.match(/^project\\/skills\\/verified\\/([a-z0-9][a-z0-9-]*)\\/SKILL\\.md$/i);
+    const match = file.path.match(/^project\/skills\/verified\/([a-z0-9][a-z0-9-]*)\/SKILL\.md$/i);
     if (match) ids.add(match[1]);
   }
   return [...ids].filter((id) => !findSkill(id)).map((id) => loadWorkspaceSkill(files, id))
