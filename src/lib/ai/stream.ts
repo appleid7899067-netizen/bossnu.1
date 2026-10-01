@@ -218,7 +218,7 @@ export async function streamChat(opts: {
             model: primaryModel,
             stream: true,
             temperature: opts.mode === "think" ? 0.6 : 0.7,
-            max_tokens: opts.mode === "think" ? 2200 : 1400,
+            max_tokens: opts.mode === "think" ? 8000 : 6000,
             reasoning_effort: opts.mode === "think" ? "medium" : "low",
             normalize: true,
           },
