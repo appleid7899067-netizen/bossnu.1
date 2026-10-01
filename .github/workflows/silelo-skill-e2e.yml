@@ -1,0 +1,84 @@
+name: Silelo Skill E2E
+
+on:
+  workflow_dispatch:
+
+jobs:
+  skill-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run production Skill E2E
+        shell: bash
+        env:
+          BASE_URL: https://bossnu1.onrender.com
+          WORKSPACE: silelo-e2e-${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          api_post() {
+            curl -fsS --retry 3 --retry-delay 3 -X POST "$BASE_URL/api/sandbox" -H 'content-type: application/json' --data "$1"
+          }
+          api_get() {
+            curl -fsS --retry 3 --retry-delay 3 "$BASE_URL$1"
+          }
+          SKILL_CONTENT=$(cat <<'EOF'
+          ---
+          name: skill-install-test
+          description: Production E2E verification skill
+          triggers:
+            - ทดสอบ Skill
+            - skill install test
+          ---
+          # skill-install-test
+          Create and verify project/test-skill.txt with the exact content:
+          SILELO_SKILL_INSTALL_OK
+          EOF
+          )
+          payload=$(jq -n --arg w "$WORKSPACE" --arg c "$SKILL_CONTENT" '{action:"create-skill",workspace:$w,skillId:"skill-install-test",content:$c}')
+          create=$(api_post "$payload")
+          echo "CREATE=$create"
+          test "$(jq -r '.success' <<<"$create")" = "true"
+          test "$(jq -r '.skillCreate.verified' <<<"$create")" = "true"
+          test "$(jq -r '.skillCreate.persisted' <<<"$create")" = "true"
+
+          load=$(api_get "/api/sandbox?workspace=$WORKSPACE&skill=skill-install-test")
+          echo "LOAD=$load"
+          test "$(jq -r '.success' <<<"$load")" = "true"
+          test "$(jq -r '.skill.id' <<<"$load")" = "skill-install-test"
+
+          exec_payload=$(jq -n --arg w "$WORKSPACE" '{workspace:$w,skill:"skill-install-test",type:"bash",cmd:"mkdir -p project && printf %s SILELO_SKILL_INSTALL_OK > project/test-skill.txt && cat project/test-skill.txt"}')
+          execute=$(api_post "$exec_payload")
+          echo "EXECUTE=$execute"
+          test "$(jq -r '.success' <<<"$execute")" = "true"
+          test "$(jq -r '.stdout' <<<"$execute")" = "SILELO_SKILL_INSTALL_OK"
+
+          readback=$(api_get "/api/workspace?workspace=$WORKSPACE&path=project/test-skill.txt")
+          echo "READBACK=$readback"
+          test "$(jq -r '.file.content' <<<"$readback")" = "SILELO_SKILL_INSTALL_OK"
+
+          duplicate=$(api_post "$payload" || true)
+          echo "DUPLICATE=$duplicate"
+          test "$(jq -r '.success' <<<"$duplicate")" = "false"
+
+          failure_payload=$(jq -n --arg w "$WORKSPACE" '{workspace:$w,skill:"skill-install-test",type:"bash",cmd:"false"}')
+          failure=$(api_post "$failure_payload" || true)
+          echo "FAILURE=$failure"
+          test "$(jq -r '.success' <<<"$failure")" = "false"
+
+          repair_payload=$(jq -n --arg w "$WORKSPACE" '{workspace:$w,skill:"skill-install-test",type:"bash",cmd:"printf %s SILELO_SKILL_INSTALL_OK > project/test-skill.txt && cat project/test-skill.txt"}')
+          repair=$(api_post "$repair_payload")
+          echo "REPAIR=$repair"
+          test "$(jq -r '.success' <<<"$repair")" = "true"
+          test "$(jq -r '.stdout' <<<"$repair")" = "SILELO_SKILL_INSTALL_OK"
+
+          persist=$(api_post "$(jq -n --arg w "$WORKSPACE" '{workspace:$w,skill:"skill-install-test",type:"bash",cmd:"cat project/test-skill.txt"}')")
+          echo "PERSIST=$persist"
+          test "$(jq -r '.success' <<<"$persist")" = "true"
+          test "$(jq -r '.stdout' <<<"$persist")" = "SILELO_SKILL_INSTALL_OK"
+
+          status=$(curl -fsS --retry 3 --retry-delay 3 -X POST "$BASE_URL/api/workspace" -H 'content-type: application/json' --data "$(jq -n --arg w "$WORKSPACE" '{workspaceId:$w,action:"sync-status"}')")
+          echo "SYNC_STATUS=$status"
+          test "$(jq -r '.ok' <<<"$status")" = "true"
+          test "$(jq -r '.sync.neon.matchesBase' <<<"$status")" = "true"
+
+          echo "SILELO_SKILL_INSTALL_OK"
+          echo "SILELO SKILL E2E: PASS"
