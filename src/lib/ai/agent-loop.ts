@@ -66,6 +66,19 @@ export function redactSensitiveCommand(command: string) {
     .replace(/\b(token|password|secret)\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;]+)/gi, "$1=[REDACTED]");
 }
 
+function verifiedResultText(result: ToolResult, requireWorkspace: boolean) {
+  const output = (result.output ?? result.stdout ?? "").trim();
+  const exit = result.exitCode;
+  const syncOk = result.workspaceSync?.verified && result.workspaceSync?.complete;
+  const lines = [
+    "รันสำเร็จค่ะ ✓",
+    output ? output : "ไม่มี stdout",
+    `exitCode: ${exit ?? 0}`,
+    ...(requireWorkspace ? [`Workspace Sync: ${syncOk ? "verified ✓" : "ยังไม่ยืนยัน"}`] : []),
+  ];
+  return "\n> " + lines.join("\n> ") + "\n";
+}
+
 function buildVerifiedSkill(goal: string, call: RunCall, result: ToolResult) {
   const safeGoal = redactSensitiveCommand(goal);
   const normalizedGoal = safeGoal.normalize("NFKC").trim().toLowerCase();
@@ -304,8 +317,7 @@ export async function runAgentLoop(opts: {
       // failed/empty answer. Emit a deterministic answer from the evidence
       // gate so the verified result reaches the user.
       if (verified && !raw.trim()) {
-        const evidence = lastVerdict?.reasons.length ? lastVerdict.reasons.join(" • ") : "exit 0 และหลักฐาน Workspace ผ่าน Verification";
-        opts.onText("\n> ✅ ตรวจสอบเสร็จแล้วค่ะ\n> " + evidence + "\n");
+        opts.onText(verifiedResultText(opts.priorResult ?? { status: "success", exitCode: 0 }, requireWorkspace));
       }
       return finish(verified ? "verified" : "answered");
     }
@@ -412,12 +424,7 @@ export async function runAgentLoop(opts: {
       if (lastVerdict.passed && forcedCall === call) {
         opts.onPhase?.("answer", "💬 Answer • คำสั่งผ่านการตรวจสอบแล้ว");
         if (!raw.trim()) {
-          const evidence = lastVerdict.reasons.length
-            ? lastVerdict.reasons.join(" • ")
-            : requireWorkspace
-              ? "exit 0 + Neon Sync verified + complete"
-              : "exit 0 และ Sandbox ตอบกลับสำเร็จ";
-          opts.onText("\n> ✅ ตรวจสอบเสร็จแล้วค่ะ\n> " + evidence + "\n");
+          opts.onText(verifiedResultText(result, requireWorkspace));
         }
         return finish("verified");
       }
