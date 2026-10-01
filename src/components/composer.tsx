@@ -21,6 +21,8 @@ import type { PuterModelOption } from "@/lib/ai/models";
 
 export type ToolAction = { id: string; label: string };
 
+const MAX_MESSAGE_LENGTH = 30_000;
+
 export function Composer({
   value, onChange, onSubmit, onStop, placeholder, disabled, busy, extra,
   selectedModel, modelOptions, onModelChange,
@@ -224,13 +226,13 @@ export function Composer({
         <textarea
           ref={ref}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onChange(e.target.value.slice(0, MAX_MESSAGE_LENGTH))}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
           placeholder={speech.listening ? "กำลังฟัง… พูดได้เลยค่ะ" : placeholder}
           rows={1}
           disabled={disabled}
-          maxLength={12000}
+          maxLength={MAX_MESSAGE_LENGTH}
           aria-label={placeholder}
           className="block min-h-9 w-full resize-none bg-transparent px-2.5 py-1.5 text-[14px] leading-[1.4] text-fg placeholder:text-subtle outline-none disabled:opacity-60"
         />
