@@ -552,8 +552,9 @@ export async function handlePost(request: Request, emit?: StreamEmit): Promise<R
       issue ? `${issue.path.join(".") || "body"}: ${issue.message}` : "Invalid request",
     );
   }
-  const { cmd, skill: skillId, reference, type, stdin } = parsed.data;
+  const { cmd, skill: skillId, reference, type, stdin, workspace } = parsed.data;
   const steps: string[] = ["รับคำสั่ง"];
+  const workspaceSeed = workspace && /^[a-zA-Z0-9_-]{1,100}$/.test(workspace) ? await loadSeed(workspace) : undefined;
   emit?.({ type: "status", status: "queued", message: "รับคำสั่ง" });
 
   // Skill only (or explicit type=skill): load, don't run.
