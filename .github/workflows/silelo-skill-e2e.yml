@@ -2,6 +2,9 @@ name: Silelo Skill E2E
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/silelo-skill-e2e.yml"
 
 jobs:
   skill-e2e:
