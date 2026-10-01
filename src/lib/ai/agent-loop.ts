@@ -404,6 +404,24 @@ export async function runAgentLoop(opts: {
       pendingVerified = lastVerdict.passed ? { call, result } : null;
       messages.push({ role: "user", content: observed });
 
+      // A user-entered command is already the requested action. Once that
+      // forced command passes the evidence gate, finish immediately instead
+      // of asking the model to generate the same <run> block again.
+      // Without this boundary a successful command could be replayed up to
+      // the full 11-run recovery budget.
+      if (lastVerdict.passed && forcedCall === call) {
+        opts.onPhase?.("answer", "💬 Answer • คำสั่งผ่านการตรวจสอบแล้ว");
+        if (!raw.trim()) {
+          const evidence = lastVerdict.reasons.length
+            ? lastVerdict.reasons.join(" • ")
+            : requireWorkspace
+              ? "exit 0 + Neon Sync verified + complete"
+              : "exit 0 และ Sandbox ตอบกลับสำเร็จ";
+          opts.onText("\n> ✅ ตรวจสอบเสร็จแล้วค่ะ\n> " + evidence + "\n");
+        }
+        return finish("verified");
+      }
+
       if (!lastVerdict.passed) {
         core.setPhase("fix");
         opts.onPhase?.("fix", "🐛 Fix • พบปัญหา กำลังแก้แล้วรันใหม่");
