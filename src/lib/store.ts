@@ -97,6 +97,70 @@ updateQuickPrompt:(id,patch)=>set(s=>({quickPrompts:s.quickPrompts.map(p=>p.id==
 deleteQuickPrompt:id=>set(s=>({quickPrompts:s.quickPrompts.filter(p=>p.id!==id)})),
 }),{name:"bossnu-silelo-v1",skipHydration:true,partialize:s=>({selectedModel:s.selectedModel,conversations:s.conversations.map(c=>({...c,messages:c.messages.map(m=>m.attachments?.length?{...m,attachments:m.attachments.map(a=>({name:a.name,size:a.size,content:""}))}:m)})),builderProject:s.builderProject,commandHistory:s.commandHistory,activeChatId:s.activeChatId,maps:s.maps,activeMapId:s.activeMapId,images:s.images,personality:s.personality,agentSkills:s.agentSkills,agentProfiles:s.agentProfiles,memory:s.memory,learnedSkills:s.learnedSkills,ui:s.ui,quickPrompts:s.quickPrompts}),merge:(persisted,current)=>{const p=(persisted??{}) as Partial<AppState>;const migratedUi:UiSettings=p.ui?{...defaultUi,...p.ui}:{...defaultUi,theme:(p.personality?.darkMode??true)?"dark":"light"};return {...current,...p,selectedModel:p.selectedModel??current.selectedModel,agentSkills:[...(p.agentSkills??current.agentSkills),...defaultSkills.filter(d=>!(p.agentSkills??current.agentSkills).some(s=>s.id===d.id))],personality:{...current.personality,...(p.personality??{})},ui:migratedUi,quickPrompts:p.quickPrompts?.length?p.quickPrompts:current.quickPrompts};}}));
 
+export type CloudState = {
+  selectedModel: string;
+  conversations: Conversation[];
+  commandHistory: CommandHistoryItem[];
+  activeChatId: string | null;
+  maps: SavedMap[];
+  activeMapId: string | null;
+  images: StudioImage[];
+  builderProject: BuilderProject | null;
+  personality: PersonalitySettings;
+  agentSkills: AgentSkill[];
+  agentProfiles: AgentProfile[];
+  memory: MemoryItem[];
+  learnedSkills: LearnedSkill[];
+  ui: UiSettings;
+  quickPrompts: QuickPrompt[];
+};
+
+export function exportCloudState(): CloudState {
+  const s = useAppStore.getState();
+  return {
+    selectedModel: s.selectedModel,
+    conversations: s.conversations,
+    commandHistory: s.commandHistory,
+    activeChatId: s.activeChatId,
+    maps: s.maps,
+    activeMapId: s.activeMapId,
+    images: s.images,
+    builderProject: s.builderProject,
+    personality: s.personality,
+    agentSkills: s.agentSkills,
+    agentProfiles: s.agentProfiles,
+    memory: s.memory,
+    learnedSkills: s.learnedSkills,
+    ui: s.ui,
+    quickPrompts: s.quickPrompts,
+  };
+}
+
+export function importCloudState(input: unknown) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return false;
+  const p = input as Partial<CloudState>;
+  const state = useAppStore.getState();
+  useAppStore.setState({
+    ...state,
+    selectedModel: typeof p.selectedModel === "string" ? p.selectedModel : state.selectedModel,
+    conversations: Array.isArray(p.conversations) ? p.conversations.slice(0, MAX_CHATS) : state.conversations,
+    commandHistory: Array.isArray(p.commandHistory) ? p.commandHistory.slice(0, 50) : state.commandHistory,
+    activeChatId: typeof p.activeChatId === "string" ? p.activeChatId : state.activeChatId,
+    maps: Array.isArray(p.maps) ? p.maps.slice(0, MAX_MAPS) : state.maps,
+    activeMapId: typeof p.activeMapId === "string" ? p.activeMapId : state.activeMapId,
+    images: Array.isArray(p.images) ? p.images.slice(0, MAX_IMAGES) : state.images,
+    builderProject: p.builderProject ?? state.builderProject,
+    personality: p.personality ? { ...state.personality, ...p.personality } : state.personality,
+    agentSkills: Array.isArray(p.agentSkills) ? p.agentSkills : state.agentSkills,
+    agentProfiles: Array.isArray(p.agentProfiles) ? p.agentProfiles : state.agentProfiles,
+    memory: Array.isArray(p.memory) ? p.memory.slice(0, 100) : state.memory,
+    learnedSkills: Array.isArray(p.learnedSkills) ? p.learnedSkills.slice(0, 200) : state.learnedSkills,
+    ui: p.ui ? { ...state.ui, ...p.ui } : state.ui,
+    quickPrompts: Array.isArray(p.quickPrompts) ? p.quickPrompts.slice(0, MAX_PROMPTS) : state.quickPrompts,
+  });
+  return true;
+}
+
 export function getConversation(id:string|null){if(!id)return undefined;return useAppStore.getState().conversations.find(c=>c.id===id);}
 
 
