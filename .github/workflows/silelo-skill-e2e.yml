@@ -85,3 +85,4 @@ jobs:
 
           echo "SILELO_SKILL_INSTALL_OK"
           echo "SILELO SKILL E2E: PASS"
+# Production persistence gate: run after every workflow change.
