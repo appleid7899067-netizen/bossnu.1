@@ -37,6 +37,8 @@ export const authEnabled = true;
 
 /** The upstream providers to render sign-in buttons for. */
 export { AUTH_PROVIDERS };
+// Compatibility alias for existing UI imports while the auth migration settles.
+export const GROK_PROVIDERS = AUTH_PROVIDERS;
 
 // ── Live-preview bearer token ────────────────────────────────────────────────
 // The embedded preview iframe has partitioned cookies, so we keep the session's
