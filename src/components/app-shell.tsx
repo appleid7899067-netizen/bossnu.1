@@ -665,6 +665,11 @@ ${message}`); toast.error(message); }
             store.deleteChat(id);
             if (search.c === id) go({ view: "chat", c: undefined });
           }}
+          onClearChatHistory={() => {
+            if (busyChat) abortRef.current?.abort();
+            store.clearChatHistory();
+            go({ view: "chat", c: undefined });
+          }}
           onOpenMap={(id) => go({ view: "maps", m: id })}
           onRenameChat={store.renameChat}
           onTogglePin={store.togglePinChat}
@@ -707,6 +712,11 @@ ${message}`); toast.error(message); }
               onDeleteChat={(id) => {
                 store.deleteChat(id);
                 if (search.c === id) go({ view: "chat", c: undefined });
+              }}
+              onClearChatHistory={() => {
+                if (busyChat) abortRef.current?.abort();
+                store.clearChatHistory();
+                go({ view: "chat", c: undefined });
               }}
               onOpenMap={(id) => go({ view: "maps", m: id })}
               onRenameChat={store.renameChat}
