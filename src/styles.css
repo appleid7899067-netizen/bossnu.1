@@ -666,7 +666,7 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
     max-width: none;
     overflow: visible;
     color: var(--color-fg);
-    font-family: ui-sans-serif, system-ui, "Noto Sans Thai", sans-serif;
+    font-family: ui-rounded, "Nunito", "Noto Sans Thai", "Leelawadee UI", system-ui, sans-serif;
     font-size: 15px;
     font-weight: 450;
     line-height: 1.65;
@@ -703,7 +703,7 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
     padding: 9px 0 16px;
     color: var(--color-fg);
     background: transparent;
-    font-family: ui-sans-serif, system-ui, "Noto Sans Thai", sans-serif;
+    font-family: ui-rounded, "Nunito", "Noto Sans Thai", "Leelawadee UI", system-ui, sans-serif;
     font-size: 14px;
     line-height: 1.75;
     contain: none;
@@ -711,7 +711,12 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 }
 
 
-/* Final compact live-activity tuning, including mobile override. */
+/* Final compact live-activity tuning: rounded Thai-friendly typography. */
+.sali-devlog-live .sali-flow-token {
+  font-family: ui-rounded, "Nunito", "Noto Sans Thai", "Leelawadee UI", system-ui, sans-serif;
+  letter-spacing: .01em;
+}
+
 .sali-devlog-live .sali-flow-current .sali-flow-token {
   font-size: 11px;
   font-weight: 400;
