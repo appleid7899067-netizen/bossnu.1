@@ -436,7 +436,7 @@ ${message}`); toast.error(message); }
   async function handleSignOut() {
     stopChat();
     try {
-      await signOut("/");
+      await signOut("/login");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "ออกจากระบบไม่สำเร็จ");
     }
