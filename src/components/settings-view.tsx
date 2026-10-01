@@ -727,13 +727,13 @@ function DataPanel() {
 
   return <div className="grid gap-4">
     <div className="grid gap-4 md:grid-cols-2">
-      <Panel title="ข้อมูลบนอุปกรณ์นี้" icon={Database}>
+      <Panel title="ข้อมูลบนอุปกรณ์นี้ (แคช)" icon={Database}>
         <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {stats.map(([label, value]) => (
             <div key={label} className="card-lift rounded-xl border border-border bg-clay/60 p-3"><dt className="text-[11px] text-muted">{label}</dt><dd className="mt-1 text-lg font-semibold tabular-nums">{value}</dd></div>
           ))}
         </dl>
-        <p className="mt-3 text-xs leading-relaxed text-subtle">ทุกอย่างเก็บในเบราว์เซอร์ (localStorage) — ล้างข้อมูลเบราว์เซอร์แล้วจะหายไป ควรสำรองไว้เป็นระยะ</p>
+        <p className="mt-3 text-xs leading-relaxed text-subtle">ข้อมูลสำคัญซิงก์กับ Workspace บน Neon แล้ว • เบราว์เซอร์เก็บไว้เฉพาะแคชเพื่อให้เปิดแอปได้เร็ว • ล้างข้อมูลเบราว์เซอร์แล้วข้อมูลใน Workspace ยังอยู่</p>
       </Panel>
       <Panel title="กิจกรรม 7 วันล่าสุด" icon={Zap}>
         <div className="flex h-36 items-stretch gap-2">
