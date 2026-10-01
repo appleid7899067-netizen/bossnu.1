@@ -434,10 +434,6 @@ ${message}`); toast.error(message); }
   }
 
   async function handleSignOut() {
-    if (!authEnabled) {
-      toast.info("ระบบเข้าสู่ระบบยังปิดอยู่ในโหมดนี้");
-      return;
-    }
     stopChat();
     try {
       await signOut("/");
