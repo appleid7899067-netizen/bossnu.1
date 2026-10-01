@@ -218,7 +218,7 @@ function waitForPopupToken(popup: Window): Promise<string | null> {
  * a hand-rolled control must catch it and let the visitor retry. In the live
  * preview the local clear is sufficient, so it always resolves.
  */
-export async function signOut(redirectTo = "/"): Promise<void> {
+export async function signOut(redirectTo = "/login"): Promise<void> {
   await runSignOut({
     livePreview: inLivePreview(),
     hasBearer: Boolean(getBearerToken()),
