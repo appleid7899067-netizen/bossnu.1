@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: bossnu-web
+    runtime: node
+    nodeVersion: '22'
+    buildCommand: 'npm ci --no-audit --no-fund && npm run build:render'
+    startCommand: 'npm start'
+    healthCheckPath: /api/health
+    envVars:
+      - key: E2B_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SANDBOX_RUNNER_URL
+        sync: false
+      - key: SANDBOX_RUNNER_TOKEN
+        sync: false
+      - key: SANDBOX_ALLOW_ORIGIN
+        value: '*'
+
+  - type: web
+    name: bossnu-runner
+    runtime: docker
+    dockerfilePath: ./sandbox-runner/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: RUNNER_TOKEN
+        generateValue: true
+      - key: PORT
+        value: '8787'
