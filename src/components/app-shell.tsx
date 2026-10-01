@@ -17,6 +17,7 @@ import { generateMindMap, generateStudioImage } from "@/lib/ai/client";
 import { redactSensitiveCommand, runAgentLoop, type AgentPhase } from "@/lib/ai/agent-loop";
 import { agentWorkspaceIdFor, createHttpWorkspace } from "@/lib/workspace/http-workspace";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
+import { authEnabled, signOut } from "@/lib/auth/client";
 import type { GithubCall, RunCall, ToolResult } from "@/lib/ai/sandbox-tool";
 import { isRunnerRuntime } from "@/types/sandbox";
 import { streamChat } from "@/lib/ai/stream";
@@ -432,6 +433,19 @@ ${message}`); toast.error(message); }
     }
   }
 
+  async function handleSignOut() {
+    if (!authEnabled) {
+      toast.info("ระบบเข้าสู่ระบบยังปิดอยู่ในโหมดนี้");
+      return;
+    }
+    stopChat();
+    try {
+      await signOut("/");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ออกจากระบบไม่สำเร็จ");
+    }
+  }
+
   function stopChat() {
     abortRef.current?.abort();
     stopVoice();
@@ -649,6 +663,7 @@ ${message}`); toast.error(message); }
           onTogglePin={store.togglePinChat}
           onExportChat={exportChat}
           searchRef={searchRef}
+          onSignOut={() => void handleSignOut()}
         />
       </div>
 
@@ -690,6 +705,7 @@ ${message}`); toast.error(message); }
               onRenameChat={store.renameChat}
               onTogglePin={store.togglePinChat}
               onExportChat={exportChat}
+              onSignOut={() => void handleSignOut()}
             />
           </div>
         </div>
