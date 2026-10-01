@@ -28,7 +28,7 @@ import { describeEvidence } from "@/lib/workspace/snapshot";
 import { createFileRoute } from "@tanstack/react-router";
 import { detectSandboxInput } from "@/lib/sandbox/detect";
 import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
-import { listSkills, loadSkill, suggestSkills } from "@/lib/sandbox/skills.server";
+import { listSkills, listWorkspaceSkills, loadSkill, loadWorkspaceSkill, suggestSkills } from "@/lib/sandbox/skills.server";
 import {
   CommandRequestSchema,
   RUNNER_RUNTIMES,
@@ -452,11 +452,17 @@ async function handleGet(request: Request): Promise<Response> {
   const skillId = url.searchParams.get("skill")?.trim();
   const reference = url.searchParams.get("reference")?.trim() || undefined;
   const query = url.searchParams.get("q")?.trim();
+  const workspace = url.searchParams.get("workspace")?.trim();
+  const workspaceSeed = workspace && /^[a-zA-Z0-9_-]{1,100}$/.test(workspace) ? await loadSeed(workspace) : undefined;
 
   if (skillId) {
     const parsed = CommandRequestSchema.safeParse({ skill: skillId, reference });
     if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid skill id");
-    const loaded = await loadSkill(skillId, reference);
+    const loaded = workspaceSeed?.ok
+      ? loadWorkspaceSkill(workspaceSeed.files, skillId, reference).ok
+        ? loadWorkspaceSkill(workspaceSeed.files, skillId, reference)
+        : await loadSkill(skillId, reference)
+      : await loadSkill(skillId, reference);
     if (!loaded.ok) return fail(loaded.status, loaded.error);
     const result: CommandResult = {
       success: true,
@@ -469,7 +475,12 @@ async function handleGet(request: Request): Promise<Response> {
   }
 
   const runner = runnerConfig();
-  const skills = query ? suggestSkills(query, 50) : listSkills();
+  const builtInSkills = query ? suggestSkills(query, 50) : listSkills();
+  const workspaceSkills = workspaceSeed?.ok ? listWorkspaceSkills(workspaceSeed.files) : [];
+  const skills = query
+    ? [...builtInSkills, ...workspaceSkills.filter((skill) => [skill.id, skill.name, ...skill.triggers].some((value) => value.toLowerCase().includes(query.toLowerCase())))]
+        .filter((skill, index, all) => all.findIndex((item) => item.id === skill.id) === index)
+    : [...builtInSkills, ...workspaceSkills];
   const body: SkillsListResponse = {
     success: true,
     count: skills.length,
@@ -517,6 +528,7 @@ export async function handlePost(request: Request, emit?: StreamEmit): Promise<R
     if (Buffer.byteLength(value.content, "utf8") > 128 * 1024) {
       return fail(413, "สร้าง Skill ไม่สำเร็จ: SKILL.md ใหญ่เกิน 128 KiB");
     }
+    if (findSkill(value.skillId)) return fail(409, `Skill "${value.skillId}" ชนกับ Built-in Skill ในระบบ`);
     const created = await createVerifiedSkill(value.workspace, value.skillId, value.content);
     const success = created.created && created.verified && created.persisted;
     return json({
