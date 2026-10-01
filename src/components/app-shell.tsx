@@ -425,11 +425,22 @@ export function AppShell({ search }: { search: Search }) {
 ${message}`); toast.error(message); }
     } finally {
       flushReplyNow();
-      await persistJournal();
-      finishVoice();
-      if (reply.trim() && !ac.signal.aborted) await speakNow(reply);
+
+      // The model stream is finished at this point. Never keep the composer
+      // locked while journal persistence or TTS is running.
       setBusyChat(false);
       setStreamingId(null);
+      finishVoice();
+
+      // Persistence and voice are post-response work. They must not hold the
+      // chat in "busy" state or make the user press Stop after the model ends.
+      void persistJournal();
+      if (reply.trim() && !ac.signal.aborted) {
+        void Promise.race([
+          speakNow(reply),
+          new Promise<void>((resolve) => window.setTimeout(resolve, 8000)),
+        ]);
+      }
     }
   }
 
