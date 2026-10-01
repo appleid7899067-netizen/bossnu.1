@@ -28,7 +28,7 @@ import { describeEvidence } from "@/lib/workspace/snapshot";
 import { createFileRoute } from "@tanstack/react-router";
 import { detectSandboxInput } from "@/lib/sandbox/detect";
 import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
-import { listSkills, listWorkspaceSkills, loadSkill, loadWorkspaceSkill, suggestSkills } from "@/lib/sandbox/skills.server";
+import { findSkill, listSkills, listWorkspaceSkills, loadSkill, loadWorkspaceSkill, suggestSkills } from "@/lib/sandbox/skills.server";
 import {
   CommandRequestSchema,
   RUNNER_RUNTIMES,
@@ -458,11 +458,8 @@ async function handleGet(request: Request): Promise<Response> {
   if (skillId) {
     const parsed = CommandRequestSchema.safeParse({ skill: skillId, reference });
     if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid skill id");
-    const loaded = workspaceSeed?.ok
-      ? loadWorkspaceSkill(workspaceSeed.files, skillId, reference).ok
-        ? loadWorkspaceSkill(workspaceSeed.files, skillId, reference)
-        : await loadSkill(skillId, reference)
-      : await loadSkill(skillId, reference);
+    const workspaceLoaded = workspaceSeed?.ok ? loadWorkspaceSkill(workspaceSeed.files, skillId, reference) : null;
+    const loaded = workspaceLoaded?.ok ? workspaceLoaded : await loadSkill(skillId, reference);
     if (!loaded.ok) return fail(loaded.status, loaded.error);
     const result: CommandResult = {
       success: true,
