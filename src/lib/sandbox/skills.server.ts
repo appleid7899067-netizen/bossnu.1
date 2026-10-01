@@ -201,6 +201,45 @@ export async function loadSkill(
  * Skills whose trigger phrases (or id) appear in `text`, best match first.
  * Used to suggest a skill for a command that did not name one.
  */
+
+
+/** Load a user-installed skill from the persisted workspace snapshot. */
+export function loadWorkspaceSkill(
+  files: Array<{ path: string; content: string }>, id: string, reference?: string,
+): { ok: true; skill: SkillContent } | { ok: false; error: string; status: number } {
+  const prefix = `project/skills/verified/${id}/`;
+  const mainPath = `${prefix}SKILL.md`;
+  const main = files.find((file) => file.path === mainPath);
+  if (!main) return { ok: false, status: 404, error: `ไม่พบสกิล "${id}" ใน workspace ที่ติดตั้งไว้` };
+  const { meta, body } = parseFrontmatter(main.content);
+  const presentation = skillPresentation(id);
+  const references = files.filter((file) => file.path.startsWith(prefix) && file.path.endsWith(".md") && file.path !== mainPath)
+    .map((file) => file.path.slice(prefix.length)).filter((path) => !path.includes("..")).sort();
+  const info: SkillInfo = {
+    id, name: skillDisplayName(id), title: presentation.title, emoji: presentation.emoji, category: presentation.category,
+    description: meta.description || meta.shortDescription || "", shortDescription: meta.shortDescription,
+    triggers: parseTriggers(meta.description), path: `skills/verified/${id}/SKILL.md`, userInvocable: meta.userInvocable,
+    references, bytes: Buffer.byteLength(main.content, "utf8"),
+  };
+  if (!reference) return { ok: true, skill: { ...info, content: body } };
+  const ref = files.find((file) => file.path === `${prefix}${reference}` && file.path.endsWith(".md"));
+  if (!ref) return { ok: false, status: 404, error: `สกิล "${id}" ไม่มีไฟล์อ้างอิง "${reference}"` };
+  return { ok: true, skill: { ...info, content: ref.content, reference, path: `skills/verified/${id}/${reference}` } };
+}
+
+/** List persisted user skills without duplicating built-in .grok skills. */
+export function listWorkspaceSkills(files: Array<{ path: string; content: string }>): SkillInfo[] {
+  const ids = new Set<string>();
+  for (const file of files) {
+    const match = file.path.match(/^project\\/skills\\/verified\\/([a-z0-9][a-z0-9-]*)\\/SKILL\\.md$/i);
+    if (match) ids.add(match[1]);
+  }
+  return [...ids].filter((id) => !findSkill(id)).map((id) => loadWorkspaceSkill(files, id))
+    .filter((result): result is { ok: true; skill: SkillContent } => result.ok)
+    .map(({ skill }) => { const { content: _content, ...info } = skill; return info; })
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
 export function suggestSkills(text: string, limit = 3): SkillInfo[] {
   const haystack = text.toLowerCase();
   if (!haystack.trim()) return [];
