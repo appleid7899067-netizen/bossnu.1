@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowLeft, ArrowUp, Box, Braces, Check, ChevronDown, Code2, FileCode2, Folder, Globe2, Maximize2, Play, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Terminal, Trash2, Wifi } from "lucide-react";
+import { ArrowLeft, Box, Braces, Check, ChevronDown, Code2, FileCode2, Folder, Globe2, Maximize2, Play, RefreshCw, Search, Settings2, ShieldCheck, Terminal, Trash2, Wifi } from "lucide-react";
 
 export const Route = createFileRoute("/workspace")({
   component: CodingWorkspace,
