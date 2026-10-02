@@ -21,7 +21,7 @@ import { authEnabled, signOut } from "@/lib/auth/client";
 import type { GithubCall, RunCall, ToolResult } from "@/lib/ai/sandbox-tool";
 import { isRunnerRuntime } from "@/types/sandbox";
 import { streamChat } from "@/lib/ai/stream";
-import { finishVoice, getVoiceSettings, setVoiceEnabled, speakNow, stopVoice } from "@/lib/ai/voice";
+import { finishVoice, getVoiceSettings, setVoiceEnabled, speakNow, speakStatus, stopVoice } from "@/lib/ai/voice";
 import type { Search } from "@/lib/search";
 import { exportCloudState, useAppStore } from "@/lib/store";
 import { loadCloudState, saveCloudState } from "@/lib/workspace/cloud-state";
@@ -492,6 +492,17 @@ export function AppShell({ search }: { search: Search }) {
             answer: "💬 Answer • ตอบในแชต",
           };
           pushActivity({ kind: "phase", phase, label: detail || labels[phase] });
+          const statusVoice: Partial<Record<AgentPhase, string>> = {
+            goal: "สลี่รับงานแล้วค่ะ",
+            plan: "สลี่กำลังวางแผนงานนะคะ",
+            act: "สลี่กำลังลงมือทำค่ะ",
+            run: "สลี่กำลังรันงานอยู่นะคะ",
+            observe: "สลี่กำลังอ่านผลจริงค่ะ",
+            verify: "สลี่กำลังตรวจสอบหลักฐานค่ะ",
+            fix: "งานยังไม่ผ่านค่ะ สลี่กำลังแก้ไขให้นะคะ",
+            answer: "ตรวจสอบเสร็จแล้วค่ะ",
+          };
+          if (statusVoice[phase]) speakStatus(statusVoice[phase]!);
         },
         onText: text => { if (text.startsWith("\\n\\n```sandbox")) return; append(text); },
         onSkillSaved: (path, saved) => pushActivity({ kind: "skill", path, status: saved ? "saved" : "failed" }),
