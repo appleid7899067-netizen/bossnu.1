@@ -27,14 +27,14 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
   onRenameChat?: (id: string, title: string) => void; onTogglePin?: (id: string) => void; onExportChat?: (id: string) => void; onSignOut?: () => void; searchRef?: RefObject<HTMLInputElement | null>;
 }) {
   const store = useAppStore();
-  return <aside className="flex h-full min-h-0 w-[260px] shrink-0 flex-col border-r border-border bg-bg">
+  return <aside className="flex h-full min-h-0 w-[224px] shrink-0 flex-col border-r border-border bg-bg">
     <div className="flex items-center justify-between px-4 py-4"><LuminaWordmark /></div>
     <div className="px-3">
       <Button className="accent-gradient h-11 w-full justify-center rounded-xl border-0 text-primary-fg shadow-lg transition-transform duration-200 hover:scale-[1.02] active:scale-[.98]" onClick={onNewChat}>
         <Plus className="size-4" strokeWidth={2.4} />แชตใหม่
       </Button>
     </div>
-    <nav className="mt-4 flex flex-col gap-1 px-3">
+    <nav className="mt-3 flex flex-col gap-0.5 px-2">
       <NavItem active={view === "chat"} icon={MessageSquare} label="แชต" onClick={() => onView("chat")} />
       <NavItem active={view === "maps"} icon={GitBranch} label="แผนที่ดาวเทียม" onClick={() => onView("maps")} />
       <NavItem active={view === "studio"} icon={ImageIcon} label="สตูดิโอรูปภาพ" onClick={() => onView("studio")} />
@@ -54,7 +54,7 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
       </Link>
       <NavItem active={view === "settings"} icon={Settings} label="ตั้งค่า" onClick={() => onView("settings")} />
     </nav>
-    <div className="mx-3 mt-3 space-y-0.5 rounded-2xl border border-border bg-elevated/60 p-2.5">
+    <div className="mx-2 mt-2 space-y-0.5 rounded-xl border border-border bg-elevated/60 p-2.5">
       <p className="px-1 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-subtle">ทางลัด</p>
       <div className="flex items-center justify-between rounded-xl px-1 py-1.5 text-sm text-muted transition-colors hover:bg-hover hover:text-fg">
         <span className="flex items-center gap-2"><SquareTerminal className="size-4 text-subtle" /> Auto Terminal</span>
@@ -65,7 +65,7 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
         <Switch compact value={store.ui.theme !== "light"} onChange={() => store.updateUi({ theme: store.ui.theme === "light" ? "dark" : "light" })} ariaLabel="สลับโหมดมืด" />
       </div>
     </div>
-    <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-3 pb-4 no-scrollbar">
+    <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4 no-scrollbar">
       {view === "maps" ? <ListBlock title="Saved maps" empty="Maps you build will live here." items={maps.map((m) => ({ id: m.id, label: m.data.topic, active: m.id === activeMapId, onOpen: () => onOpenMap(m.id) }))} />
         : <ChatList conversations={conversations} activeChatId={view === "chat" ? activeChatId : null} searchRef={searchRef} onOpenChat={onOpenChat} onDeleteChat={onDeleteChat} onClearChatHistory={onClearChatHistory} onRenameChat={onRenameChat} onTogglePin={onTogglePin} onExportChat={onExportChat} />}
     </div>
