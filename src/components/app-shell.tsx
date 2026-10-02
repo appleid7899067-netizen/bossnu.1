@@ -20,7 +20,7 @@ import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { authEnabled, signOut } from "@/lib/auth/client";
 import type { GithubCall, RunCall, ToolResult } from "@/lib/ai/sandbox-tool";
 import { isRunnerRuntime } from "@/types/sandbox";
-import { streamChat } from "@/lib/ai/stream";
+import { enrichMediaContext, streamChat } from "@/lib/ai/stream";
 import { finishVoice, getVoiceSettings, setVoiceEnabled, speakNow, speakStatus, stopVoice } from "@/lib/ai/voice";
 import type { Search } from "@/lib/search";
 import { exportCloudState, useAppStore } from "@/lib/store";
@@ -173,8 +173,17 @@ export function AppShell({ search }: { search: Search }) {
     const chatMode = mode ?? convo?.mode ?? "instant";
     store.addUserMessage(id, content, files);
     const assistantId = store.startAssistant(id);
-    const history = (useAppStore.getState().conversations.find(c => c.id === id)?.messages ?? [])
+    let history = (useAppStore.getState().conversations.find(c => c.id === id)?.messages ?? [])
       .filter(m => m.id !== assistantId && (m.content || m.attachments?.length)).map(m => ({ role: m.role, content: messageForModel(m) }));
+    if (files.some(file => file.kind === "image" || file.kind === "audio" || file.mimeType?.startsWith("image/") || file.mimeType?.startsWith("audio/"))) {
+      const mediaLogId = startStreamLog("puter", "Media • วิเคราะห์รูป/เสียง…");
+      try {
+        history = await enrichMediaContext(history, files);
+        updateStreamLog(mediaLogId, "puter", "done", "Media • วิเคราะห์เสร็จแล้ว", 0);
+      } catch (error) {
+        updateStreamLog(mediaLogId, "puter", "error", error instanceof Error ? error.message : "Media analysis failed", 0);
+      }
+    }
     const ac = new AbortController();
     abortRef.current = ac;
     setDraft(""); setAttachments([]); setActiveTool("auto"); setActiveRuns((count) => count + 1); setStreamingId(assistantId); setSandboxRun(null);
