@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type RefObject } from "react";
-import { Bot, Download, FileStack, GitBranch, ImageIcon, LogOut, MessageSquare, MoreHorizontal, Pencil, Pin, PinOff, Plus, Search, Settings, SquareTerminal, Trash2 } from "lucide-react";
+import { Bot, Braces, Download, FileStack, GitBranch, ImageIcon, LogOut, MessageSquare, MoreHorizontal, Pencil, Pin, PinOff, Plus, Search, Settings, SquareTerminal, Trash2 } from "lucide-react";
 import type { CommandHistoryItem } from "@/lib/types";
 import { LuminaWordmark } from "@/components/lumina-mark";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,12 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
         "text-muted hover:bg-hover hover:text-fg",
       )} activeProps={{ className: "bg-primary/10 text-fg" }}>
         <SquareTerminal className="size-4 shrink-0 text-subtle group-hover:text-muted" strokeWidth={1.8} />Sandbox
+      </Link>
+      <Link to="/workspace" className={cn(
+        "group flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-sm font-medium transition-all duration-200",
+        "text-muted hover:bg-hover hover:text-fg",
+      )} activeProps={{ className: "bg-primary/10 text-fg" }}>
+        <Braces className="size-4 shrink-0 text-subtle group-hover:text-primary" strokeWidth={1.8} />Workspace · ห้องโค้ด
       </Link>
       <NavItem active={view === "settings"} icon={Settings} label="ตั้งค่า" onClick={() => onView("settings")} />
     </nav>
