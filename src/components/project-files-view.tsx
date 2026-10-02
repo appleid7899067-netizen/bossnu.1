@@ -21,7 +21,7 @@ function mediaSource(file: WorkspaceFile) {
   return "";
 }
 
-export function ProjectFilesView({ workspaceId }: { workspaceId: string }) {
+export function ProjectFilesView({ workspaceId, initialPath }: { workspaceId: string; initialPath?: string }) {
   const [files, setFiles] = useState<WorkspaceFile[]>([]);
   const [selectedPath, setSelectedPath] = useState("");
   const [draft, setDraft] = useState("");
@@ -42,7 +42,10 @@ export function ProjectFilesView({ workspaceId }: { workspaceId: string }) {
       if (!response.ok || !data.ok) throw new Error(data.error || "โหลดไฟล์โปรเจ็คไม่สำเร็จ");
       const next = (data.files ?? []) as WorkspaceFile[];
       setFiles(next);
-      const path = selectFirst ? next[0]?.path ?? "" : selectedPath || next[0]?.path || "";
+      const preferred = initialPath ? initialPath.replace(/^project\//, "") : "";
+      const path = selectFirst
+        ? (next.find(file => file.path === preferred || `project/${file.path}` === initialPath)?.path ?? next[0]?.path ?? "")
+        : selectedPath || next[0]?.path || "";
       setSelectedPath(path);
       const selected = next.find(file => file.path === path);
       setDraft(selected?.content ?? "");
