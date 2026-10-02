@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Menu, MoreHorizontal, Phone, Volume2, VolumeX, X } from "lucide-react";
 import { ProjectFilesView } from "@/components/project-files-view";
+import { SatelliteMapView } from "@/components/satellite-map-view";
 import { Toaster, toast } from "sonner";
 import { AppBuilderView } from "@/components/app-builder-view";
 import { ChatThread, type SandboxRunView } from "@/components/chat-thread";
@@ -856,7 +857,9 @@ ${message}`); toast.error(message); }
         {view === "files" ? (
           <ProjectFilesView workspaceId={agentWorkspaceIdFor(currentUser?.id, search.c ?? "default")} />
         ) : view === "maps" ? (
-          <MindMapView
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            <div className="min-h-[680px] flex-1"><SatelliteMapView /></div>
+            <div className="min-h-[620px] shrink-0"><MindMapView
             maps={store.maps}
             active={activeMap}
             topic={mapTopic}
@@ -876,7 +879,7 @@ ${message}`); toast.error(message); }
             }}
             busy={busyMap}
             error={mapError}
-          />
+          /></div>
         ) : view === "builder" ? (
           <AppBuilderView
             project={store.builderProject ?? undefined}
