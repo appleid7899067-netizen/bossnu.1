@@ -282,7 +282,7 @@ function InlineCodeWorkspace({ workspaceId, path }: { workspaceId: string; path?
         {path ? <span className="ml-auto truncate text-[10px] text-subtle">{path}</span> : null}
       </div>
       <div className="h-[620px] min-h-0 border-t border-border bg-bg">
-        <ProjectFilesView workspaceId={workspaceId} />
+        <ProjectFilesView workspaceId={workspaceId} initialPath={path} />
       </div>
     </section>
   );
@@ -400,95 +400,57 @@ function LiveExecutionLog({ command, output, fallback }: { command?: string; out
 }
 
 function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatActivity[]; live: boolean; liveText?: string }) {
-  const visible = activities.slice(-80);
-  const latestCommand = [...visible].reverse().find((activity): activity is Extract<ChatActivity, { kind: "command" }> => activity.kind === "command");
-
-  function phaseLabel(activity: Extract<ChatActivity, { kind: "phase" }>) {
-    const labels: Record<string, string> = {
-      goal: "GOAL",
-      plan: "PLAN",
-      act: "ACT",
-      run: "RUN",
-      observe: "OBSERVE",
-      verify: "VERIFY",
-      fix: "FIX",
-      answer: "ANSWER",
-    };
-    return labels[activity.phase] || activity.phase.toUpperCase();
+  const phaseOrder = ["goal", "plan", "act", "run", "observe", "verify", "fix", "answer"];
+  const phaseMap = new Map<string, Extract<ChatActivity, { kind: "phase" }>>();
+  for (const activity of activities) {
+    if (activity.kind === "phase") phaseMap.set(activity.phase, activity);
   }
+  const phases = phaseOrder
+    .map(phase => phaseMap.get(phase))
+    .filter((activity): activity is Extract<ChatActivity, { kind: "phase" }> => Boolean(activity))
+    .slice(-7);
+  const latestCommand = [...activities].reverse().find((activity): activity is Extract<ChatActivity, { kind: "command" }> => activity.kind === "command");
+  const fileActivity = [...activities].reverse().find(activity => activity.kind === "files");
+  const skillActivity = [...activities].reverse().find(activity => activity.kind === "skill");
+  const filteredOutput = (latestCommand?.output || liveText)
+    .split("\n")
+    .filter(line => line.trim())
+    .filter(line => !/^\s*(npm notice|npm warn|warning|deprecated|up to date|found \d+ vulnerabilities|exitCode|workspace sync|workspaceSync|process exited)/i.test(line))
+    .slice(-12)
+    .join("\n");
 
-  function activityText(activity: ChatActivity) {
-    if (activity.kind === "phase") {
-      return phaseLabel(activity) + " " + activity.label.replace(/^[^•]+•\s*/, "").trim();
-    }
-    if (activity.kind === "command") {
-      const status = activity.status === "success" ? "✓" : activity.status === "running" ? "…" : "✕";
-      return status + " " + activity.runtime + " $" + activity.command;
-    }
-    if (activity.kind === "stream") {
-      return activity.source.toUpperCase() + " " + (activity.text || "กำลังรับข้อมูล…");
-    }
-    if (activity.kind === "files") {
-      return "EDIT " + activity.files.length + " ไฟล์";
-    }
-    return activity.status === "saved" ? "SKILL ✓ " + activity.path : "SKILL ✕ " + activity.path;
-  }
+  const tokenForPhase = (phase: string) => phase.toUpperCase();
+  const statusToken = latestCommand
+    ? latestCommand.status === "success" ? "✓ RUN" : latestCommand.status === "running" ? "RUN" : "✕ RUN"
+    : fileActivity
+      ? "✓ EDIT"
+      : skillActivity
+        ? skillActivity.status === "saved" ? "✓ SKILL" : "✕ SKILL"
+        : live ? "RUN" : "✓ DONE";
 
   return (
     <section aria-label="SALI live stream" className={`sali-devlog mb-3${live ? " sali-devlog-live" : " sali-devlog-done"}`}>
       <div className="sali-devlog-head">
-        <span className="sali-devlog-title">{live ? "กำลังทำงานให้คุณอยู่ค่ะ ✨" : "ทำงานเสร็จแล้วค่ะ ✨"}</span>
+        <span className="sali-devlog-title">{live ? "สลี่กำลังทำงาน" : "สลี่ทำงานเสร็จแล้ว"}</span>
         <span className="sali-devlog-headline" aria-hidden="true" />
         {live ? <span className="sali-live-cursor" aria-label="กำลังทำงาน" /> : <span className="sali-summary-mark" aria-label="เสร็จแล้ว">✓</span>}
       </div>
-
       <div className="sali-devlog-body">
         <div className="sali-devlog-flow" aria-live={live ? "polite" : "off"}>
-          {visible.map((activity, index) => (
+          {phases.map((activity, index) => (
             <span key={activity.id} className="sali-flow-item">
               {index > 0 ? <span className="sali-flow-arrow" aria-hidden="true">→</span> : null}
-              <span className={
-                activity.kind === "phase"
-                  ? "sali-flow-token sali-flow-phase"
-                  : activity.kind === "command"
-                    ? activity.status === "success" ? "sali-flow-token sali-flow-ok" : activity.status === "running" ? "sali-flow-token sali-flow-live" : "sali-flow-token sali-flow-error"
-                    : activity.kind === "stream"
-                      ? activity.status === "done" ? "sali-flow-token sali-flow-ok" : activity.status === "error" ? "sali-flow-token sali-flow-error" : "sali-flow-token sali-flow-live"
-                      : activity.kind === "files"
-                        ? "sali-flow-token sali-flow-ok"
-                        : activity.status === "saved" ? "sali-flow-token sali-flow-ok" : "sali-flow-token sali-flow-error"
-              }>
-                {activityText(activity)}
-              </span>
+              <span className="sali-flow-token sali-flow-phase" title={activity.label}>{tokenForPhase(activity.phase)}</span>
             </span>
           ))}
-          {live ? (
-            <span className="sali-flow-item sali-flow-current" aria-live="polite">
-              {visible.length ? <span className="sali-flow-arrow" aria-hidden="true">→</span> : null}
-              <span className="sali-flow-token sali-flow-live">กำลังประมวลผล<span className="sali-terminal-caret" /></span>
-            </span>
-          ) : null}
+          <span className="sali-flow-item sali-flow-current">
+            {phases.length ? <span className="sali-flow-arrow" aria-hidden="true">→</span> : null}
+            <span className={`sali-flow-token ${live ? "sali-flow-live" : "sali-flow-ok"}`}>{statusToken}{live ? <span className="sali-terminal-caret" /> : null}</span>
+          </span>
         </div>
-
-        {live ? (
-          latestCommand || liveText ? (
-            <LiveExecutionLog command={latestCommand?.command} output={latestCommand?.output} fallback={liveText} />
-          ) : (
-            <div className="sali-devlog-terminal" aria-label="terminal logs code stream">
-              <span className="sali-devlog-prompt">›</span>
-              <span>กำลังเตรียม HTML / code stream</span>
-              <span className="sali-devlog-trail" aria-hidden="true" />
-              <span className="sali-terminal-caret" />
-            </div>
-          )
-        ) : (
-          <div className="sali-devlog-complete" role="status">
-            <div className="sali-complete-rule"><span>งานเสร็จแล้ว</span></div>
-            <div className="sali-complete-result">
-              <span>แก้ไขเรียบร้อย</span><b>→</b><span>ตรวจสอบแล้ว</span><b>→</b><span>ผลลัพธ์พร้อมใช้งาน</span><span className="sali-complete-badge">OK</span>
-            </div>
-          </div>
-        )}
+        {live && (latestCommand || filteredOutput) ? (
+          <LiveExecutionLog command={latestCommand?.command} output={filteredOutput} fallback="" />
+        ) : null}
       </div>
     </section>
   );
