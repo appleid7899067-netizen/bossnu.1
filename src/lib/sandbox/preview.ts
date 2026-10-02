@@ -42,7 +42,7 @@ export function sandboxPreviewDocument(runtime: string, source: string): string 
       : page('<base href="/">', normalized);
   }
   if (runtime === "javascript") {
-    const safeScript = normalized.replace(/<\\/script/gi, "<\\\\/script");
+    const safeScript = normalized.split("</script").join("<\\/script");
     return page('<base href="/">', `<div id="app"></div><script>${safeScript}</script>`);
   }
   if (runtime === "tailwind") {
@@ -50,7 +50,7 @@ export function sandboxPreviewDocument(runtime: string, source: string): string 
     const cdn = '<script src="https://cdn.tailwindcss.com"></script>';
     if (looksLikeMarkup) return page('<base href="/">' + cdn, normalized);
     return page(
-      `<base href="/">${cdn}<style type="text/tailwindcss">${normalized.replace(/<\\/style/gi, "<\\\\/style")}</style>`,
+      `<base href="/">${cdn}<style type="text/tailwindcss">${normalized.split("</style").join("<\\/style")}</style>`,
       placeholder("Tailwind CSS"),
     );
   }
