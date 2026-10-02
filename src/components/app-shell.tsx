@@ -156,11 +156,11 @@ export function AppShell({ search }: { search: Search }) {
     });
   }
 
-  async function send(text: string, chatId?: string, mode?: ChatMode, allowDangerous = false, files: ChatAttachment[] = []) {
+  async function send(text: string, chatId?: string, mode?: ChatMode, allowDangerous = false, files: ChatAttachment[] = [], forceExecution = false) {
     const content = text.trim();
     if ((!content && !files.length) || busyChat) return;
     const detection = detectSandboxInput(content);
-    const executionRequested = shouldExecuteSandboxInput(content, detection);
+    const executionRequested = forceExecution || shouldExecuteSandboxInput(content, detection);
     if (detection.command && detection.dangerous && !allowDangerous) {
       setDangerousApproval({ content, chatId, mode, attachments: files, reason: detection.riskReason ?? "คำสั่งนี้อาจกระทบไฟล์" });
       return;
@@ -564,6 +564,24 @@ ${message}`); toast.error(message); }
     stopVoice();
   }
 
+  async function emergencyFix() {
+    const id = activeChat?.id;
+    if (!id) return;
+    const emergencyPrompt = "แก้ด่วนฉุกเฉิน: ตรวจสถานะงานล่าสุดและ Workspace จริงก่อน ถ้ามีงานค้าง Error หรือจอขาว ให้ลงมือแก้ทันที แล้ว RUN ใหม่ → OBSERVE → VERIFY จากหลักฐานจริง ห้ามตอบว่าผ่านจนกว่าจะมีผลยืนยัน";
+    if (busyRef.current) {
+      stopChat();
+      const deadline = Date.now() + 3000;
+      while (busyRef.current && Date.now() < deadline) {
+        await new Promise(resolve => window.setTimeout(resolve, 100));
+      }
+    }
+    if (busyRef.current) {
+      toast.error("สลี่ยังหยุดงานเดิมไม่เสร็จ กรุณากดอีกครั้ง");
+      return;
+    }
+    void send(emergencyPrompt, id, activeChat?.mode, false, [], true);
+  }
+
   /** Re-asks the most recent user message, replacing everything after it. */
   function regenerate() {
     if (busyChat || !activeChat) return;
@@ -927,6 +945,7 @@ ${message}`); toast.error(message); }
                 onModelChange={store.setSelectedModel}
                 onChange={setDraft}
                 onSubmit={() => void send(commandForTool(draft), activeChat?.id, undefined, false, attachments)}
+                onEmergency={() => void emergencyFix()}
                 attachments={attachments}
                 onAttachments={setAttachments}
                 inputRef={composerRef}
