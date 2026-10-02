@@ -28,7 +28,19 @@ async function runLiveWebSearch(query: string, signal?: AbortSignal) {
 }
 
 function shouldUseLiveWeb(query: string) {
-  return /(?:ล่าสุด|เรียล.?ไทม์|ตอนนี้|วันนี้|เมื่อกี้|ข่าว|ราคา|หุ้น|คริปโต|สภาพอากาศ|พยากรณ์|ตาราง|คะแนน|ผลแข่ง|กำลังเกิด|current|latest|today|now|live|real[- ]?time|news|price|stock|weather|score|schedule|recent|search|ค้นหา|เช็คเว็บ|ตรวจเว็บ|บนเว็บ)/i.test(query);
+  const q = query.normalize("NFKC").trim();
+  if (!q) return false;
+
+  // Freshness-first: explicit requests for current/live/external information
+  // always get a real web lookup before the model answers.
+  if (/(?:ล่าสุด|เรียล.?ไทม์|ตอนนี้|วันนี้|เมื่อกี้|ปัจจุบัน|สด|ข่าว|ราคา|หุ้น|คริปโต|สภาพอากาศ|พยากรณ์|ตาราง|คะแนน|ผลแข่ง|กำลังเกิด|สถานะ|อัปเดต|update|current|latest|today|now|live|real[- ]?time|news|price|stock|weather|score|schedule|recent|search|ค้นหา|เช็คเว็บ|ตรวจเว็บ|บนเว็บ|อินเทอร์เน็ต|internet|web)/i.test(q)) return true;
+
+  // URLs, product/service names with factual lookup language, and questions
+  // explicitly asking for verification should also use the live source.
+  if (/(https?:\\/\\/|www\\.)/i.test(q)) return true;
+  if (/(?:ตรวจสอบ|ยืนยัน|เช็ก|เช็ค|verify|look up|lookup|find out|ค้นข้อมูล|ข้อมูลจากเว็บ|จากเว็บ|จากอินเทอร์เน็ต)/i.test(q)) return true;
+
+  return false;
 }
 
 async function runGithubHealth(signal?: AbortSignal) {
@@ -229,7 +241,8 @@ export async function streamChat(opts: {
       learnedSkills ? `ทักษะจากโค้ดที่เคยทดสอบผ่าน:\n${learnedSkills}` : "ยังไม่มีทักษะโค้ดที่ทดสอบผ่าน",
       "NO-GUESS / EVIDENCE-FIRST MODE: ห้ามเดาข้อเท็จจริง ห้ามเติมตัวเลข ชื่อ ราคา สถานะ หรือเหตุการณ์ที่ไม่มีหลักฐานรองรับ",
       "ถ้าข้อมูลไม่แน่ใจหรือหลักฐานไม่พอ ให้บอกตรง ๆ ว่า ยังยืนยันไม่ได้ และอย่าสร้างคำตอบให้ดูแน่นอน",
-      "ข้อมูลปัจจุบันหรือข้อมูลภายนอกที่มีการดึง Live Web มาแล้ว ต้องยึดเฉพาะข้อมูลจาก Live Web และระบุแหล่งที่มา ไม่ใช้ความจำมาเติมช่องว่าง",
+      "REALTIME WEB POLICY: เมื่อคำขอเกี่ยวกับข้อมูลล่าสุด ปัจจุบัน สถานะ ราคา ข่าว ตาราง คะแนน หรือผู้ใช้ขอให้ค้นหา/ตรวจสอบเว็บ ต้องเรียก Live Web ก่อนตอบทุกครั้ง. ห้ามใช้ความจำแทนข้อมูลสด. ถ้า Live Web ล้มเหลว ให้บอกว่ายังยืนยันข้อมูลสดไม่ได้ แทนการเดา.",
+      "ข้อมูลปัจจุบันหรือข้อมูลภายนอกที่มีการดึง Live Web มาแล้ว ต้องยึดเฉพาะข้อมูลจาก Live Web และระบุแหล่งที่มา ไม่ใช้ความจำมาเติมช่องว่าง.",
       "การอ้างว่าทำงานสำเร็จต้องมีผล Run/Verify จริงจากเครื่องมือ ไม่ใช่แค่คำสั่งถูกส่งออกไป",
       "ห้ามอ้างว่าทำสิ่งที่ยังไม่ได้ทำจริง",
       buildSkillContext(latestUser),
