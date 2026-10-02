@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import type { ChatActivity } from "@/lib/types";
 
 type Props = { activities: ChatActivity[]; live: boolean };
@@ -27,9 +27,9 @@ function latestStreams(activities: ChatActivity[]) {
 function packageNames(command?: string, output?: string) {
   const text = [command ?? "", output ?? ""].join("\n");
   const names = new Set<string>();
-  for (const match of text.matchAll(/(?:npm\\s+(?:install|i)|pnpm\\s+add|yarn\\s+add)\\s+([^\\n;&]+)/gi)) {
-    for (const token of match[1].split(/\\s+/)) {
-      const clean = token.replace(/^[^-\\w@/]+|[),;]+$/g, "");
+  for (const match of text.matchAll(/(?:npm\s+(?:install|i)|pnpm\s+add|yarn\s+add)\s+([^\n;&]+)/gi)) {
+    for (const token of match[1].split(/\s+/)) {
+      const clean = token.replace(/^[^-\w@/]+|[),;]+$/g, "");
       if (clean && !clean.startsWith("-")) names.add(clean);
     }
   }
@@ -38,7 +38,7 @@ function packageNames(command?: string, output?: string) {
 
 function usefulOutput(output?: string) {
   return (output ?? "").split("\n").map(x => x.trim()).filter(Boolean)
-    .filter(x => !/^(npm notice|npm warn|warning|deprecated|up to date|found \\d+ vulnerabilities|exitCode|workspace sync|workspaceSync|process exited)/i.test(x))
+    .filter(x => !/^(npm notice|npm warn|warning|deprecated|up to date|found \d+ vulnerabilities|exitCode|workspace sync|workspaceSync|process exited)/i.test(x))
     .slice(-6);
 }
 
@@ -106,7 +106,7 @@ export function LiveResultPresentation({ activities, live }: Props) {
 
       <div className="sali-result-stage">
         {streams.map((item, index) => (
-          <div key={item.id} className="sali-result-stack sali-result-stream" style={{ "--sali-delay": `${index * 70}ms` } as React.CSSProperties}>
+          <div key={item.id} className="sali-result-stack sali-result-stream" style={{ "--sali-delay": `${index * 70}ms` } as CSSProperties}>
             <div className="sali-result-stream-head">
               <div className="sali-result-stack-title">{item.source === "sandbox" ? "SALI ↔ SANDBOX" : item.source.toUpperCase() + " STREAM"}</div>
               <span className={item.status === "error" ? "bad" : item.status === "done" ? "ok" : "live"}>
