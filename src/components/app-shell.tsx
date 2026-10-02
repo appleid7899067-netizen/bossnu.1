@@ -197,6 +197,10 @@ export function AppShell({ search }: { search: Search }) {
       if (replyTimer !== null) return;
       replyTimer = window.setTimeout(flushReply, 80);
     };
+    const cleanWorkspaceLinks = (value: string) => value
+      .replace(/https?:\/\/localhost(?::\\d+)?\/[^\\s)\\]]*/gi, "")
+      .replace(/เปิดที่\\s*:\\s*http:\/\/localhost(?::\\d+)?[^\\n]*/gi, "เปิดดูได้จาก Live Preview ใน Bossnu")
+      .replace(/เปิดเซิร์ฟเวอร์[^\\n]*\\n/gi, "");
     const flushReplyNow = () => {
       if (replyTimer !== null) {
         window.clearTimeout(replyTimer);
@@ -205,6 +209,8 @@ export function AppShell({ search }: { search: Search }) {
       if (queuedReply) {
         reply += queuedReply;
         queuedReply = "";
+        const cleaned = cleanWorkspaceLinks(reply);
+        if (cleaned !== reply) reply = cleaned;
         store.patchAssistant(id, assistantId, { content: reply });
       }
     };
