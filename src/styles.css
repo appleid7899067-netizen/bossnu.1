@@ -1034,7 +1034,7 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 }
 
 
-/* Live Result Presentation: evidence-driven visual change for real Sandbox work. */
+/* Live Result Presentation: real execution process + streaming evidence. */
 .sali-result-visual{margin:8px 0 14px;padding:12px;border:1px solid color-mix(in srgb,var(--color-primary) 18%,var(--color-border));border-radius:18px;background:linear-gradient(180deg,color-mix(in srgb,var(--color-primary) 5%,var(--color-surface)),color-mix(in srgb,var(--color-bg) 92%,transparent));overflow:hidden}
 .sali-result-visual.is-error{border-color:color-mix(in srgb,var(--color-danger) 30%,var(--color-border))}
 .sali-result-visual-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -1044,27 +1044,36 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .sali-result-state{font-size:8px;letter-spacing:.08em;padding:3px 7px;border-radius:999px;background:color-mix(in srgb,var(--color-primary) 9%,transparent);color:var(--color-primary);white-space:nowrap}
 .sali-result-state.bad{color:var(--color-danger);background:color-mix(in srgb,var(--color-danger) 9%,transparent)}
 .sali-result-state.ok{color:var(--color-success);background:color-mix(in srgb,var(--color-success) 9%,transparent)}
-.sali-result-flow{display:flex;align-items:center;gap:4px;margin:12px 0 10px;overflow-x:auto;scrollbar-width:none}
+.sali-result-flow{display:flex;align-items:center;gap:4px;margin:12px 0 10px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .sali-result-flow::-webkit-scrollbar{display:none}
 .sali-result-step{display:flex;align-items:center;gap:4px;flex:0 0 auto;color:var(--color-subtle);font-size:8.5px;white-space:nowrap}
 .sali-result-step.done{color:var(--color-fg)}
-.sali-result-dot{display:grid;place-items:center;width:15px;height:15px;border-radius:50%;background:color-mix(in srgb,var(--color-fg) 6%,transparent);font-size:8px}
+.sali-result-step.current{color:var(--color-primary)}
+.sali-result-dot{display:grid;place-items:center;width:15px;height:15px;border-radius:50%;background:color-mix(in srgb,var(--color-fg) 6%,transparent);font-size:7px}
 .sali-result-step.done .sali-result-dot{background:color-mix(in srgb,var(--color-primary) 16%,transparent);color:var(--color-primary)}
-.sali-result-step.waiting .sali-result-dot{animation:sali-result-pulse 1s ease-in-out infinite}
+.sali-result-step.current .sali-result-dot{background:color-mix(in srgb,var(--color-primary) 20%,transparent);color:var(--color-primary);animation:sali-result-pulse 1s ease-in-out infinite}
 .sali-result-step i{font-style:normal;color:var(--color-subtle);margin-left:1px}
+.sali-result-live-detail{min-width:0;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:8px;color:var(--color-muted)}
 .sali-result-stage{display:grid;gap:8px;min-width:0}
 .sali-result-stack,.sali-result-output{min-width:0;padding:9px 10px;border-radius:12px;background:color-mix(in srgb,var(--color-bg) 55%,transparent)}
 .sali-result-stack-title{font-size:7px;letter-spacing:.1em;color:var(--color-subtle);margin-bottom:6px}
-.sali-result-package,.sali-result-file,.sali-result-output-line{display:flex;align-items:center;gap:7px;min-width:0;padding:4px 0;font-size:10px;line-height:1.45;animation:sali-result-in .38s ease both;animation-delay:var(--sali-delay,0ms)}
+.sali-result-stream-status{display:flex;justify-content:space-between;gap:8px;font-size:8px;color:var(--color-subtle);margin-bottom:4px}
+.sali-result-stream-status .live{color:var(--color-primary)}
+.sali-result-stream-status .ok{color:var(--color-success)}
+.sali-result-stream-status .bad{color:var(--color-danger)}
+.sali-result-stream-line{font-size:9px;line-height:1.5;color:var(--color-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sali-result-command{display:flex;align-items:center;gap:7px;min-width:0;font-size:9px;line-height:1.5}
+.sali-result-command>span{color:var(--color-primary)}
+.sali-result-command code{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-fg);font-family:var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)}
+.sali-result-command em{margin-left:auto;font-size:8px;font-style:normal;color:var(--color-subtle)}
+.sali-result-package,.sali-result-file,.sali-result-output-line{display:flex;align-items:center;gap:7px;min-width:0;padding:4px 0;font-size:10px;line-height:1.45}
 .sali-result-package>span:not(.sali-result-bar),.sali-result-file>span:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sali-result-package em{margin-left:auto;font-size:8px;font-style:normal;color:var(--color-subtle)}
 .sali-result-bar{width:34px;height:4px;flex:0 0 34px;border-radius:99px;background:color-mix(in srgb,var(--color-fg) 7%,transparent);overflow:hidden}
-.sali-result-bar b{display:block;width:100%;height:100%;border-radius:inherit;background:var(--color-primary);transform-origin:left;animation:sali-result-fill .7s ease both;animation-delay:var(--sali-delay,0ms)}
+.sali-result-bar b{display:block;width:100%;height:100%;border-radius:inherit;background:var(--color-primary)}
 .sali-result-file-action{display:grid;place-items:center;width:16px;height:16px;border-radius:5px;background:color-mix(in srgb,var(--color-primary) 10%,transparent);color:var(--color-primary);font-size:10px}
 .sali-result-output-line{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-muted)}
 .sali-result-empty{font-size:10px;color:var(--color-muted);padding:7px}
-@keyframes sali-result-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-@keyframes sali-result-in{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
-@keyframes sali-result-pulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
-@media(max-width:640px){.sali-result-visual{margin:5px 0 12px;padding:11px;border-radius:16px}.sali-result-visual-head strong{font-size:10.5px}.sali-result-flow{margin:10px 0 8px}.sali-result-stack,.sali-result-output{padding:8px 9px}.sali-result-package,.sali-result-file,.sali-result-output-line{font-size:9.5px}}
-@media(prefers-reduced-motion:reduce){.sali-result-step.waiting .sali-result-dot,.sali-result-bar b,.sali-result-package,.sali-result-file,.sali-result-output-line{animation:none}}
+@keyframes sali-result-pulse{0%,100%{opacity:.4;transform:scale(.86)}50%{opacity:1;transform:scale(1)}}
+@media(max-width:640px){.sali-result-visual{margin:5px 0 12px;padding:11px;border-radius:16px}.sali-result-visual-head strong{font-size:10.5px}.sali-result-flow{margin:10px 0 8px}.sali-result-stack,.sali-result-output{padding:8px 9px}.sali-result-package,.sali-result-file,.sali-result-output-line{font-size:9.5px}.sali-result-live-detail{max-width:180px}}
+@media(prefers-reduced-motion:reduce){.sali-result-step.current .sali-result-dot{animation:none}}
