@@ -180,12 +180,27 @@ export async function syncStatus(workspace: string, limit = 10): Promise<SyncSta
  */
 export function publicRunnerResult<T extends Record<string, unknown>>(result: T, workspaceSync?: SyncEvidence) {
   const { workspaceSnapshot: _snapshot, workspaceFiles, ...rest } = result as T & { workspaceSnapshot?: unknown; workspaceFiles?: unknown };
+  // Keep a tiny, server-safe integrity signal for the Agent Verification Gate.
+  // Full file contents stay private because snapshots can be large.
+  const snapshotFiles = _snapshot && typeof _snapshot === "object" && Array.isArray((_snapshot as { files?: unknown[] }).files)
+    ? (_snapshot as { files: unknown[] }).files
+    : [];
+  const sourceFiles = snapshotFiles.length ? snapshotFiles : (Array.isArray(workspaceFiles) ? workspaceFiles : []);
+  const emptyHtmlFiles = sourceFiles
+    .filter((f): f is { path: string; content: string } =>
+      Boolean(f) && typeof (f as { path?: unknown }).path === "string" && typeof (f as { content?: unknown }).content === "string")
+    .filter((f) => {
+      const source = f.content.replace(/<!--[\\s\\S]*?-->/g, "").trim();
+      return /^<!doctype\\s+html\\s*$/i.test(source);
+    })
+    .map((f) => f.path);
+  const integrity = emptyHtmlFiles.length ? { emptyHtmlFiles } : undefined;
   const files = Array.isArray(workspaceFiles)
     ? workspaceFiles
         .filter((f): f is { path: string; content: string } => Boolean(f) && typeof f.path === "string" && typeof f.content === "string")
         .map((f) => ({ path: f.path, size: f.content.length, sha256: sha256(f.content) }))
     : undefined;
-  return { ...rest, ...(files ? { workspaceFiles: files } : {}), ...(workspaceSync ? { workspaceSync } : {}) };
+  return { ...rest, ...(files ? { workspaceFiles: files } : {}), ...(integrity ? { workspaceIntegrity: integrity } : {}), ...(workspaceSync ? { workspaceSync } : {}) };
 }
 
 /** JSON body for the runner's /execute and /execute/stream endpoints. */
