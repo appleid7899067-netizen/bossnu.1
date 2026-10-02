@@ -188,7 +188,8 @@ export async function streamChat(opts: {
 
     let liveWebContext = "";
     let liveWebSources: Array<{ title: string; url: string }> = [];
-    if (shouldUseLiveWeb(latestUser)) {
+    const liveWebRequired = shouldUseLiveWeb(latestUser);
+    if (liveWebRequired) {
       try {
         opts.onEvent({ type: "thinking", text: "🌐 Live Web • กำลังดึงข้อมูลล่าสุด..." });
         const web = await runLiveWebSearch(latestUser, opts.signal);
@@ -226,6 +227,10 @@ export async function streamChat(opts: {
       `สกิลที่เปิดใช้งาน: ${activeSkills || "ไม่มี"}`,
       memories ? `ความจำที่บันทึกไว้:\n${memories}` : "ไม่มีความจำที่บันทึกไว้",
       learnedSkills ? `ทักษะจากโค้ดที่เคยทดสอบผ่าน:\n${learnedSkills}` : "ยังไม่มีทักษะโค้ดที่ทดสอบผ่าน",
+      "NO-GUESS / EVIDENCE-FIRST MODE: ห้ามเดาข้อเท็จจริง ห้ามเติมตัวเลข ชื่อ ราคา สถานะ หรือเหตุการณ์ที่ไม่มีหลักฐานรองรับ",
+      "ถ้าข้อมูลไม่แน่ใจหรือหลักฐานไม่พอ ให้บอกตรง ๆ ว่า ยังยืนยันไม่ได้ และอย่าสร้างคำตอบให้ดูแน่นอน",
+      "ข้อมูลปัจจุบันหรือข้อมูลภายนอกที่มีการดึง Live Web มาแล้ว ต้องยึดเฉพาะข้อมูลจาก Live Web และระบุแหล่งที่มา ไม่ใช้ความจำมาเติมช่องว่าง",
+      "การอ้างว่าทำงานสำเร็จต้องมีผล Run/Verify จริงจากเครื่องมือ ไม่ใช่แค่คำสั่งถูกส่งออกไป",
       "ห้ามอ้างว่าทำสิ่งที่ยังไม่ได้ทำจริง",
       buildSkillContext(latestUser),
       liveWebContext ? `ข้อมูลจาก Live Web ที่ดึงมาแล้ว ห้ามแต่งเติมข้อเท็จจริงเกี่ยวกับข้อมูลปัจจุบันนอกแหล่งนี้:\n${liveWebContext}` : "",
