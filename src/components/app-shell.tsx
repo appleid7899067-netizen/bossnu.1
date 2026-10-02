@@ -49,7 +49,8 @@ export function AppShell({ search }: { search: Search }) {
   const [mapTopic, setMapTopic] = useState("");
   const [studioPrompt, setStudioPrompt] = useState("");
   const [aspect, setAspect] = useState("1:1");
-  const [busyChat, setBusyChat] = useState(false);
+  const [activeRuns, setActiveRuns] = useState(0);
+  const busyChat = activeRuns > 0;
   const [busyMap, setBusyMap] = useState(false);
   const [busyImage, setBusyImage] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -158,7 +159,7 @@ export function AppShell({ search }: { search: Search }) {
 
   async function send(text: string, chatId?: string, mode?: ChatMode, allowDangerous = false, files: ChatAttachment[] = [], forceExecution = false, modelOverride?: string) {
     const content = text.trim();
-    if ((!content && !files.length) || busyChat) return;
+    if (!content && !files.length) return;
     const detection = detectSandboxInput(content);
     const executionRequested = forceExecution || shouldExecuteSandboxInput(content, detection);
     if (detection.command && detection.dangerous && !allowDangerous) {
@@ -174,10 +175,9 @@ export function AppShell({ search }: { search: Search }) {
     const assistantId = store.startAssistant(id);
     const history = (useAppStore.getState().conversations.find(c => c.id === id)?.messages ?? [])
       .filter(m => m.id !== assistantId && (m.content || m.attachments?.length)).map(m => ({ role: m.role, content: messageForModel(m) }));
-    abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-    setDraft(""); setAttachments([]); setActiveTool("auto"); setBusyChat(true); setStreamingId(assistantId); setSandboxRun(null);
+    setDraft(""); setAttachments([]); setActiveTool("auto"); setActiveRuns((count) => count + 1); setStreamingId(assistantId); setSandboxRun(null);
     stopVoice(); go({ view: "chat", c: id });
     let reply = "";
     let queuedReply = "";
@@ -551,8 +551,8 @@ ${message}`); toast.error(message); }
 
       // The model stream is finished at this point. Never keep the composer
       // locked while journal persistence or TTS is running.
-      setBusyChat(false);
-      setStreamingId(null);
+      setActiveRuns((count) => Math.max(0, count - 1));
+      setStreamingId(current => current === assistantId ? null : current);
       finishVoice();
 
       // Persistence and voice are post-response work. They must not hold the
