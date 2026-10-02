@@ -9,7 +9,9 @@ export type EvidenceInput = {
   exitCode?: number | null;
   error?: string;
   output?: string;
-  workspaceFiles?: Array<{ path: string; content?: string }>;
+  workspaceFiles?: Array<{ path: string; content?: string; size?: number }>;
+  /** Server-safe integrity findings detected from the real post-run workspace. */
+  workspaceIntegrity?: { emptyHtmlFiles?: string[] };
   language?: string;
   command?: string;
   workspaceSync?: {
@@ -33,6 +35,8 @@ export function evaluateEvidence(result: EvidenceInput, opts: { requireWorkspace
   if (result.status !== "success") reasons.push(`สถานะการรันคือ "${result.status}" ไม่ใช่ success`);
   if (typeof result.exitCode === "number" && result.exitCode !== 0) reasons.push(`exit code = ${result.exitCode}`);
   if (result.error) reasons.push(`error: ${String(result.error).slice(0, 200)}`);
+  const emptyHtmlFiles = result.workspaceIntegrity?.emptyHtmlFiles ?? [];
+  if (emptyHtmlFiles.length) reasons.push(`HTML file ถูกสร้างไม่ครบ เหลือเพียง <!doctype html>: ${emptyHtmlFiles.slice(0, 5).join(", ")}`);
   if (result.language === "html" || /(?:^|\\s)(?:html|\.html)\\b/i.test(result.command ?? "")) {
     const htmlFiles = (result.workspaceFiles ?? []).filter(file => /\\.html?$/i.test(file.path));
     if (htmlFiles.length) {
@@ -87,6 +91,8 @@ export function gateMessage(reasons: string[], attempt: number, runsLeft: number
     "REPAIR ACTION REQUIRED: your next response MUST contain an executable <run> action that changes/fixes the workspace. A read-only rerun of the same failing command is not a repair.",
     "If the repair and verification need separate commands, use separate <run> blocks: first edit/fix, then run the repaired target and inspect its real output.",
     "Do not merely explain the error, suggest a fix, or ask the user to fix it. Perform the fix in Sandbox when a run is available.",
+    reasons.some((r) => r.includes("HTML file ถูกสร้างไม่ครบ"))
+      ? "HTML REPAIR: the generated file contains only the doctype. Regenerate the COMPLETE intended HTML from the original goal/context, write the full content with a safe file-write method (prefer Sandbox file APIs or printf/base64 over heredoc), then run/preview the repaired file and verify its real contents. Never repeat the empty/truncated write." : "",
     "Do not claim success from a command being issued or from text such as VERIFIED: true. Success requires the actual run evidence.",
     runsLeft > 0
       ? `You have ${runsLeft} sandbox run(s) left. Use the next run for the repair and verification.`
