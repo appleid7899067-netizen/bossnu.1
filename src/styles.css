@@ -926,3 +926,109 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .sali-work-bar-state{font-size:9px;font-weight:800;color:var(--color-primary);text-align:center}
 .sali-work-bar.is-pending .sali-work-bar-state{color:var(--color-subtle)}
 @keyframes sali-work-bar-pulse{0%,100%{width:42%;opacity:.65}50%{width:92%;opacity:1}}
+
+
+/* Chat room refinement: keep Sali's work trace compact, horizontal, and readable. */
+.sali-work-bars{
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  gap:6px;
+  width:100%;
+  margin:0 0 10px;
+  padding:2px 0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:none;
+  overscroll-behavior-x:contain;
+}
+.sali-work-bars::-webkit-scrollbar{display:none}
+.sali-work-bar{
+  display:grid;
+  grid-template-columns:auto 54px 12px;
+  align-items:center;
+  gap:5px;
+  flex:0 0 auto;
+  width:auto;
+  min-width:0;
+  height:22px;
+  padding:0 7px;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--color-bg) 38%,transparent);
+}
+.sali-work-bar-label{font-size:8px;font-weight:500;font-style:italic;letter-spacing:.06em;white-space:nowrap}
+.sali-work-bar-track{width:54px;height:4px}
+.sali-work-bar-state{font-size:8px}
+.sali-work-bar.is-active{
+  background:color-mix(in srgb,var(--color-primary) 8%,var(--color-bg));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--color-primary) 12%,transparent);
+}
+.sali-summary-body{
+  overflow-x:hidden;
+  font-size:13px;
+  line-height:1.72;
+}
+.sali-summary-body .assistant-prose,
+.sali-summary-body .assistant-prose p,
+.sali-summary-body .assistant-prose li{
+  overflow-wrap:anywhere;
+  word-break:normal;
+}
+.sali-summary-body pre{
+  overflow-x:auto;
+  max-width:100%;
+  border-radius:10px;
+}
+.sali-summary-body code{
+  overflow-wrap:anywhere;
+}
+.sali-devlog{
+  contain:layout paint;
+}
+.sali-devlog-live .sali-devlog-flow{
+  scroll-snap-type:x proximity;
+}
+.sali-devlog-live .sali-flow-item{
+  scroll-snap-align:start;
+}
+@media (max-width:640px){
+  .chat-scroll{
+    scroll-padding-bottom:96px;
+    -webkit-overflow-scrolling:touch;
+  }
+  .sali-work-bars{
+    margin-bottom:8px;
+    padding-bottom:2px;
+  }
+  .sali-work-bar{
+    grid-template-columns:auto 42px 10px;
+    gap:4px;
+    padding:0 6px;
+  }
+  .sali-work-bar-track{width:42px}
+  .sali-work-bar-label{font-size:7px}
+  .sali-summary{
+    margin-top:6px;
+    border-radius:16px;
+  }
+  .sali-summary-body{
+    padding:12px 13px 14px;
+    font-size:13px;
+    line-height:1.7;
+  }
+  .sali-summary-body .assistant-prose{
+    font-size:13px;
+    line-height:1.7;
+  }
+  .sali-summary-body pre{
+    margin-left:-3px;
+    margin-right:-3px;
+  }
+}
+@media (prefers-reduced-motion:reduce){
+  .sali-devlog-live .sali-flow-current .sali-flow-token,
+  .sali-devlog-live .sali-flow-current::after,
+  .sali-work-bar.is-active .sali-work-bar-fill{
+    animation:none;
+  }
+}
