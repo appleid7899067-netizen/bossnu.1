@@ -399,21 +399,27 @@ function LiveExecutionLog({ command, output, fallback }: { command?: string; out
   );
 }
 
-function SaliWaterGraph({ phaseCount, live }: { phaseCount: number; live: boolean }) {
-  const level = Math.max(8, Math.min(92, phaseCount * 13 + (live ? 6 : 0)));
-  const points = Array.from({ length: 12 }, (_, index) => {
-    const wave = Math.sin(index * 0.9 + phaseCount * 0.7) * 7;
-    const trend = index * (level / 16);
-    return `${index * 10},${Math.max(8, 92 - trend + wave)}`;
-  }).join(" ");
+function SaliWorkBars({ activities, live }: { activities: ChatActivity[]; live: boolean }) {
+  const phaseOrder = ["goal", "plan", "act", "run", "observe", "verify", "fix", "answer"];
+  const phaseMap = new Map<string, Extract<ChatActivity, { kind: "phase" }>>();
+  for (const activity of activities) {
+    if (activity.kind === "phase") phaseMap.set(activity.phase, activity);
+  }
+  const lastPhase = [...activities].reverse().find((activity): activity is Extract<ChatActivity, { kind: "phase" }> => activity.kind === "phase")?.phase;
   return (
-    <div className={`sali-water-graph${live ? " sali-water-graph-live" : ""}`} aria-label="กราฟการทำงานของสลี่">
-      <div className="sali-water-graph-head"><span>LIVE / WORK LEVEL</span><span>{live ? "กำลังไหล" : "เสร็จแล้ว"} · {level}%</span></div>
-      <svg viewBox="0 0 110 100" preserveAspectRatio="none" aria-hidden="true">
-        <polygon points={`0,100 ${points} 110,100`} fill="currentColor" opacity=".08" />
-        <polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
-      </svg>
-      <div className="sali-water-scale"><span>สูง</span><span>ระดับการทำงาน</span><span>ต่ำ</span></div>
+    <div className="sali-work-bars" aria-label="ลำดับการทำงานของสลี่">
+      {phaseOrder.map((phase) => {
+        const activity = phaseMap.get(phase);
+        const active = live && phase === lastPhase;
+        const done = Boolean(activity) && !active;
+        return (
+          <div key={phase} className={`sali-work-bar ${active ? "is-active" : ""} ${done ? "is-done" : ""} ${!activity ? "is-pending" : ""}`}>
+            <span className="sali-work-bar-label">{phase.toUpperCase()}</span>
+            <span className="sali-work-bar-track"><span className="sali-work-bar-fill" /></span>
+            <span className="sali-work-bar-state">{active ? "…" : done ? "✓" : ""}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -455,7 +461,7 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
         {live ? <span className="sali-live-cursor" aria-label="กำลังทำงาน" /> : <span className="sali-summary-mark" aria-label="เสร็จแล้ว">✓</span>}
       </div>
       <div className="sali-devlog-body">
-        <SaliWaterGraph phaseCount={phases.length} live={live} />
+        <SaliWorkBars activities={activities} live={live} />
         <div className="sali-devlog-flow" aria-live={live ? "polite" : "off"}>
           {phases.map((activity, index) => (
             <span key={activity.id} className="sali-flow-item">
