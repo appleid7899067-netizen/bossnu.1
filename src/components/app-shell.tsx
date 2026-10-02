@@ -201,6 +201,9 @@ export function AppShell({ search }: { search: Search }) {
     const cleanWorkspaceLinks = (value: string) => value
       // Keep generated work inside Bossnu. Never expose local server URLs or launch commands.
       .replace(/https?:\/\/localhost(?::\d+)?\/[^\s)\]]*/gi, "")
+      .replace(/\\\\n/g, "\n")
+      .replace(/<div\\b[^>]*\\bstyle\\s*=\\s*["\x27][^"\x27]*["\x27][^>]*>[\\s\\S]*?<\\/div>/gi, "")
+      .replace(/<html\\b[\\s\\S]*?<\\/html>/gi, "")
       .replace(/เปิดที่\s*:\s*https?:\/\/localhost(?::\d+)?[^\n]*/gi, "เปิดดูได้จาก Live Preview ใน Bossnu")
       .replace(/เปิดเซิร์ฟเวอร์[^\n]*(?:\n|$)/gi, "")
       .replace(/<run\b[^>]*>[\s\S]*?<\/run>/gi, "")
@@ -345,12 +348,12 @@ export function AppShell({ search }: { search: Search }) {
                   previewHtml: sandboxPreviewDocument("html", html),
                   previewPath: htmlPath,
                 });
-                append(`เปิด Live Preview: ${htmlPath}\\n\\n`);
+                append(`เปิด Live Preview: ${htmlPath}\n\n`);
               } else {
-                append(`สร้าง ${htmlPath} แล้ว แต่โหลดไฟล์เพื่อ Preview ไม่สำเร็จ\\n\\n`);
+                append(`สร้าง ${htmlPath} แล้ว แต่โหลดไฟล์เพื่อ Preview ไม่สำเร็จ\n\n`);
               }
             } catch (previewError) {
-              if (!ac.signal.aborted) append(`สร้าง ${htmlPath} แล้ว แต่ Preview โหลดไม่สำเร็จ: ${previewError instanceof Error ? previewError.message : "unknown error"}\\n\\n`);
+              if (!ac.signal.aborted) append(`สร้าง ${htmlPath} แล้ว แต่ Preview โหลดไม่สำเร็จ: ${previewError instanceof Error ? previewError.message : "unknown error"}\n\n`);
             }
           }
         }
@@ -460,7 +463,7 @@ export function AppShell({ search }: { search: Search }) {
       }
       if (detection.webPreview && detection.code && ["html", "javascript", "css", "tailwind"].includes(detection.runtime)) {
         setSandboxRun({ runtime: detection.runtime, label: detection.label, command: "browser sandbox", status: "Preview พร้อมแล้ว", previewHtml: sandboxPreviewDocument(detection.runtime, detection.code) });
-        append("แสดง Live Preview ในแชตแล้วค่ะ\\n\\n");
+        append("แสดง Live Preview ในแชตแล้วค่ะ\n\n");
       }
       await runAgentLoop({
         messages: history, signal: ac.signal, tools,
@@ -516,7 +519,7 @@ export function AppShell({ search }: { search: Search }) {
       });
       if (!reply && !ac.signal.aborted) append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
     } catch (error) {
-      if (ac.signal.aborted) { append("\\n\\n⛔ หยุดการทำงานแล้ว"); }
+      if (ac.signal.aborted) { append("\n\n⛔ หยุดการทำงานแล้ว"); }
       else { const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด"; append(`
 
 ${message}`); toast.error(message); }
