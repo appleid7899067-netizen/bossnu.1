@@ -20,8 +20,8 @@ function latestPhase(activities: ChatActivity[]) {
   return [...activities].reverse().find((a): a is PhaseActivity => a.kind === "phase");
 }
 
-function latestStream(activities: ChatActivity[]) {
-  return [...activities].reverse().find((a): a is StreamActivity => a.kind === "stream");
+function latestStreams(activities: ChatActivity[]) {
+  return activities.filter((a): a is StreamActivity => a.kind === "stream").slice(-4);
 }
 
 function packageNames(command?: string, output?: string) {
@@ -57,7 +57,7 @@ export function LiveResultPresentation({ activities, live }: Props) {
   const command = latestCommand(activities);
   const files = changedFiles(activities);
   const phase = latestPhase(activities);
-  const stream = latestStream(activities);
+  const streams = latestStreams(activities);
   const packages = packageNames(command?.command, command?.output);
   const output = usefulOutput(command?.output);
 
@@ -79,7 +79,7 @@ export function LiveResultPresentation({ activities, live }: Props) {
   const working = live && !failed;
   const status = failed ? "ERROR" : syncVerified ? "VERIFIED" : working ? "LIVE" : "DONE";
 
-  if (!command && !files.length && !phaseTrail.length && !stream) return null;
+  if (!command && !files.length && !phaseTrail.length && !streams.length) return null;
 
   return (
     <section className={`sali-result-visual ${working ? "is-live" : ""} ${failed ? "is-error" : ""}`} aria-label="กระบวนการทำงานจริงของ Sali">
@@ -105,18 +105,20 @@ export function LiveResultPresentation({ activities, live }: Props) {
       </div>
 
       <div className="sali-result-stage">
-        {stream && (working || stream.status !== "running") ? (
-          <div className="sali-result-stack sali-result-stream">
-            <div className="sali-result-stack-title">{stream.source.toUpperCase()} STREAM</div>
-            <div className="sali-result-stream-status">
-              <span className={stream.status === "error" ? "bad" : stream.status === "done" ? "ok" : "live"}>
-                {stream.status === "error" ? "ERROR" : stream.status === "done" ? "✓ DONE" : "● LIVE"}
+        {streams.map((item, index) => (
+          <div key={item.id} className="sali-result-stack sali-result-stream" style={{ "--sali-delay": `${index * 70}ms` } as React.CSSProperties}>
+            <div className="sali-result-stream-head">
+              <div className="sali-result-stack-title">{item.source === "sandbox" ? "SALI ↔ SANDBOX" : item.source.toUpperCase() + " STREAM"}</div>
+              <span className={item.status === "error" ? "bad" : item.status === "done" ? "ok" : "live"}>
+                {item.status === "error" ? "ERROR" : item.status === "done" ? "✓ DONE" : "● LIVE"}
               </span>
-              {stream.chars ? <span>{stream.chars.toLocaleString()} chars</span> : null}
             </div>
-            <div className="sali-result-stream-line">{stream.text || "กำลังรอข้อมูล..."}</div>
+            <div className="sali-result-stream-status">
+              <span>{item.text || "กำลังรอข้อมูล..."}</span>
+              {item.chars ? <span>{item.chars.toLocaleString()} chars</span> : null}
+            </div>
           </div>
-        ) : null}
+        ))}
 
         {command ? (
           <div className="sali-result-stack">
@@ -160,7 +162,7 @@ export function LiveResultPresentation({ activities, live }: Props) {
           </div>
         ) : null}
 
-        {working && !command && !stream ? (
+        {working && !command && !streams.length ? (
           <div className="sali-result-empty">กำลังเตรียมขั้นตอนถัดไปจาก Agent จริง...</div>
         ) : null}
       </div>
