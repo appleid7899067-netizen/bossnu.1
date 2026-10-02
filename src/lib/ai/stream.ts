@@ -57,9 +57,9 @@ export async function ensurePuterSignedIn() {
   return puter;
 }
 
-const CONTEXT_CHAR_BUDGET = 48_000;
-const CONTEXT_RECENT_MESSAGES = 18;
-const RETRY_DELAYS_MS = [350, 800, 1600];
+const CONTEXT_CHAR_BUDGET = 24_000;
+const CONTEXT_RECENT_MESSAGES = 10;
+const RETRY_DELAYS_MS = [250, 600];
 
 function compactMessage(content: string, maxChars = 1_200) {
   const clean = content.replace(/\s+/g, " ").trim();
@@ -188,7 +188,7 @@ export async function streamChat(opts: {
 
     let liveWebContext = "";
     let liveWebSources: Array<{ title: string; url: string }> = [];
-    if (opts.tools && shouldUseLiveWeb(latestUser)) {
+    if (shouldUseLiveWeb(latestUser)) {
       try {
         opts.onEvent({ type: "thinking", text: "🌐 Live Web • กำลังดึงข้อมูลล่าสุด..." });
         const web = await runLiveWebSearch(latestUser, opts.signal);
@@ -211,9 +211,9 @@ export async function streamChat(opts: {
     const settings = useAppStore.getState();
     const selectedModel = getPuterModel(opts.model ?? settings.selectedModel).id;
     const activeSkills = settings.agentSkills.filter((s) => s.enabled && (opts.tools || s.id !== "sandbox-terminal")).map((s) => s.name).join(", ");
-    const memories = settings.memory.slice(0, 12).map((m) => `- ${m.content}`).join("\n");
+    const memories = settings.memory.slice(0, 8).map((m) => `- ${compactMessage(m.content, 700)}`).join("\n");
     const agent = settings.agentProfiles[0];
-    const learnedSkills = settings.learnedSkills.slice(0, 30).map((s) => `- ${s.name} [${s.runtime}] result: ${s.result} | command: ${s.pattern} | evidence: ${s.evidence.slice(0, 240)} | uses: ${s.uses}`).join("\n");
+    const learnedSkills = settings.learnedSkills.slice(0, 12).map((s) => `- ${s.name} [${s.runtime}] ${compactMessage(s.result, 220)} | ${compactMessage(s.pattern, 180)} | uses: ${s.uses}`).join("\n");
 
     const system = [
       `Persona: คุณคือ ${settings.personality.name} ผู้ช่วย AI ผู้หญิงของผู้ใช้`,
@@ -246,8 +246,8 @@ export async function streamChat(opts: {
             model: primaryModel,
             stream: true,
             temperature: opts.mode === "think" ? 0.6 : 0.7,
-            max_tokens: opts.mode === "think" ? 8000 : 6000,
-            reasoning_effort: opts.mode === "think" ? "medium" : "low",
+            max_tokens: opts.mode === "think" ? 5000 : 3500,
+            reasoning_effort: opts.mode === "think" ? "low" : "low",
             normalize: true,
           },
         ) as unknown as AsyncIterable<unknown>;
