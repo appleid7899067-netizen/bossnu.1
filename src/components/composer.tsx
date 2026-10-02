@@ -24,7 +24,7 @@ export type ToolAction = { id: string; label: string };
 const MAX_MESSAGE_LENGTH = 30_000;
 
 export function Composer({
-  value, onChange, onSubmit, onStop, placeholder, disabled, busy, extra,
+  value, onChange, onSubmit, onStop, onEmergency, placeholder, disabled, busy, extra,
   selectedModel, modelOptions, onModelChange,
   contextualActions, onContextAction, voiceEnabled, onToggleVoice,
   toolActions, activeTool, onToolAction,
@@ -37,6 +37,8 @@ export function Composer({
   onChange: (next: string) => void;
   onSubmit: () => void;
   onStop?: () => void;
+  /** Emergency recovery action that can interrupt a stuck run and restart the agent. */
+  onEmergency?: () => void;
   placeholder: string;
   disabled?: boolean;
   busy?: boolean;
@@ -399,6 +401,11 @@ export function Composer({
               )}
             >
               <Mic className="size-4" />
+            </button>
+          ) : null}
+          {onEmergency ? (
+            <button type="button" aria-label="แก้ด่วนฉุกเฉิน" title={busy ? "หยุดงานที่ค้าง แล้วให้สลี่ตรวจ แก้ รัน และ Verify ใหม่" : "ปลุกสลี่: ตรวจ แก้ รัน และ Verify ใหม่"} onClick={onEmergency} className={cn("grid size-10 shrink-0 place-items-center rounded-xl text-muted transition-colors hover:bg-danger/10 hover:text-danger", busy && "bg-danger/10 text-danger animate-pulse")}>
+              <span className="text-[13px] font-bold leading-none">!</span>
             </button>
           ) : null}
           {onToggleVoice ? (
