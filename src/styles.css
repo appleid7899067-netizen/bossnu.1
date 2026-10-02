@@ -908,3 +908,15 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
     animation: none;
   }
 }
+
+
+.sali-work-bars{display:flex;flex-direction:column;gap:5px;width:100%;margin:0 0 10px}
+.sali-work-bar{display:grid;grid-template-columns:58px minmax(0,1fr) 14px;align-items:center;gap:7px;height:22px;min-width:0}
+.sali-work-bar-label{font-size:8px;font-weight:700;letter-spacing:.06em;color:var(--color-subtle)}
+.sali-work-bar-track{position:relative;height:6px;overflow:hidden;border-radius:999px;background:color-mix(in srgb,var(--color-fg) 7%,transparent)}
+.sali-work-bar-fill{display:block;width:0;height:100%;border-radius:999px;background:var(--color-primary);transition:width .25s ease}
+.sali-work-bar.is-done .sali-work-bar-fill{width:100%;opacity:.7}
+.sali-work-bar.is-active .sali-work-bar-fill{width:68%;animation:sali-work-bar-pulse 1.15s ease-in-out infinite}
+.sali-work-bar-state{font-size:9px;font-weight:800;color:var(--color-primary);text-align:center}
+.sali-work-bar.is-pending .sali-work-bar-state{color:var(--color-subtle)}
+@keyframes sali-work-bar-pulse{0%,100%{width:42%;opacity:.65}50%{width:92%;opacity:1}}
