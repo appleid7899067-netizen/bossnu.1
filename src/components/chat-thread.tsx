@@ -78,9 +78,27 @@ export function ChatThread({
     <div ref={scroller} onScroll={onScroll} className="chat-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-[#0b0712]">
       <div className="mx-auto flex w-full max-w-[1400px] min-w-0 flex-col gap-4 px-3 py-4 sm:gap-5 sm:px-6 sm:py-5 lg:px-8">
         {messages.length === 0 ? (
-          <div className="flex min-h-[45vh] items-center justify-center text-center">
-            <p className="text-sm text-muted">เริ่มคุยกับสลี่ได้เลยค่ะ</p>
-          </div>
+          <section className="sali-command-center lumina-rise" aria-label="ห้องแชทหลักของสลี่">
+            <div className="sali-command-orbit" aria-hidden="true"><span /><span /><span /></div>
+            <div className="sali-command-copy">
+              <span className="sali-command-kicker">BOSSNU.SILELO • SALI</span>
+              <h1>พร้อมลงมือทำงานจริง</h1>
+              <p>คุย สร้าง แก้ไฟล์ รัน และตรวจผลใน Workspace เดียวกัน</p>
+            </div>
+            <div className="sali-command-flow" aria-label="วงจรการทำงาน">
+              {["GOAL","PLAN","READ","ANALYZE","EDIT","RUN","OBSERVE","VERIFY","OK"].map((step, index) => (
+                <span key={step} className="sali-command-step">
+                  {index > 0 ? <i aria-hidden="true">→</i> : null}
+                  <b>{step}</b>
+                </span>
+              ))}
+            </div>
+            <div className="sali-command-hint">
+              <span className="sali-command-live-dot" />
+              <span>SALI / READY</span>
+              <em>ส่งคำสั่งแรกได้เลย</em>
+            </div>
+          </section>
         ) : null}
 
         {messages.map((m, index) => (
