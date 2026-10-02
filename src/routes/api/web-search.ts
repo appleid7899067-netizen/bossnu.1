@@ -29,8 +29,8 @@ export const Route = createFileRoute("/api/web-search")({
             body: JSON.stringify({
               model: "gpt-5.5",
               tools: [{ type: "web_search", search_context_size: "low", external_web_access: true }],
-              tool_choice: "auto",
-              input: `Search the live web for the user's query. Prefer current primary sources and clearly dated information. Query: ${query}`,
+              tool_choice: "required",
+              input: `Search the live web for the user's query. You MUST use web search. Prefer current primary sources and clearly dated information. Do not answer from memory. If reliable evidence is unavailable, say so. Query: ${query}`,
             }),
           });
 
@@ -60,6 +60,7 @@ export const Route = createFileRoute("/api/web-search")({
             query,
             answer: answer.slice(0, 12000),
             results: results.slice(0, 8),
+            evidenceReady: Boolean(answer.trim()) && results.length > 0,
             retrievedAt: new Date().toISOString(),
           }, { headers: { "cache-control": "no-store" } });
         } catch (error) {
