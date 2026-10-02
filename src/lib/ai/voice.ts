@@ -194,8 +194,33 @@ export function isVoiceEnabled() {
 }
 
 /** Streaming text is intentionally silent. The final summary is spoken once. */
+let statusSpeechQueue: string[] = [];
+let statusSpeechRunning = false;
+
+async function drainStatusSpeech() {
+  if (statusSpeechRunning || !statusSpeechQueue.length || !settings.enabled) return;
+  statusSpeechRunning = true;
+  const next = statusSpeechQueue.shift()!;
+  try {
+    await speakDevice(cleanSpeechText(next));
+  } finally {
+    statusSpeechRunning = false;
+    if (statusSpeechQueue.length) void drainStatusSpeech();
+  }
+}
+
+/** Short real-time work-status voice. Queued so status announcements never overlap. */
+export function speakStatus(text: string) {
+  const cleaned = cleanSpeechText(text);
+  if (!cleaned || !settings.enabled || !hasSpeech) return;
+  const last = statusSpeechQueue[statusSpeechQueue.length - 1];
+  if (last === cleaned || speaking && last === cleaned) return;
+  statusSpeechQueue = [...statusSpeechQueue.slice(-2), cleaned];
+  void drainStatusSpeech();
+}
+
 export function speakRealtime(_text: string) {
-  // Intentionally deferred until the final response to prevent overlapping speech.
+  // Streaming text remains silent. Work-status announcements use speakStatus().
 }
 
 export function isVoiceSpeaking() {
@@ -215,5 +240,7 @@ export async function speakNow(text: string) {
 
 export function stopVoice() {
   speaking = false;
+  statusSpeechQueue = [];
+  statusSpeechRunning = false;
   if (hasSpeech) window.speechSynthesis.cancel();
 }
