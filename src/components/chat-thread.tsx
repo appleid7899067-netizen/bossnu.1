@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowDown, Check, Copy, Download, FileText, Maximize2, Minimize2, Pencil, RefreshCw, Trash2, Volume2 } from "lucide-react";
 import { formatBytes } from "@/lib/attachments";
 import { Markdown } from "@/components/markdown";
+import { ProjectFilesView } from "@/components/project-files-view";
 import type { ChatActivity, ChatMessage } from "@/lib/types";
 import { speakNow, stopVoice } from "@/lib/ai/voice";
 
@@ -13,6 +14,7 @@ export type SandboxRunView = {
   output?: string;
   previewUrl?: string | null;
   previewHtml?: string;
+  previewPath?: string;
 };
 
 export function ChatThread({
@@ -24,6 +26,7 @@ export function ChatThread({
   onContextAction,
   busy = false,
   sandboxRun,
+  workspaceId,
 }: {
   messages: ChatMessage[];
   streamingId?: string | null;
@@ -35,6 +38,7 @@ export function ChatThread({
   onContextAction?: (action: string) => void;
   busy?: boolean;
   sandboxRun?: SandboxRunView | null;
+  workspaceId?: string;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -91,7 +95,8 @@ export function ChatThread({
             onContextAction={onContextAction}
           />
         ))}
-        {sandboxRun?.previewHtml ? <SandboxHtmlPreview html={sandboxRun.previewHtml} /> : null}
+        {sandboxRun?.previewHtml ? <SandboxHtmlPreview html={sandboxRun.previewHtml} path={sandboxRun.previewPath} /> : null}
+        {sandboxRun?.previewHtml && workspaceId ? <InlineCodeWorkspace workspaceId={workspaceId} path={sandboxRun.previewPath} /> : null}
         <div ref={bottomRef} aria-hidden="true" className="h-px w-full shrink-0" />
       </div>
       {!autoScroll && messages.length ? (
@@ -268,12 +273,28 @@ function MessageBubble({
 }
 
 
-function SandboxHtmlPreview({ html }: { html: string }) {
+function InlineCodeWorkspace({ workspaceId, path }: { workspaceId: string; path?: string }) {
+  return (
+    <section className="sali-devlog mb-3 overflow-hidden" aria-label="Code workspace">
+      <div className="sali-devlog-head">
+        <span className="sali-devlog-mark">{"</>"}</span>
+        <span>CODE / WORKSPACE</span>
+        {path ? <span className="ml-auto truncate text-[10px] text-subtle">{path}</span> : null}
+      </div>
+      <div className="h-[620px] min-h-0 border-t border-border bg-bg">
+        <ProjectFilesView workspaceId={workspaceId} />
+      </div>
+    </section>
+  );
+}
+
+function SandboxHtmlPreview({ html, path }: { html: string; path?: string }) {
   return (
     <section className="sali-devlog mb-3" aria-label="Sandbox live preview">
       <div className="sali-devlog-head">
         <span className="sali-devlog-mark">›_</span>
         <span>SANDBOX / PREVIEW</span>
+        {path ? <span className="ml-auto truncate text-[10px] text-subtle">{path}</span> : null}
         <span className="sali-summary-mark">✓</span>
       </div>
       <div className="overflow-hidden rounded-xl border border-primary/20 bg-white">
