@@ -33,6 +33,17 @@ test("evidence: non-zero exit, error status and missing sync fail with reasons",
   assert.ok(v.reasons.some(r => r.includes("Neon Sync")));
 });
 
+test("evidence: truncated doctype-only HTML is rejected", () => {
+  const v = evaluateEvidence({
+    status: "success",
+    exitCode: 0,
+    workspaceIntegrity: { emptyHtmlFiles: ["project/public/grok-ui.html"] },
+    workspaceSync: synced,
+  }, { requireWorkspace: true });
+  assert.equal(v.passed, false);
+  assert.match(v.reasons.join("\n"), /เหลือเพียง <!doctype html>/);
+});
+
 test("evidence: API success is not enough — read-back mismatch fails", () => {
   const v = evaluateEvidence({ status: "success", exitCode: 0, workspaceSync: { verified: false, complete: true, mismatched: ["project/a.js"] } }, { requireWorkspace: true });
   assert.equal(v.passed, false);
