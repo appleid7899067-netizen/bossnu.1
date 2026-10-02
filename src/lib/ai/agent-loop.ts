@@ -82,16 +82,20 @@ function verifiedResultText(result: ToolResult, requireWorkspace: boolean) {
 function buildVerifiedSkill(goal: string, call: RunCall, result: ToolResult) {
   const safeGoal = redactSensitiveCommand(goal);
   const normalizedGoal = safeGoal.normalize("NFKC").trim().toLowerCase();
-  const slug = normalizedGoal
-    .replace(/[^\p{L}\p{N}]+/gu, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 56)
-    .replace(/-+$/g, "") || "verified-run";
-  let hash = 2166136261;
-  for (let index = 0; index < normalizedGoal.length; index++) {
-    hash = Math.imul(hash ^ normalizedGoal.charCodeAt(index), 16777619);
-  }
-  const path = `skills/verified/${slug}-${(hash >>> 0).toString(36)}/SKILL.md`;
+  const combined = `${normalizedGoal} ${call.command}`;
+  const categoryRules: Array<[string, RegExp]> = [
+    ["git", /\bgit\b|github|commit|branch|merge|rebase|push|pull/],
+    ["npm", /\bnpm\b|\bnpx\b|package-lock|package\.json/],
+    ["build", /build|compile|tsc|vite build|next build|bundle/],
+    ["linter", /lint|eslint|prettier|format|typecheck/],
+    ["docker", /docker|container|compose/],
+    ["test", /test|vitest|jest|playwright|cypress/],
+    ["html", /html|css|javascript|frontend|web page|live preview/],
+    ["python", /\bpython(?:3)?\b|pip|pytest/],
+    ["node", /\bnode\b|tsx|nodejs/],
+  ];
+  const skillId = categoryRules.find(([, pattern]) => pattern.test(combined))?.[0] ?? "verified-run";
+  const path = `skills/verified/${skillId}/SKILL.md`;
   const title = (safeGoal.trim().split(/\r?\n/, 1)[0] || "Verified Sandbox Task").slice(0, 120);
   const task = safeGoal.slice(0, 2000).split(/\r?\n/).map(line => `> ${line}`).join("\n");
   const command = redactSensitiveCommand(call.command).slice(0, 8000).replace(/```/g, "`ˋ`");
