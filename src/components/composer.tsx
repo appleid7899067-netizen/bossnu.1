@@ -24,7 +24,7 @@ export type ToolAction = { id: string; label: string };
 const MAX_MESSAGE_LENGTH = 30_000;
 
 export function Composer({
-  value, onChange, onSubmit, onStop, onEmergency, placeholder, disabled, busy, extra,
+  value, onChange, onSubmit, onStop, onEmergency, onSendToGpt, placeholder, disabled, busy, extra,
   selectedModel, modelOptions, onModelChange,
   contextualActions, onContextAction, voiceEnabled, onToggleVoice,
   toolActions, activeTool, onToolAction,
@@ -39,6 +39,8 @@ export function Composer({
   onStop?: () => void;
   /** Emergency recovery action that can interrupt a stuck run and restart the agent. */
   onEmergency?: () => void;
+  /** Send the current task explicitly to the GPT worker/model. */
+  onSendToGpt?: () => void;
   placeholder: string;
   disabled?: boolean;
   busy?: boolean;
@@ -401,6 +403,11 @@ export function Composer({
               )}
             >
               <Mic className="size-4" />
+            </button>
+          ) : null}
+          {onSendToGpt ? (
+            <button type="button" aria-label="ส่งงานให้ GPT" title="ส่งงานนี้ให้ GPT ตรวจและทำต่อ" onClick={onSendToGpt} disabled={disabled || !hasContent || busy} className="grid size-10 shrink-0 place-items-center rounded-xl text-muted transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-40">
+              <span className="text-[11px] font-bold tracking-tight">GPT</span>
             </button>
           ) : null}
           {onEmergency ? (
