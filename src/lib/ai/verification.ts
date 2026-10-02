@@ -8,6 +8,10 @@ export type EvidenceInput = {
   status: string;
   exitCode?: number | null;
   error?: string;
+  output?: string;
+  workspaceFiles?: Array<{ path: string; content?: string }>;
+  language?: string;
+  command?: string;
   workspaceSync?: {
     verified?: boolean;
     complete?: boolean;
@@ -29,6 +33,16 @@ export function evaluateEvidence(result: EvidenceInput, opts: { requireWorkspace
   if (result.status !== "success") reasons.push(`สถานะการรันคือ "${result.status}" ไม่ใช่ success`);
   if (typeof result.exitCode === "number" && result.exitCode !== 0) reasons.push(`exit code = ${result.exitCode}`);
   if (result.error) reasons.push(`error: ${String(result.error).slice(0, 200)}`);
+  if (result.language === "html" || /(?:^|\\s)(?:html|\.html)\\b/i.test(result.command ?? "")) {
+    const htmlFiles = (result.workspaceFiles ?? []).filter(file => /\\.html?$/i.test(file.path));
+    if (htmlFiles.length) {
+      const blank = htmlFiles.filter(file => {
+        const source = String(file.content ?? "").replace(/<!--[\\s\\S]*?-->/g, "").trim();
+        return !/<(?:body|main|div|section|canvas|svg|button|h[1-6]|p|script|style)\\b/i.test(source) && source.length < 180;
+      });
+      if (blank.length) reasons.push(`HTML Preview ว่างหรือไม่มีเนื้อหาที่แสดงผล: ${blank.slice(0, 3).map(file => file.path).join(", ")}`);
+    }
+  }
   if (opts.requireWorkspace) {
     const sync = result.workspaceSync;
     if (!sync) reasons.push("ไม่มีหลักฐาน Neon Sync จากการรันนี้");
