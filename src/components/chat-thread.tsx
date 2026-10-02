@@ -3,6 +3,7 @@ import { ArrowDown, Check, Copy, Download, FileText, Maximize2, Minimize2, Penci
 import { formatBytes } from "@/lib/attachments";
 import { Markdown } from "@/components/markdown";
 import { ProjectFilesView } from "@/components/project-files-view";
+import { LiveResultPresentation } from "@/components/live-result-presentation";
 import type { ChatActivity, ChatMessage } from "@/lib/types";
 import { speakNow, stopVoice } from "@/lib/ai/voice";
 
@@ -222,6 +223,7 @@ function MessageBubble({
     <div className="lumina-rise group w-full">
       <div className="min-w-0 w-full break-words text-[13px] pl-0 sm:pl-0 leading-[1.6] [overflow-wrap:anywhere] sm:text-[12.5px] sm:leading-[1.55]">
         {(live || message.activities?.length) ? <ActivityFeed activities={message.activities ?? []} live={live} liveText={live ? message.content : ""} /> : null}
+        {!live && message.activities?.length ? <LiveResultPresentation activities={message.activities} live={false} /> : null}
         {empty && !live && !message.activities?.length ? (
           <p className="text-sm font-medium text-muted">กำลังดำเนินการ...</p>
         ) : null}
