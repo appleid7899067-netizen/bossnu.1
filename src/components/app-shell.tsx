@@ -270,6 +270,7 @@ export function AppShell({ search }: { search: Search }) {
       let outputTimer: number | null = null;
       const startedAt = Date.now();
       const activityId = uid("activity");
+      const sandboxStreamId = startStreamLog("sandbox", `Sali → Sandbox • ${call.language} • กำลังเตรียมรัน`);
       const currentActivities = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
       store.patchAssistant(id, assistantId, { activities: [...currentActivities, { id: activityId, kind: "command" as const, runtime: call.language, command: call.command.slice(0, 5000), status: "running", output: "", createdAt: startedAt }].slice(-120) });
       const historyId = store.addCommandHistory({ command: call.command, runtime: call.language, status: "running" });
@@ -294,13 +295,16 @@ export function AppShell({ search }: { search: Search }) {
           onEvent: event => {
             if (ac.signal.aborted) return;
             if (event.type === "status" && event.message) {
+              updateStreamLog(sandboxStreamId, "sandbox", "running", event.message, output.length);
               output = (output + `${output ? "\n" : ""}› ${event.message}\n`).slice(-64000);
               scheduleOutput();
             } else if (event.type === "output") {
               output = (output + event.text).slice(-64000);
+              updateStreamLog(sandboxStreamId, "sandbox", "running", output.slice(-240), output.length);
               scheduleOutput();
             } else if (event.type === "error") {
               output = (output + `${output ? "\n" : ""}✕ ${event.error}\n`).slice(-64000);
+              updateStreamLog(sandboxStreamId, "sandbox", "error", event.error, output.length);
               scheduleOutput();
             }
           },
@@ -309,6 +313,7 @@ export function AppShell({ search }: { search: Search }) {
         flushOutput();
         store.updateCommandHistory(historyId, result.status === "success" ? "success" : "error");
         const resultOutput = result.output || output || result.error || "";
+        updateStreamLog(sandboxStreamId, "sandbox", result.status === "success" ? "done" : "error", resultOutput.slice(-240) || result.status, resultOutput.length);
         setSandboxRun(current => current ? { ...current, status: result.status, output: resultOutput, previewUrl: result.previewUrl } : current);
         patchActivity(activityId, { status: result.status, output: resultOutput.slice(-6000), previewUrl: result.previewUrl, exitCode: result.exitCode, durationMs: result.durationMs ?? Date.now() - startedAt, sync: result.workspaceSync ? { verified: result.workspaceSync.verified, complete: result.workspaceSync.complete, added: result.workspaceSync.added, modified: result.workspaceSync.modified, deleted: result.workspaceSync.deleted, expectedCount: result.workspaceSync.expectedCount, error: result.workspaceSync.error } : undefined });
         const sync = result.workspaceSync;
