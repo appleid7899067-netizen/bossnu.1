@@ -587,9 +587,7 @@ ${message}`); toast.error(message); }
       return `PHASE: ${activity.label}`;
     }).join("\n\n");
 
-    const task = draft.trim() || current?.messages
-      ? draft.trim()
-      : lastAssistant?.content?.trim() || "ตรวจงานล่าสุดในแชตนี้ต่อ";
+    const task = draft.trim() || lastAssistant?.content?.trim() || "ตรวจงานล่าสุดในแชตนี้ต่อ";
     const handoff = [
       "GPT HANDOFF • รับงานต่อจาก Sali แบบต่อเนื่องในห้องเดิม",
       task,
