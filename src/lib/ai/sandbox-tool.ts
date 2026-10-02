@@ -177,6 +177,7 @@ export type ToolResult = {
   durationMs?: number;
   /** Server routes strip contents; only path/size/hash reach the client. */
   workspaceFiles?: Array<{ path: string; content?: string; size?: number; sha256?: string }>;
+  workspaceIntegrity?: { emptyHtmlFiles?: string[] };
   workspaceSync?: {
     verified: boolean;
     complete: boolean;
