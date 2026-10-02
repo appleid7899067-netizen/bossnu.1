@@ -54,5 +54,5 @@ export function sandboxPreviewDocument(runtime: string, source: string): string 
       placeholder("Tailwind CSS"),
     );
   }
-  return page(`<base href="/"><style>${normalized.replace(/<\\/style/gi, "<\\\\/style")}</style>`, placeholder("CSS"));
+  return page(`<base href="/"><style>${normalized.split("</style").join("<\\/style")}</style>`, placeholder("CSS"));
 }
