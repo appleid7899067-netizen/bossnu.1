@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Menu, MoreHorizontal, Phone, Volume2, VolumeX, X } from "lucide-react";
+import { ArrowLeft, Braces, Menu, MoreHorizontal, Phone, Terminal, Volume2, VolumeX, Wifi, X } from "lucide-react";
 import { ProjectFilesView } from "@/components/project-files-view";
 import { Toaster, toast } from "sonner";
 import { AppBuilderView } from "@/components/app-builder-view";
@@ -814,7 +814,7 @@ ${message}`); toast.error(message); }
   const showDiscover = view === "chat" && !activeChat?.messages.length;
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-bg text-fg">
+    <div className="flex h-dvh overflow-hidden bg-[#0b0712] text-[#f5f2fb]">
       <div className="hidden md:flex">
         <Sidebar
           view={view}
@@ -905,7 +905,21 @@ ${message}`); toast.error(message); }
       ) : null}
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex min-h-16 items-center gap-2 border-b border-border bg-bg/90 px-3 py-2 backdrop-blur-md md:hidden">
+        {view === "chat" ? (
+          <header className="hidden h-12 shrink-0 items-center justify-between border-b border-[#a76eff2b] bg-[#120b1d] px-4 md:flex">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <div className="grid size-7 shrink-0 place-items-center rounded-lg border border-[#00ff9d40] bg-[#00ff9d14] text-[#00ff9d]"><Terminal size={15} /></div>
+              <span className="text-sm font-bold tracking-tight text-[#f5f2fb]">Bossnu<span className="text-[#00ff9d]">.Silelo</span></span>
+              <span className="h-4 w-px bg-[#a76eff35]" />
+              <span className="flex items-center gap-1.5 rounded-md border border-[#a76eff26] bg-[#0b0712] px-2 py-1.5 text-[11px] text-[#c9bfd8]"><Braces size={12} className="text-[#00ff9d]" /> ห้องแชทหลัก</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1.5 rounded-full border border-[#00ff9d30] bg-[#00ff9d0e] px-2 py-1 text-[9px] font-bold tracking-wider text-[#00ff9d]"><span className="size-1.5 rounded-full bg-[#00ff9d]" /> SALI / READY</span>
+              <button type="button" onClick={() => { window.location.href = "/workspace"; }} className="flex items-center gap-1.5 rounded-lg border border-[#a76eff2b] px-2.5 py-1.5 text-xs text-[#c9bfd8] transition hover:border-[#00ff9d55] hover:bg-[#00ff9d0d] hover:text-white"><Braces size={13} className="text-[#00ff9d]" /> ห้องโค้ด <ArrowLeft size={12} className="rotate-180" /></button>
+            </div>
+          </header>
+        ) : null}
+        <header className="flex min-h-14 items-center gap-2 border-b border-[#a76eff2b] bg-[#120b1d]/95 px-3 py-2 backdrop-blur-md md:hidden">
           <Button variant="ghost" size="icon-sm" aria-label={drawer ? "ปิดเมนู" : "เปิดเมนู"} onClick={() => setDrawer((v) => !v)}>
             {drawer ? <X className="size-6" /> : <Menu className="size-6" />}
           </Button>
@@ -989,7 +1003,7 @@ ${message}`); toast.error(message); }
                 onContextAction={(action) => { if (!activeChat?.id || busyChat) return; void send(action, activeChat.id); }}
               />
             )}
-            {view === "settings" ? null : <div className="mx-auto w-full max-w-[1400px] px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
+            {view === "settings" ? null : <div className="mx-auto w-full max-w-[1400px] border-t border-[#a76eff24] bg-[#120b1d] px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
               <Composer
                 value={draft}
                 selectedModel={store.selectedModel}
@@ -1039,7 +1053,7 @@ ${message}`); toast.error(message); }
                   />
                 }
               />
-              <p className="mt-2 px-1 text-center text-[0.7rem] text-subtle">
+              <p className="mt-2 px-1 text-center text-[0.65rem] text-[#80758e]">
                 สลี่พร้อมช่วยค่ะ • แชตเก็บไว้บนอุปกรณ์นี้ • <kbd className="font-sans">/</kbd> พิมพ์ • <kbd className="font-sans">Ctrl K</kbd> ค้นหา • <kbd className="font-sans">Ctrl ,</kbd> ตั้งค่า • <kbd className="font-sans">Esc</kbd> หยุด
               </p>
             </div>}
