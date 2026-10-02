@@ -127,7 +127,7 @@ export function Composer({
 
   function handleSubmit(e?: FormEvent) {
     e?.preventDefault();
-    if (busy || disabled || !hasContent) return;
+    if (disabled || !hasContent) return;
     if (speech.listening) speech.stop();
     onSubmit();
   }
@@ -426,27 +426,26 @@ export function Composer({
               {voiceEnabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
             </button>
           ) : null}
-          <div className="ml-auto shrink-0">
-            {busy ? (
-              <Button type="button" size="icon" variant="primary" aria-label="หยุด" title="หยุด (Esc)" onClick={onStop} className="size-9 rounded-full">
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            {busy && onStop ? (
+              <Button type="button" size="icon" variant="ghost" aria-label="หยุดงานล่าสุด" title="หยุดงานล่าสุด (Esc)" onClick={onStop} className="size-9 rounded-full text-danger hover:bg-danger/10 hover:text-danger">
                 <Square className="size-3.5 fill-current" />
               </Button>
-            ) : (
-              <Button
-                type="submit"
-                size="icon"
-                variant="primary"
-                aria-label="ส่ง"
-                disabled={disabled || !hasContent}
-                className={cn(
-                  "accent-gradient size-11 rounded-full border-0 text-primary-fg shadow-lg transition-all duration-200",
-                  "enabled:hover:scale-105 enabled:active:scale-95",
-                  hasContent && "glow-breathe",
-                )}
-              >
-                <ArrowUp className="size-5" strokeWidth={2.4} />
-              </Button>
-            )}
+            ) : null}
+            <Button
+              type="submit"
+              size="icon"
+              variant="primary"
+              aria-label="ส่ง"
+              disabled={disabled || !hasContent}
+              className={cn(
+                "accent-gradient size-11 rounded-full border-0 text-primary-fg shadow-lg transition-all duration-200",
+                "enabled:hover:scale-105 enabled:active:scale-95",
+                hasContent && "glow-breathe",
+              )}
+            >
+              <ArrowUp className="size-5" strokeWidth={2.4} />
+            </Button>
           </div>
         </div>
       </div>
