@@ -334,7 +334,13 @@ export function AppShell({ search }: { search: Search }) {
           const htmlPath = (result.workspaceSync.addedFiles ?? [])
             .concat(result.workspaceSync.modifiedFiles ?? [])
             .find((path) => /\.html?$/i.test(path));
-          if (htmlPath) {
+          const htmlWorkspaceFile = htmlPath
+            ? (result.workspaceFiles ?? []).find(file => file.path === htmlPath)
+            : undefined;
+          const htmlLooksRenderable = htmlWorkspaceFile
+            ? /<(?:body|main|div|section|canvas|svg|button|h[1-6]|p|script|style)\\b/i.test(String(htmlWorkspaceFile.content ?? ""))
+            : true;
+          if (htmlPath && htmlLooksRenderable) {
             try {
               const previewResponse = await fetch(`/api/workspace?workspace=${encodeURIComponent(workspaceId)}&path=${encodeURIComponent(htmlPath)}`, { signal: ac.signal });
               const previewData = await previewResponse.json().catch(() => ({})) as { ok?: boolean; file?: { content?: string } };
