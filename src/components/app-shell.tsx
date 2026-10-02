@@ -310,6 +310,34 @@ export function AppShell({ search }: { search: Search }) {
         if (result.status === "success" && result.exitCode === 0 && result.workspaceSync?.verified && result.workspaceSync.complete) {
           const safeCommand = redactSensitiveCommand(call.command);
           store.saveLearnedSkill({ name: `Sandbox ${call.language}`, runtime: call.language, pattern: safeCommand, testCommand: safeCommand, result: "passed", evidence: `exit 0 • Neon Sync verified • ${result.workspaceSync.expectedCount ?? 0} project files` });
+
+          // If the command created/updated an HTML file, immediately load the
+          // verified Workspace copy into the in-chat Live Preview. Do not ask
+          // the user to open a local file or invent a localhost URL.
+          const htmlPath = (result.workspaceSync.addedFiles ?? [])
+            .concat(result.workspaceSync.modifiedFiles ?? [])
+            .find((path) => /\.html?$/i.test(path));
+          if (htmlPath) {
+            try {
+              const previewResponse = await fetch(`/api/workspace?workspace=${encodeURIComponent(workspaceId)}&path=${encodeURIComponent(htmlPath)}`, { signal: ac.signal });
+              const previewData = await previewResponse.json().catch(() => ({})) as { ok?: boolean; file?: { content?: string } };
+              const html = previewData.ok && typeof previewData.file?.content === "string" ? previewData.file.content : "";
+              if (html) {
+                setSandboxRun({
+                  runtime: "html",
+                  label: "HTML / Web",
+                  command: call.command,
+                  status: "Preview พร้อมแล้ว",
+                  previewHtml: sandboxPreviewDocument("html", html),
+                });
+                append(`เปิด Live Preview: ${htmlPath}\\n\\n`);
+              } else {
+                append(`สร้าง ${htmlPath} แล้ว แต่โหลดไฟล์เพื่อ Preview ไม่สำเร็จ\\n\\n`);
+              }
+            } catch (previewError) {
+              if (!ac.signal.aborted) append(`สร้าง ${htmlPath} แล้ว แต่ Preview โหลดไม่สำเร็จ: ${previewError instanceof Error ? previewError.message : "unknown error"}\\n\\n`);
+            }
+          }
         }
         return result;
       } catch (error) {
