@@ -223,7 +223,7 @@ function MessageBubble({
     <div className="lumina-rise group w-full">
       <div className="min-w-0 w-full break-words text-[13px] pl-0 sm:pl-0 leading-[1.6] [overflow-wrap:anywhere] sm:text-[12.5px] sm:leading-[1.55]">
         {(live || message.activities?.length) ? <ActivityFeed activities={message.activities ?? []} live={live} liveText={live ? message.content : ""} /> : null}
-        {!live && message.activities?.length ? <LiveResultPresentation activities={message.activities} live={false} /> : null}
+        {message.activities?.length ? <LiveResultPresentation activities={message.activities} live={live} /> : null}
         {empty && !live && !message.activities?.length ? (
           <p className="text-sm font-medium text-muted">กำลังดำเนินการ...</p>
         ) : null}
