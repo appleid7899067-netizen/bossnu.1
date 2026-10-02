@@ -37,7 +37,7 @@ function shouldUseLiveWeb(query: string) {
 
   // URLs, product/service names with factual lookup language, and questions
   // explicitly asking for verification should also use the live source.
-  if (/(https?:\\/\\/|www\\.)/i.test(q)) return true;
+  if (q.includes("://") || /www\\./i.test(q)) return true;
   if (/(?:ตรวจสอบ|ยืนยัน|เช็ก|เช็ค|verify|look up|lookup|find out|ค้นข้อมูล|ข้อมูลจากเว็บ|จากเว็บ|จากอินเทอร์เน็ต)/i.test(q)) return true;
 
   return false;
