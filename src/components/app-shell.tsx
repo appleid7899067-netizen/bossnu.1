@@ -370,6 +370,7 @@ export function AppShell({ search }: { search: Search }) {
         }
         return result;
       } catch (error) {
+        updateStreamLog(sandboxStreamId, "sandbox", ac.signal.aborted ? "done" : "error", ac.signal.aborted ? "หยุดการรันแล้ว" : (error instanceof Error ? error.message : "Sandbox execution failed"), output.length);
         if (outputTimer !== null) window.clearTimeout(outputTimer);
         outputTimer = null;
         store.updateCommandHistory(historyId, ac.signal.aborted ? "aborted" : "error");
