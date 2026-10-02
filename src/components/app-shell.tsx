@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Braces, Menu, MoreHorizontal, Phone, Terminal, Volume2, VolumeX, Wifi, X } from "lucide-react";
+import { ArrowLeft, Braces, Menu, MoreHorizontal, Phone, Terminal, Volume2, VolumeX, X } from "lucide-react";
 import { ProjectFilesView } from "@/components/project-files-view";
 import { Toaster, toast } from "sonner";
 import { AppBuilderView } from "@/components/app-builder-view";
@@ -930,6 +930,7 @@ ${message}`); toast.error(message); }
             <p className="truncate text-[15px] font-semibold">{store.personality.name || "สลี่"}</p>
             <p className="truncate text-[11px] text-muted">สร้างโดย AI • พร้อมช่วยงาน</p>
           </div>
+          <Button variant="ghost" size="icon-sm" aria-label="เปิดห้องโค้ด" title="ห้องโค้ด" onClick={() => { window.location.href = "/workspace"; }}><Braces className="size-5 text-[#00ff9d]" /></Button>
           <Button variant="ghost" size="icon-sm" aria-label="โหมดโทรคุย" onClick={() => setCallOpen(true)}><Phone className="size-5" /></Button>
           <Button variant="ghost" size="icon-sm" aria-label={voiceEnabled ? "ปิดเสียงตอบกลับ" : "เปิดเสียงตอบกลับ"} onClick={() => { const next = !voiceEnabled; setVoiceEnabledState(next); setVoiceEnabled(next); }}>
             {voiceEnabled ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
