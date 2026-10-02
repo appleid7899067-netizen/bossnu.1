@@ -201,7 +201,7 @@ export function AppShell({ search }: { search: Search }) {
     const cleanWorkspaceLinks = (value: string) => value
       // Keep generated work inside Bossnu. Never expose local server URLs or launch commands.
       .replace(/https?:\/\/localhost(?::\d+)?\/[^\s)\]]*/gi, "")
-      .replace(/\\\\n/g, "\n")
+      .replace(/\\n/g, "\n")
       .replace(/<div\\b[^>]*\\bstyle\\s*=\\s*["\x27][^"\x27]*["\x27][^>]*>[\\s\\S]*?<\\/div>/gi, "")
       .replace(/<html\\b[\\s\\S]*?<\\/html>/gi, "")
       .replace(/เปิดที่\s*:\s*https?:\/\/localhost(?::\d+)?[^\n]*/gi, "เปิดดูได้จาก Live Preview ใน Bossnu")
