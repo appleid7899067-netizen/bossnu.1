@@ -187,6 +187,15 @@ function WebPreview({ html, css, tailwind, live }: { html: string; css: string; 
   );
 }
 
+function buildPreviewDocument(code: string) {
+  const source = code.trim();
+  if (!source) return "<!doctype html><html><body style=\"margin:0;padding:24px;font:14px system-ui;color:#64748b\">กำลังสร้างหน้าเว็บ…</body></html>";
+  // Complete documents must be preserved; fragments need a real document shell
+  // so browser previews render consistently on mobile and desktop.
+  if (/<html[\\s>]/i.test(source) || /<!doctype\\s+html/i.test(source)) return source;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{min-height:100%;}body{margin:0;padding:16px;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow-wrap:anywhere}img,video,canvas,svg{max-width:100%;height:auto}*{box-sizing:border-box}</style></head><body>${source}</body></html>`;
+}
+
 function CodeBlock({ code, lang, live, showPreview = true }: { code: string; lang?: string; live?: boolean; showPreview?: boolean }) {
   const value = (lang || "").toLowerCase();
   const MAX_RENDER_CHARS = 12000;
@@ -236,7 +245,7 @@ function CodeBlock({ code, lang, live, showPreview = true }: { code: string; lan
           <pre className={cn("overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-[#e8efff]", expanded ? "max-h-[75vh]" : "max-h-[320px]")}><code>{code}</code></pre>
         </div>
       ) : preview && isWeb && showPreview && value !== "css" && value !== "tailwind" && value !== "tailwindcss" ? (
-        <iframe title="HTML preview" sandbox="allow-scripts" srcDoc={code} className={cn("w-full bg-white", expanded ? "h-[75vh]" : "h-[360px]")} />
+        <iframe title="HTML preview" sandbox="allow-scripts" srcDoc={buildPreviewDocument(code)} className={cn("w-full bg-white", expanded ? "h-[75vh]" : "h-[360px]")} />
       ) : (
         <pre className={cn("overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-[#e8efff]", expanded ? "max-h-[75vh]" : "max-h-[320px]")}><code>{code}</code></pre>
       )}
