@@ -189,7 +189,8 @@ export function AppShell({ search }: { search: Search }) {
       if (!queuedReply) return;
       reply += queuedReply;
       queuedReply = "";
-      store.patchAssistant(id, assistantId, { content: reply });
+      const cleaned = cleanWorkspaceLinks(reply);
+      store.patchAssistant(id, assistantId, { content: cleaned });
     };
     const append = (text: string) => {
       if (!text) return;
@@ -198,9 +199,18 @@ export function AppShell({ search }: { search: Search }) {
       replyTimer = window.setTimeout(flushReply, 80);
     };
     const cleanWorkspaceLinks = (value: string) => value
-      .replace(/https?:\/\/localhost(?::\\d+)?\/[^\\s)\\]]*/gi, "")
-      .replace(/เปิดที่\\s*:\\s*http:\/\/localhost(?::\\d+)?[^\\n]*/gi, "เปิดดูได้จาก Live Preview ใน Bossnu")
-      .replace(/เปิดเซิร์ฟเวอร์[^\\n]*\\n/gi, "");
+      // Keep generated work inside Bossnu. Never expose local server URLs or launch commands.
+      .replace(/https?:\\/\\/localhost(?::\\d+)?\\/[^\\s)\\]]*/gi, "")
+      .replace(/เปิดที่\\s*:\\s*https?:\\/\\/localhost(?::\\d+)?[^\\n]*/gi, "เปิดดูได้จาก Live Preview ใน Bossnu")
+      .replace(/เปิดเซิร์ฟเวอร์[^\\n]*(?:\\n|$)/gi, "")
+      .replace(/<run\\b[^>]*>[\\s\\S]*?<\\/run>/gi, "")
+      .replace(/<\\/?run\\b[^>]*>/gi, "")
+      // Tool/server implementation details should stay in the activity layer, not the chat bubble.
+      .replace(/(?:python3?|node|npx)\\s+-m\\s+http\\.server[^\\n]*/gi, "")
+      .replace(/Server running at\\s+https?:\\/\\/localhost[^\\n]*/gi, "")
+      .replace(/(?:cd\\s+[^\\n]*project[^\\n]*&&\\s*)?(?:node|python3?|npx)\\s+-e\\s+[\\s\\S]*?server\\.listen\\([^\\n]*/gi, "")
+      .replace(/(?:\\r?\\n){3,}/g, "\\n\\n")
+      .trim();
     const flushReplyNow = () => {
       if (replyTimer !== null) {
         window.clearTimeout(replyTimer);
@@ -209,8 +219,7 @@ export function AppShell({ search }: { search: Search }) {
       if (queuedReply) {
         reply += queuedReply;
         queuedReply = "";
-        const cleaned = cleanWorkspaceLinks(reply);
-        if (cleaned !== reply) reply = cleaned;
+        reply = cleanWorkspaceLinks(reply);
         store.patchAssistant(id, assistantId, { content: reply });
       }
     };
