@@ -156,7 +156,7 @@ export function AppShell({ search }: { search: Search }) {
     });
   }
 
-  async function send(text: string, chatId?: string, mode?: ChatMode, allowDangerous = false, files: ChatAttachment[] = [], forceExecution = false) {
+  async function send(text: string, chatId?: string, mode?: ChatMode, allowDangerous = false, files: ChatAttachment[] = [], forceExecution = false, modelOverride?: string) {
     const content = text.trim();
     if ((!content && !files.length) || busyChat) return;
     const detection = detectSandboxInput(content);
@@ -444,7 +444,7 @@ export function AppShell({ search }: { search: Search }) {
           signal: ac.signal,
           tools: false,
           latestUser: content,
-          model: store.selectedModel,
+          model: modelOverride ?? store.selectedModel,
           onEvent: event => {
             if (ac.signal.aborted) return;
             if (event.type === "thinking") {
@@ -565,9 +565,40 @@ ${message}`); toast.error(message); }
   }
 
   function sendToGpt() {
-    if (busyChat || !draft.trim() && !attachments.length) return;
+    if (busyChat) return;
+    const id = activeChat?.id;
+    if (!id) return;
+
+    const current = useAppStore.getState().conversations.find(chat => chat.id === id);
+    const lastAssistant = [...(current?.messages ?? [])].reverse().find(message => message.role === "assistant");
+    const failedActivities = (lastAssistant?.activities ?? []).filter(activity =>
+      (activity.kind === "command" && (activity.status === "error" || activity.exitCode !== 0)) ||
+      (activity.kind === "phase" && /ไม่ผ่าน|failed|error/i.test(activity.label))
+    );
+    const evidence = failedActivities.slice(-4).map(activity => {
+      if (activity.kind === "command") {
+        return [
+          `COMMAND: ${activity.command}`,
+          `STATUS: ${activity.status}`,
+          `EXIT: ${activity.exitCode ?? "unknown"}`,
+          `OUTPUT: ${activity.output ?? ""}`,
+        ].join("\n");
+      }
+      return `PHASE: ${activity.label}`;
+    }).join("\n\n");
+
+    const task = draft.trim() || current?.messages
+      ? draft.trim()
+      : lastAssistant?.content?.trim() || "ตรวจงานล่าสุดในแชตนี้ต่อ";
+    const handoff = [
+      "GPT HANDOFF • รับงานต่อจาก Sali แบบต่อเนื่องในห้องเดิม",
+      task,
+      evidence ? "\nหลักฐานงานล่าสุดจาก Sali:\n" + evidence.slice(-12000) : "",
+      "\nคำสั่ง: อ่าน Workspace จริงก่อนลงมือ ถ้ามี Error ให้แก้ แล้ว RUN → OBSERVE → VERIFY จากหลักฐานจริง ห้ามตอบว่าผ่านโดยไม่มีผลยืนยัน",
+    ].filter(Boolean).join("\n");
+
     store.setSelectedModel("gpt-5.6-luna");
-    void send(commandForTool(draft), activeChat?.id, undefined, false, attachments);
+    void send(handoff, id, current?.mode, true, attachments, true, "gpt-5.6-luna");
   }
 
   async function emergencyFix() {
