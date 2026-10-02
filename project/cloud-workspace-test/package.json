@@ -1,0 +1,8 @@
+{
+  "name": "cloud-workspace-test",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "check": "node -e \"const fs=require('fs'); const s=fs.readFileSync('index.html','utf8'); if(!/<h1>.*<\\/h1>/s.test(s)) process.exit(1); console.log('HTML_CHECK_PASS')\""
+  }
+}
