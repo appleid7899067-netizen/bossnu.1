@@ -1057,7 +1057,10 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
 .sali-result-stage{display:grid;gap:8px;min-width:0}
 .sali-result-stack,.sali-result-output{min-width:0;padding:9px 10px;border-radius:12px;background:color-mix(in srgb,var(--color-bg) 55%,transparent)}
 .sali-result-stack-title{font-size:7px;letter-spacing:.1em;color:var(--color-subtle);margin-bottom:6px}
-.sali-result-stream-status{display:flex;justify-content:space-between;gap:8px;font-size:8px;color:var(--color-subtle);margin-bottom:4px}
+.sali-result-stream-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sali-result-stream-head .sali-result-stack-title{margin-bottom:0}
+.sali-result-stream-status{display:flex;justify-content:space-between;gap:8px;font-size:8px;color:var(--color-subtle);margin-top:5px;margin-bottom:0;min-width:0}
+.sali-result-stream-status>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sali-result-stream-status .live{color:var(--color-primary)}
 .sali-result-stream-status .ok{color:var(--color-success)}
 .sali-result-stream-status .bad{color:var(--color-danger)}
