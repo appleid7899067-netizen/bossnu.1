@@ -859,7 +859,7 @@ ${message}`); toast.error(message); }
         ) : view === "maps" ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             <div className="min-h-[680px] flex-1"><SatelliteMapView /></div>
-            <div className="min-h-[620px] shrink-0"><MindMapView
+            <MindMapView
             maps={store.maps}
             active={activeMap}
             topic={mapTopic}
@@ -879,7 +879,7 @@ ${message}`); toast.error(message); }
             }}
             busy={busyMap}
             error={mapError}
-          /></div>
+          />
         ) : view === "builder" ? (
           <AppBuilderView
             project={store.builderProject ?? undefined}
