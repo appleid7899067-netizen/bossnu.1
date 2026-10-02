@@ -13,7 +13,7 @@ const TEXT_EXTENSIONS = [
 ];
 
 /** The `accept` attribute for the file picker. */
-export const ATTACHMENT_ACCEPT = [...TEXT_EXTENSIONS.map((ext) => `.${ext}`), "text/*", "application/json"].join(",");
+export const ATTACHMENT_ACCEPT = [...TEXT_EXTENSIONS.map((ext) => `.${ext}`), "text/*", "application/json", "image/*", "audio/*"].join(",");
 
 export function fileExtension(name: string) {
   const base = name.toLowerCase().split("/").pop() ?? "";
@@ -24,6 +24,13 @@ export function fileExtension(name: string) {
 export function isTextFile(file: { name: string; type: string }) {
   if (file.type.startsWith("text/") || file.type === "application/json") return true;
   return TEXT_EXTENSIONS.includes(fileExtension(file.name));
+}
+
+export function attachmentKind(file: { name: string; type: string }): "text" | "image" | "audio" | null {
+  if (isTextFile(file)) return "text";
+  if (file.type.startsWith("image/")) return "image";
+  if (file.type.startsWith("audio/")) return "audio";
+  return null;
 }
 
 export function formatBytes(bytes: number) {
@@ -44,8 +51,9 @@ export async function readAttachments(files: Iterable<File>, existing: ChatAttac
       errors.push(`แนบได้สูงสุด ${MAX_ATTACHMENTS} ไฟล์ต่อข้อความ`);
       break;
     }
-    if (!isTextFile(file)) {
-      errors.push(`${file.name}: รองรับเฉพาะไฟล์ข้อความและโค้ด`);
+    const kind = attachmentKind(file);
+    if (!kind) {
+      errors.push(`${file.name}: รองรับไฟล์ข้อความ รูปภาพ และเสียง`);
       continue;
     }
     if (file.size > MAX_ATTACHMENT_BYTES) {
@@ -56,9 +64,16 @@ export async function readAttachments(files: Iterable<File>, existing: ChatAttac
       errors.push(`${file.name}: ไฟล์แนบรวมเกิน ${formatBytes(MAX_TOTAL_ATTACHMENT_BYTES)}`);
       continue;
     }
-    const content = await file.text();
+    const content = kind === "text"
+      ? await file.text()
+      : await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error(`อ่านไฟล์ ${file.name} ไม่สำเร็จ`));
+          reader.onload = () => resolve(String(reader.result ?? ""));
+          reader.readAsDataURL(file);
+        });
     total += file.size;
-    added.push({ name: file.name, size: file.size, content });
+    added.push({ name: file.name, size: file.size, content, mimeType: file.type || "application/octet-stream", kind });
   }
   return { added, errors };
 }
