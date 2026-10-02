@@ -1,7 +1,7 @@
 export type ChatMode = "instant" | "think";
 export type AiModelId = string;
 export type AppView = "chat" | "maps" | "studio" | "builder" | "files" | "settings";
-export type ChatAttachment = { name: string; size: number; content: string; };
+export type ChatAttachment = { name: string; size: number; content: string; mimeType?: string; kind?: "text" | "image" | "audio"; };
 export type ChatActivity =
   | { id: string; kind: "phase"; phase: string; label: string; createdAt: number }
   | { id: string; kind: "command"; runtime: string; command: string; status: string; output?: string; previewUrl?: string | null; exitCode?: number | null; durationMs?: number; sync?: { verified: boolean; complete: boolean; added?: number; modified?: number; deleted?: number; expectedCount?: number; error?: string }; createdAt: number }
