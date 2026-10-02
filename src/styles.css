@@ -1115,3 +1115,235 @@ html[data-theme="dark"] .sali-result-stack,
 html[data-theme="dark"] .sali-result-output {
   background: rgba(10,6,17,.62);
 }
+
+
+/* Bossnu.Silelo vNext: premium main-chat command center. */
+.sali-command-center{
+  position:relative;
+  isolation:isolate;
+  display:flex;
+  min-height:clamp(280px,42vh,430px);
+  width:min(920px,100%);
+  margin:auto;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  padding:34px 22px;
+  border:1px solid rgba(167,110,255,.22);
+  border-radius:30px;
+  background:
+    radial-gradient(420px 220px at 50% 38%,rgba(0,255,157,.07),transparent 70%),
+    radial-gradient(520px 260px at 50% 0%,rgba(126,58,190,.16),transparent 72%),
+    rgba(18,11,29,.76);
+  box-shadow:0 30px 90px rgba(0,0,0,.34),inset 0 1px rgba(255,255,255,.025);
+  backdrop-filter:blur(18px);
+}
+.sali-command-center::before{
+  content:"";
+  position:absolute;
+  inset:1px;
+  border-radius:29px;
+  pointer-events:none;
+  background:linear-gradient(135deg,rgba(255,255,255,.035),transparent 35%,rgba(0,255,157,.025));
+}
+.sali-command-orbit{
+  position:absolute;
+  top:22px;
+  left:50%;
+  width:92px;
+  height:92px;
+  transform:translateX(-50%);
+  opacity:.9;
+}
+.sali-command-orbit::before,
+.sali-command-orbit::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border:1px solid rgba(0,255,157,.14);
+  border-radius:50%;
+}
+.sali-command-orbit::after{
+  inset:13px;
+  border-color:rgba(167,110,255,.18);
+}
+.sali-command-orbit span{
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:5px;
+  height:5px;
+  margin:-2.5px;
+  border-radius:50%;
+  background:#00ff9d;
+  box-shadow:0 0 18px rgba(0,255,157,.75);
+  transform-origin:2.5px 2.5px;
+}
+.sali-command-orbit span:nth-child(1){transform:rotate(0deg) translateX(42px)}
+.sali-command-orbit span:nth-child(2){transform:rotate(120deg) translateX(42px);opacity:.55}
+.sali-command-orbit span:nth-child(3){transform:rotate(240deg) translateX(42px);opacity:.3}
+.sali-command-copy{
+  position:relative;
+  z-index:1;
+  margin-top:42px;
+  text-align:center;
+}
+.sali-command-kicker{
+  display:block;
+  margin-bottom:9px;
+  color:#00ff9d;
+  font-size:9px;
+  font-weight:650;
+  letter-spacing:.18em;
+}
+.sali-command-copy h1{
+  margin:0;
+  color:#f7f3ff;
+  font-size:clamp(24px,3.5vw,36px);
+  font-weight:520;
+  letter-spacing:-.035em;
+}
+.sali-command-copy p{
+  margin:9px auto 0;
+  max-width:560px;
+  color:#a9a0b7;
+  font-size:12px;
+  line-height:1.7;
+}
+.sali-command-flow{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  width:min(100%,800px);
+  margin-top:28px;
+  overflow-x:auto;
+  padding:7px 2px 9px;
+  scrollbar-width:none;
+}
+.sali-command-flow::-webkit-scrollbar{display:none}
+.sali-command-step{
+  display:flex;
+  flex:0 0 auto;
+  align-items:center;
+  gap:5px;
+  color:#71687c;
+  font-size:7px;
+  letter-spacing:.07em;
+  white-space:nowrap;
+}
+.sali-command-step b{
+  padding:5px 7px;
+  border:1px solid rgba(167,110,255,.14);
+  border-radius:999px;
+  background:rgba(8,5,13,.38);
+  font-weight:550;
+}
+.sali-command-step:nth-child(1) b,
+.sali-command-step:last-child b{
+  border-color:rgba(0,255,157,.2);
+  color:#00ff9d;
+}
+.sali-command-step i{
+  color:#564c61;
+  font-style:normal;
+}
+.sali-command-hint{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin-top:13px;
+  color:#00ff9d;
+  font-size:8px;
+  letter-spacing:.08em;
+}
+.sali-command-hint em{
+  margin-left:4px;
+  color:#766d82;
+  font-size:9px;
+  font-style:normal;
+  letter-spacing:0;
+}
+.sali-command-live-dot{
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:#00ff9d;
+  box-shadow:0 0 14px rgba(0,255,157,.7);
+  animation:sali-command-pulse 1.5s ease-in-out infinite;
+}
+@keyframes sali-command-pulse{
+  0%,100%{opacity:.45;transform:scale(.8)}
+  50%{opacity:1;transform:scale(1.15)}
+}
+
+/* Make the real execution stream feel like one continuous instrument panel. */
+.sali-devlog{
+  border-radius:24px;
+  background:rgba(18,11,29,.88);
+  box-shadow:0 18px 60px rgba(0,0,0,.26),inset 0 1px rgba(255,255,255,.02);
+}
+.sali-devlog-live .sali-devlog-flow{
+  min-height:42px;
+  padding:8px 10px;
+  border:1px solid rgba(167,110,255,.12);
+  border-radius:16px;
+  background:rgba(7,4,11,.34);
+}
+.sali-flow-token{
+  font-size:9px;
+  font-weight:500;
+}
+.sali-flow-arrow{color:rgba(0,255,157,.32)}
+.sali-summary{
+  border-radius:20px;
+  border-color:rgba(0,255,157,.13);
+  background:linear-gradient(180deg,rgba(18,11,29,.96),rgba(11,7,18,.9));
+  box-shadow:0 12px 40px rgba(0,0,0,.2);
+}
+.sali-summary-head{
+  min-height:34px;
+  padding:0 13px;
+  color:#8f849a;
+  font-size:8px;
+}
+.sali-summary-body{
+  padding:14px 16px 17px;
+  color:#ddd7e5;
+}
+
+/* Composer becomes a floating command dock while retaining the real Composer logic. */
+@media (min-width:641px){
+  .chat-scroll + div{
+    background:linear-gradient(180deg,rgba(18,11,29,.55),rgba(18,11,29,.97)) !important;
+    border-top-color:rgba(167,110,255,.14) !important;
+    backdrop-filter:blur(16px);
+  }
+}
+@media (max-width:640px){
+  .sali-command-center{
+    min-height:330px;
+    border-radius:24px;
+    padding:28px 14px;
+  }
+  .sali-command-orbit{top:18px;transform:translateX(-50%) scale(.82)}
+  .sali-command-copy{margin-top:38px}
+  .sali-command-copy h1{font-size:25px}
+  .sali-command-copy p{font-size:11px;max-width:310px}
+  .sali-command-flow{
+    justify-content:flex-start;
+    margin-top:22px;
+    width:100%;
+  }
+  .sali-command-step{font-size:6.5px}
+  .sali-command-step b{padding:5px 6px}
+  .sali-command-hint{margin-top:11px}
+}
+@media (prefers-reduced-motion:reduce){
+  .sali-command-live-dot{animation:none}
+}
