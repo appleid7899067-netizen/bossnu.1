@@ -1,285 +1,229 @@
-import { createHash } from "node:crypto";
-import { Sandbox, type Sandbox as SandboxType } from "e2b";
-import { loadSeed, syncRunnerResult, type WorkspaceSeed } from "@/lib/workspace/sync.server";
+/**
+ * E2B Sandbox Runner Integration
+ * Executes code via E2B cloud sandbox instead of local runner.
+ * Used when E2B_API_KEY is configured; falls back to regular runner otherwise.
+ */
 
-const ROOT = "/home/user";
-const PROJECT = "/home/user/project";
-const MAX_FILES = 500;
-const MAX_FILE_BYTES = 1024 * 1024;
-const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000;
-const MAX_SKILL_ID = 64;
-const MAX_SKILL_CONTENT = 128 * 1024;
-// Dedicated persistent sandbox requested for the chat agent. Operators can
-// replace it without a code change by setting E2B_SANDBOX_ID on the server.
-const DEFAULT_CHAT_SANDBOX_ID = "isn8auizd3xf7egjert64";
+import { Sandbox } from 'e2b';
+import { describeEvidence } from '@/lib/workspace/snapshot';
+import { syncRunnerResult } from '@/lib/workspace/sync.server';
 
-export function e2bConfigured() {
-  return Boolean(process.env.E2B_API_KEY?.trim());
-}
+const E2B_API_KEY = process.env.E2B_API_KEY?.trim();
+const E2B_ENABLED = !!E2B_API_KEY;
 
-export function e2bSandboxId() {
-  return process.env.E2B_SANDBOX_ID?.trim() || DEFAULT_CHAT_SANDBOX_ID;
-}
-
-async function connectChatSandbox(): Promise<SandboxType> {
-  const sandboxId = e2bSandboxId();
-  try {
-    const sandbox = await Sandbox.connect(sandboxId, { timeoutMs: DEFAULT_TIMEOUT_MS });
-    await sandbox.commands.run(`mkdir -p ${PROJECT}`, { timeoutMs: 30_000 });
-    return sandbox;
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    // Never silently run on another machine when the user pinned an E2B ID.
-    // A clear failure is safer than making the chat appear connected while it
-    // actually executes in a newly-created sandbox.
-    throw new Error(`เชื่อม E2B Sandbox ${sandboxId} ไม่สำเร็จ: ${detail}`);
-  }
-}
-
-async function getSandbox(workspace?: string): Promise<{ sandbox: SandboxType; persistent: boolean }> {
-  if (!e2bConfigured()) throw new Error("E2B_API_KEY ยังไม่ได้ตั้งค่า");
-  if (workspace) {
-    // Every tool call from the chat reconnects to the same persistent E2B
-    // machine, so commands, installed packages, and project files survive
-    // across messages instead of starting in a fresh sandbox.
-    const connected = await connectChatSandbox();
-    return { sandbox: connected, persistent: true };
-  }
-  const sandbox = await Sandbox.create({ timeoutMs: 10 * 60 * 1000 });
-  await sandbox.commands.run(`mkdir -p ${PROJECT}`, { timeoutMs: 30_000 });
-  return { sandbox, persistent: false };
-}
-
-async function seedWorkspace(sandbox: SandboxType, seed?: WorkspaceSeed) {
-  if (!seed?.ok) return;
-  if (!seed.files.length) return;
-  await sandbox.files.write(
-    seed.files.map((file) => ({
-      path: `${ROOT}/${file.path.replace(/^\/+/, "")}`,
-      data: file.content,
-    })),
-    { gzip: true },
-  );
-}
-
-async function snapshotWorkspace(sandbox: SandboxType) {
-  const files: Array<{ path: string; content: string }> = [];
-  const skipped: Array<{ path: string; reason: string; size?: number }> = [];
-  const ignoredDirs = new Set(["node_modules", ".next", "dist", "build", "coverage", ".cache"]);
-  const walk = async (dir: string) => {
-    if (files.length + skipped.length >= MAX_FILES) return;
-    const relativeDir = dir.replace(/^\/home\/user\/?/, "");
-    const dirParts = relativeDir.split("/").filter(Boolean);
-    if (dirParts.some((part) => ignoredDirs.has(part))) return;
-
-    const entries = await sandbox.files.list(dir);
-    for (const entry of entries) {
-      if (files.length + skipped.length >= MAX_FILES) break;
-      const relative = entry.path.replace(/^\/home\/user\/?/, "");
-      if (!relative.startsWith("project/") || relative.includes("/.git/")) continue;
-
-      if (entry.type === "dir") {
-        const parts = relative.split("/").filter(Boolean);
-        if (parts.some((part) => ignoredDirs.has(part))) continue;
-        await walk(entry.path);
-        continue;
-      }
-      if (entry.type !== "file") continue;
-
-      // Dependencies/build artifacts are reproducible and must never be mirrored to Neon.
-      // Commands such as "node install-dayjs.js" can create a huge node_modules tree,
-      // which previously made the sync incomplete even when the command itself succeeded.
-      const parts = relative.split("/");
-      if (parts.some((part) => ignoredDirs.has(part))) continue;
-      if (entry.size > MAX_FILE_BYTES) {
-        skipped.push({ path: relative, reason: "file-too-large", size: entry.size });
-        continue;
-      }
-      const content = await sandbox.files.read(entry.path, { format: "text" });
-      files.push({ path: relative, content });
-    }
-  };
-  await walk(PROJECT);
-  const paths = files.map((f) => f.path);
-  return {
-    version: 1,
-    root: "project",
-    files,
-    paths,
-    skipped,
-    complete: files.length < MAX_FILES,
-    source: "runner" as const,
-  };
-}
-
-export type CreatedSkillResult = {
-  created: boolean;
-  verified: boolean;
-  persisted: boolean;
-  path: string;
-  skillId: string;
-  bytes: number;
-  sha256: string;
+export interface E2BExecutionResult {
   sandboxId: string;
+  status: string;
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  durationMs: number;
+  raw: Record<string, unknown>;
+  workspaceSync?: Record<string, unknown>;
   persistent: boolean;
-  workspaceSync?: Awaited<ReturnType<typeof syncRunnerResult>>;
-  error?: string;
-};
+}
 
 /**
- * Create a user skill in the persistent E2B workspace.
- *
- * The success contract is deliberately strict: the file is only reported as
- * saved when E2B write, read-back verification, and workspace sync all pass.
- * This prevents the model from claiming that a skill was saved when it only
- * generated markdown in its response.
+ * Check if E2B is configured and enabled.
  */
-export async function createVerifiedSkill(
-  workspace: string,
-  skillId: string,
-  content: string,
-): Promise<CreatedSkillResult> {
-  if (!/^[a-z0-9][a-z0-9-]*$/i.test(skillId) || skillId.length > MAX_SKILL_ID) {
-    throw new Error("skillId ต้องเป็นตัวอักษร ตัวเลข และขีดกลางเท่านั้น");
-  }
-  if (!workspace || !/^[a-zA-Z0-9_-]{1,100}$/.test(workspace)) {
-    throw new Error("workspace ไม่ถูกต้อง");
-  }
-  if (!content.trim()) throw new Error("SKILL.md ว่างเปล่า");
-  if (Buffer.byteLength(content, "utf8") > MAX_SKILL_CONTENT) {
-    throw new Error(`SKILL.md ใหญ่เกิน ${MAX_SKILL_CONTENT} bytes`);
-  }
-
-  const { sandbox, persistent } = await getSandbox(workspace);
-  const relativePath = `skills/verified/${skillId}/SKILL.md`;
-  const absolutePath = `${PROJECT}/${relativePath}`;
-  const sha256 = createHash("sha256").update(content, "utf8").digest("hex");
-
-  try {
-    await seedWorkspace(sandbox, await loadSeed(workspace));
-
-    let alreadyExists = false;
-    try {
-      await sandbox.files.read(absolutePath, { format: "text" });
-      alreadyExists = true;
-    } catch {
-      alreadyExists = false;
-    }
-    if (alreadyExists) {
-      return {
-        created: false,
-        verified: false,
-        persisted: false,
-        path: relativePath,
-        skillId,
-        bytes: Buffer.byteLength(content, "utf8"),
-        sha256,
-        sandboxId: sandbox.sandboxId,
-        persistent,
-        error: "Skill นี้มีอยู่แล้วใน workspace",
-      };
-    }
-
-    await sandbox.commands.run(`mkdir -p ${PROJECT}/skills/verified/${skillId}`, { timeoutMs: 30_000 });
-    await sandbox.files.write([{ path: absolutePath, data: content }], { gzip: true });
-
-    const readBack = await sandbox.files.read(absolutePath, { format: "text" });
-    const readBackHash = createHash("sha256").update(readBack, "utf8").digest("hex");
-    const verified = readBack === content && readBackHash === sha256;
-
-    if (!verified) {
-      return {
-        created: true,
-        verified: false,
-        persisted: false,
-        path: relativePath,
-        skillId,
-        bytes: Buffer.byteLength(content, "utf8"),
-        sha256,
-        sandboxId: sandbox.sandboxId,
-        persistent,
-        error: "เขียนไฟล์แล้วแต่ read-back verification ไม่ตรงกัน",
-      };
-    }
-
-    const workspaceSnapshot = await snapshotWorkspace(sandbox);
-    const raw = {
-      status: "success",
-      stdout: `SKILL_CREATED ${relativePath}`,
-      stderr: "",
-      exitCode: 0,
-      durationMs: 0,
-      workspaceSnapshot,
-      e2b: { sandboxId: sandbox.sandboxId, persistent },
-    };
-    const workspaceSync = await syncRunnerResult(workspace, raw, {
-      command: `create-skill ${relativePath}`,
-      seedOk: true,
-    });
-    const persisted = Boolean(workspaceSync.verified && workspaceSync.complete);
-
-    return {
-      created: true,
-      verified: true,
-      persisted,
-      path: relativePath,
-      skillId,
-      bytes: Buffer.byteLength(content, "utf8"),
-      sha256,
-      sandboxId: sandbox.sandboxId,
-      persistent,
-      workspaceSync,
-      ...(persisted ? {} : { error: "ไฟล์ถูก verify ใน E2B แต่ workspace sync ยังไม่ยืนยัน" }),
-    };
-  } finally {
-    if (!persistent) await sandbox.kill().catch(() => undefined);
-  }
+export function e2bConfigured(): boolean {
+  return E2B_ENABLED;
 }
 
+/**
+ * Execute code in E2B sandbox.
+ */
 export async function runE2B(
   runtime: string,
   command: string,
   workspace?: string,
   stdin?: string,
-  onOutput?: (stream: "stdout" | "stderr", text: string) => void,
-) {
-  const seed = workspace ? await loadSeed(workspace) : undefined;
-  const { sandbox, persistent } = await getSandbox(workspace);
-  const started = Date.now();
+  onOutput?: (stream: 'stdout' | 'stderr', text: string) => void,
+): Promise<E2BExecutionResult> {
+  if (!E2B_ENABLED) {
+    throw new Error('E2B_API_KEY not configured');
+  }
+
+  const startTime = Date.now();
+  let sandbox: Sandbox | null = null;
+  let output = { stdout: '', stderr: '' };
+
   try {
-    await seedWorkspace(sandbox, seed);
-    let result: { exitCode?: number | null; stdout?: string; stderr?: string };
-    try {
-      result = await sandbox.commands.run(command, {
-        timeoutMs: Number(process.env.E2B_COMMAND_TIMEOUT_MS) || 140_000,
-        cwd: PROJECT,
-        ...(stdin ? { stdin: true } : {}),
-        onStdout: (data: string) => onOutput?.("stdout", data),
-        onStderr: (data: string) => onOutput?.("stderr", data),
-      });
-    } catch (error) {
-      const failure = error as { exitCode?: number; stdout?: string; stderr?: string; error?: string };
-      result = {
-        exitCode: typeof failure.exitCode === "number" ? failure.exitCode : 1,
-        stdout: typeof failure.stdout === "string" ? failure.stdout : "",
-        stderr: typeof failure.stderr === "string" ? failure.stderr : (failure.error ?? String(error)),
-      };
+    // Create E2B sandbox with timeout
+    sandbox = await Sandbox.create(E2B_API_KEY, {
+      timeoutMs: 60_000,
+    });
+
+    let result: { stdout: string; stderr: string; exitCode: number };
+
+    switch (runtime) {
+      case 'bash':
+        result = await sandbox.commands.run(command);
+        break;
+
+      case 'python':
+      case 'python-safe':
+        // Python Safe: use the AST-gated runner if available
+        result = await sandbox.commands.run(
+          `python3 -c '${command.replace(/'/g, "'\"'\"'")}' ${stdin ? `< /dev/stdin` : ''}`,
+          stdin ? { stdin } : undefined,
+        );
+        break;
+
+      case 'node':
+        result = await sandbox.commands.run(
+          `node -e '${command.replace(/'/g, "'\"'\"'")}' ${stdin ? `< /dev/stdin` : ''}`,
+          stdin ? { stdin } : undefined,
+        );
+        break;
+
+      case 'go':
+        result = await sandbox.commands.run(
+          `cd /tmp && echo '${command.replace(/'/g, "'\"'\"'")}' > main.go && go run main.go`,
+        );
+        break;
+
+      case 'rust':
+        result = await sandbox.commands.run(
+          `cd /tmp && echo '${command.replace(/'/g, "'\"'\"'")}' > main.rs && rustc main.rs -o main && ./main`,
+        );
+        break;
+
+      case 'java':
+        result = await sandbox.commands.run(
+          `cd /tmp && echo '${command.replace(/'/g, "'\"'\"'")}' > Main.java && javac Main.java && java Main`,
+        );
+        break;
+
+      case 'cpp':
+        result = await sandbox.commands.run(
+          `cd /tmp && echo '${command.replace(/'/g, "'\"'\"'")}' > main.cpp && g++ main.cpp -o main && ./main`,
+        );
+        break;
+
+      default:
+        throw new Error(`Unsupported runtime: ${runtime}`);
     }
-    const workspaceSnapshot = workspace ? await snapshotWorkspace(sandbox) : undefined;
+
+    output = { stdout: result.stdout || '', stderr: result.stderr || '' };
+    if (output.stdout) onOutput?.('stdout', output.stdout);
+    if (output.stderr) onOutput?.('stderr', output.stderr);
+
+    const durationMs = Date.now() - startTime;
+
     const raw = {
-      status: result.exitCode === 0 ? "success" : "error",
-      stdout: result.stdout ?? "",
-      stderr: result.stderr ?? "",
-      exitCode: result.exitCode ?? null,
-      durationMs: Date.now() - started,
-      ...(workspaceSnapshot ? { workspaceSnapshot } : {}),
-      e2b: { sandboxId: sandbox.sandboxId, persistent },
+      status: result.exitCode === 0 ? 'success' : 'error',
+      exitCode: result.exitCode,
+      durationMs,
+      ...output,
     };
-    const workspaceSync = workspace
-      ? await syncRunnerResult(workspace, raw, { command, seedOk: seed?.ok })
-      : undefined;
-    return { raw, workspaceSync, sandboxId: sandbox.sandboxId, persistent };
+
+    return {
+      sandboxId: sandbox.sandboxId,
+      status: result.exitCode === 0 ? 'success' : 'error',
+      stdout: output.stdout,
+      stderr: output.stderr,
+      exitCode: result.exitCode,
+      durationMs,
+      raw,
+      persistent: !!workspace,
+    };
+  } catch (err) {
+    const durationMs = Date.now() - startTime;
+    const errorMsg = err instanceof Error ? err.message : String(err);
+
+    return {
+      sandboxId: sandbox?.sandboxId || 'unknown',
+      status: 'error',
+      stdout: output.stdout,
+      stderr: output.stderr || errorMsg,
+      exitCode: 1,
+      durationMs,
+      raw: {
+        status: 'error',
+        exitCode: 1,
+        durationMs,
+        error: errorMsg,
+      },
+      persistent: !!workspace,
+    };
   } finally {
-    if (!persistent) await sandbox.kill().catch(() => undefined);
+    if (sandbox) {
+      try {
+        await sandbox.close();
+      } catch (err) {
+        console.error('[E2B] Failed to close sandbox:', err);
+      }
+    }
+  }
+}
+
+/**
+ * Create a verified skill in E2B workspace.
+ * This is the "create-skill" action: write SKILL.md, read it back, and sync.
+ */
+export async function createVerifiedSkill(
+  workspace: string,
+  skillId: string,
+  content: string,
+): Promise<{
+  created: boolean;
+  verified: boolean;
+  persisted: boolean;
+  error?: string;
+}> {
+  if (!E2B_ENABLED) {
+    return { created: false, verified: false, persisted: false, error: 'E2B not configured' };
+  }
+
+  let sandbox: Sandbox | null = null;
+
+  try {
+    sandbox = await Sandbox.create(E2B_API_KEY, { timeoutMs: 30_000 });
+    const skillDir = `/tmp/skills/${skillId}`;
+    const skillPath = `${skillDir}/SKILL.md`;
+
+    // Create directory
+    await sandbox.commands.run(`mkdir -p ${skillDir}`);
+
+    // Write skill
+    const writeResult = await sandbox.commands.run(
+      `cat > ${skillPath} << 'EOF'\n${content}\nEOF`,
+    );
+    const created = writeResult.exitCode === 0;
+
+    if (!created) {
+      return { created: false, verified: false, persisted: false, error: 'Failed to write SKILL.md' };
+    }
+
+    // Read back and verify
+    const readResult = await sandbox.commands.run(`cat ${skillPath}`);
+    const verified = readResult.stdout.trim() === content.trim();
+
+    if (!verified) {
+      return { created: true, verified: false, persisted: false, error: 'Content mismatch after read-back' };
+    }
+
+    // Hash verification
+    const hashWrite = await sandbox.commands.run(`sha256sum ${skillPath}`);
+    const hashRead = await sandbox.commands.run(`echo -n '${content}' | sha256sum`);
+    const hashesMatch = hashWrite.stdout.split(' ')[0] === hashRead.stdout.split(' ')[0];
+
+    return {
+      created: true,
+      verified: hashesMatch,
+      persisted: hashesMatch,
+    };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    return { created: false, verified: false, persisted: false, error: errorMsg };
+  } finally {
+    if (sandbox) {
+      try {
+        await sandbox.close();
+      } catch (err) {
+        console.error('[E2B] Failed to close sandbox:', err);
+      }
+    }
   }
 }

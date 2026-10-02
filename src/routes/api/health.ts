@@ -1,31 +1,54 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { e2bConfigured, e2bSandboxId } from "@/lib/sandbox/e2b-runner.server";
-import { runnerConfig } from "@/lib/sandbox/runner-config.server";
-
 /**
- * Web-service liveness plus non-secret sandbox configuration visibility.
- * Never returns API keys or runner tokens.
+ * Health Check Endpoint
+ * Reports service status, feature availability, and dependency health.
+ * Used by: Render health checks, monitoring, deployment verification.
  */
-export const Route = createFileRoute("/api/health")({
-  server: {
-    handlers: {
-      GET: async () => {
-        const runner = runnerConfig();
-        return Response.json(
-          {
-            ok: true,
-            service: "bossnu-web",
-            check: "liveness",
-            sandbox: {
-              e2bConfigured: e2bConfigured(),
-              e2bSandboxId: e2bSandboxId(),
-              runnerUrl: runner.url,
-              runnerTokenConfigured: runner.tokenConfigured,
-            },
-          },
-          { headers: { "cache-control": "no-store" } },
-        );
-      },
+
+import { createFileRoute } from '@tanstack/react-router';
+import { e2bConfigured } from '@/lib/sandbox/e2b-runner.server';
+import { isNeonEnabled, checkNeonHealth } from '@/lib/db/neon';
+
+export const Route = createFileRoute('/api/health')(
+  {
+    validateSearch: (search: unknown) => search, // Accept any query params
+  },
+  {
+    component: () => null, // Not rendered as a page
+    beforeLoad: async () => {
+      // This hook runs on server-side before route rendering
     },
   },
-});
+);
+
+// Server-side handler for GET /api/health
+Route.createServerFn()
+  .handler(
+    async ({ request }) => {
+      if (request.method !== 'GET') {
+        return new Response(null, { status: 405 });
+      }
+
+      const neonHealth = await checkNeonHealth();
+
+      const response = {
+        ok: true,
+        service: 'bossnu-web',
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        uptime: process.uptime(),
+        features: {
+          e2b: e2bConfigured(),
+          neon: isNeonEnabled(),
+          neonConnected: neonHealth,
+        },
+      };
+
+      return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+          'cache-control': 'no-store',
+        },
+      });
+    },
+  );
