@@ -1,4 +1,4 @@
-import { i as __toESM, r as __require, t as __commonJSMin } from "../../_runtime.mjs";
+import { i as __require, o as __toESM, t as __commonJSMin } from "../../_runtime.mjs";
 import { i as parseHref, r as normalizeProtocolRelative } from "../tanstack__history.mjs";
 import { PassThrough, Readable } from "node:stream";
 //#region node_modules/react/cjs/react.production.js
@@ -436,10 +436,6 @@ function redirect(opts) {
 /** Check whether a value is a TanStack Router redirect Response. */
 function isRedirect(obj) {
 	return obj instanceof Response && !!obj.options;
-}
-/** Parse a serialized redirect object back into a redirect Response. */
-function parseRedirect(obj) {
-	if (obj !== null && typeof obj === "object" && obj.isSerializedRedirect) return redirect(obj);
 }
 //#endregion
 //#region node_modules/@tanstack/router-core/dist/esm/ssr/ssr-match-id.js
@@ -13449,7 +13445,7 @@ var require_react_dom_server_node_production = /* @__PURE__ */ __commonJSMin(((e
 	var async_hooks = __require("async_hooks");
 	var React = require_react();
 	var ReactDOM = require_react_dom();
-	var stream = __require("stream");
+	var stream$1 = __require("stream");
 	var REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element");
 	var REACT_PORTAL_TYPE = Symbol.for("react.portal");
 	var REACT_FRAGMENT_TYPE = Symbol.for("react.fragment");
@@ -17872,7 +17868,7 @@ var require_react_dom_server_node_production = /* @__PURE__ */ __commonJSMin(((e
 	exports.prerenderToNodeStream = function(children, options) {
 		return new Promise(function(resolve, reject) {
 			var resumableState = createResumableState(options ? options.identifierPrefix : void 0, options ? options.unstable_externalRuntimeSrc : void 0, options ? options.bootstrapScriptContent : void 0, options ? options.bootstrapScripts : void 0, options ? options.bootstrapModules : void 0), request = createPrerenderRequest(children, resumableState, createRenderState(resumableState, void 0, options ? options.unstable_externalRuntimeSrc : void 0, options ? options.importMap : void 0, options ? options.onHeaders : void 0, options ? options.maxHeadersLength : void 0), createRootFormatContext(options ? options.namespaceURI : void 0), options ? options.progressiveChunkSize : void 0, options ? options.onError : void 0, options ? options.onBrowserBailout : void 0, function() {
-				var readable = new stream.Readable({ read: function() {
+				var readable = new stream$1.Readable({ read: function() {
 					startFlowing(request, writable);
 				} }), writable = createFakeWritableFromReadable(readable);
 				readable = {
@@ -17995,7 +17991,7 @@ var require_react_dom_server_node_production = /* @__PURE__ */ __commonJSMin(((e
 	exports.resumeAndPrerenderToNodeStream = function(children, postponedState, options) {
 		return new Promise(function(resolve, reject) {
 			var request = resumeAndPrerenderRequest(children, postponedState, createRenderState(postponedState.resumableState, void 0, void 0, void 0, void 0, void 0), options ? options.onError : void 0, options ? options.onBrowserBailout : void 0, function() {
-				var readable = new stream.Readable({ read: function() {
+				var readable = new stream$1.Readable({ read: function() {
 					startFlowing(request, writable);
 				} }), writable = createFakeWritableFromReadable(readable);
 				readable = {
@@ -18141,4 +18137,4 @@ var renderRouterToStream = async ({ request, router, responseHeaders, children }
 	}
 };
 //#endregion
-export { createInlineCssPlaceholderAsset as A, createSieveCache as B, createPlugin as C, isStream as D, fromJSON as E, resolveManifestCssLink as F, isRedirect as G, isDangerousProtocol as H, waitForReason as I, isNotFound as J, parseRedirect as K, _getRenderedMatches as L, getScriptPreloadAttrs as M, getStylesheetHref as N, toCrossJSONAsync as O, resolveManifestAssetLink as P, executeRewriteInput as R, require_jsx_runtime as S, crossSerializeStream as T, isPromise as U, decodePath as V, dehydrateSsrMatchId as W, require_react as Y, lazyRouteComponent as _, disposeSsrResponse as a, useNavigate as b, replaceSsrResponse as c, GLOBAL_TSR as d, Scripts as f, Outlet as g, createRouter as h, defineHandlerCallback as i, createInlineCssStyleAsset as j, toCrossJSONStream as k, stripSsrResponseBody as l, RouterProvider as m, require_react_dom as n, isSsrResponse as o, HeadContent as p, rootRouteId as q, bindSsrResponseToRequest as r, normalizeSsrResponse as s, renderRouterToStream as t, createHydrationScripts as u, createFileRoute as v, createStream as w, useRouter as x, createRootRoute as y, invariant as z };
+export { toCrossJSONStream as A, invariant as B, require_jsx_runtime as C, fromJSON as D, crossSerializeStream as E, resolveManifestAssetLink as F, dehydrateSsrMatchId as G, decodePath as H, resolveManifestCssLink as I, isNotFound as J, isRedirect as K, waitForReason as L, createInlineCssStyleAsset as M, getScriptPreloadAttrs as N, isStream as O, getStylesheetHref as P, _getRenderedMatches as R, useRouter as S, createStream as T, isDangerousProtocol as U, createSieveCache as V, isPromise as W, require_react as Y, lazyRouteComponent as _, disposeSsrResponse as a, Link as b, replaceSsrResponse as c, GLOBAL_TSR as d, Scripts as f, Outlet as g, createRouter as h, defineHandlerCallback as i, createInlineCssPlaceholderAsset as j, toCrossJSONAsync as k, stripSsrResponseBody as l, RouterProvider as m, require_react_dom as n, isSsrResponse as o, HeadContent as p, rootRouteId as q, bindSsrResponseToRequest as r, normalizeSsrResponse as s, renderRouterToStream as t, createHydrationScripts as u, createFileRoute as v, createPlugin as w, useNavigate as x, createRootRoute as y, executeRewriteInput as z };
