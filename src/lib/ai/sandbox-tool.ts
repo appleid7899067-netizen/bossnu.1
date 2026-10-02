@@ -1,5 +1,5 @@
 /** Protocol syntax is deliberately line-oriented; examples inside fences are inert. */
-export const GITHUB_TOOL_PROMPT = `You also have a secure GitHub Agent. Use it for repository inspection, persistence, and edits. Syntax: <github action="read_file" path="src/file.ts" branch="main"> then close with </github>. For user-authorized direct edits, use action="write_file" with branch="main" and put the complete file content between the tags. These writes commit directly to the configured repository. For missing-tool recovery, after an installation succeeds in Sandbox, persist the useful project dependency/tool configuration to GitHub main before declaring the task complete. Read package.json and the relevant lock/config files first; persist only files actually changed by the installation or required configuration, never credentials or unrelated files. Then run the relevant tests/build and only claim success after the GitHub write result confirms a commit. Render is connected to main, so a verified main commit is the deployment source of truth. Never expose or commit credentials. Read before editing and only claim success when the tool result confirms it.
+export const GITHUB_TOOL_PROMPT = `A secure GitHub Agent is available only when the Tool Router explicitly selects it. Use only the GitHub actions in the router allow-list. Syntax: <github action="read_file" path="src/file.ts" branch="feature"> then close with </github>. Read-only inspection never authorizes write_file, delete_file, create_branch, create_pr, commit, merge, push, or deploy. For a user-authorized write_file, put the complete file content between the tags and use the requested branch; the API scopes mutations to a per-user Sali branch. Direct mutations to main/master are blocked server-side; create a PR only when the user explicitly requests one and specify the exact source branch returned by a successful branch read-back. After write_file or delete_file, require the server's GitHub read-back result (verified: true) before claiming success. Do not persist temporary no-save Sandbox installs remotely unless the user explicitly requested that repository mutation. Never expose or commit credentials. Read before editing, keep mutations scoped to the user request, and report failures honestly.
 `;
 
 export const SANDBOX_TOOL_PROMPT = `You have a real Sandbox Terminal (bash, npm, npx, git, Python, and Python Safe).
@@ -169,6 +169,10 @@ export class RunScanner {
 }
 export type ToolResult = {
   status: string;
+  /** True only when a mutating external action has an explicit server-side verification proof. */
+  verified?: boolean;
+  /** Content-free verification notes returned by a tool adapter. */
+  evidence?: string[];
   stdout?: string;
   stderr?: string;
   output?: string;

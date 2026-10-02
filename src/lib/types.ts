@@ -6,6 +6,7 @@ export type ChatActivity =
   | { id: string; kind: "phase"; phase: string; label: string; createdAt: number }
   | { id: string; kind: "command"; runtime: string; command: string; status: string; output?: string; previewUrl?: string | null; exitCode?: number | null; durationMs?: number; sync?: { verified: boolean; complete: boolean; added?: number; modified?: number; deleted?: number; expectedCount?: number; error?: string }; createdAt: number }
   | { id: string; kind: "files"; files: { path: string; action: "added" | "modified" | "deleted" | "renamed"; from?: string }[]; createdAt: number }
+  | { id: string; kind: "evidence"; tool: "sandbox" | "github"; stage: "execution" | "auto-install"; action: string; what: string; where: string[]; result: string; evidence: string[]; status: "verified" | "failed" | "unverified"; createdAt: number }
   | { id: string; kind: "skill"; path: string; status: "saved" | "failed"; createdAt: number }
   | { id: string; kind: "stream"; source: "puter" | "sandbox" | "agent"; status: "running" | "done" | "error"; text?: string; chars?: number; createdAt: number };
 export type ChatMessage = { id: string; role: "user" | "assistant"; content: string; thinking?: string; attachments?: ChatAttachment[]; activities?: ChatActivity[]; createdAt: number; };

@@ -340,6 +340,10 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
   font-size: 10px;
 }
 
+.sali-summary-mark.is-failed {
+  color: var(--color-danger);
+}
+
 .sali-summary-body {
   min-width: 0;
   padding: 9px 11px 10px;

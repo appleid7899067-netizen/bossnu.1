@@ -27,26 +27,30 @@ export type EvidenceInput = {
 export type EvidenceVerdict = { passed: boolean; reasons: string[] };
 
 /**
- * A run passes only when the command really succeeded AND (when a persistent
- * workspace is in use) Neon was read back and matches the sandbox exactly.
+ * A run passes only when the command really succeeded AND returned exit 0
+ * AND (when a persistent workspace is in use) Neon read-back matches exactly.
  */
 export function evaluateEvidence(result: EvidenceInput, opts: { requireWorkspace: boolean }): EvidenceVerdict {
   const reasons: string[] = [];
   if (result.status !== "success") reasons.push(`สถานะการรันคือ "${result.status}" ไม่ใช่ success`);
-  if (typeof result.exitCode === "number" && result.exitCode !== 0) reasons.push(`exit code = ${result.exitCode}`);
+  if (result.exitCode == null) reasons.push("ไม่มี exit code จาก Sandbox จึงยืนยันผลการรันไม่ได้");
+  else if (result.exitCode !== 0) reasons.push(`exit code = ${result.exitCode}`);
   if (result.error) reasons.push(`error: ${String(result.error).slice(0, 200)}`);
+
   const emptyHtmlFiles = result.workspaceIntegrity?.emptyHtmlFiles ?? [];
   if (emptyHtmlFiles.length) reasons.push(`HTML file ถูกสร้างไม่ครบ เหลือเพียง <!doctype html>: ${emptyHtmlFiles.slice(0, 5).join(", ")}`);
-  if (result.language === "html" || /(?:^|\\s)(?:html|\.html)\\b/i.test(result.command ?? "")) {
-    const htmlFiles = (result.workspaceFiles ?? []).filter(file => /\\.html?$/i.test(file.path));
+  const isHtmlTask = result.language === "html" || /(?:^|\s)(?:html|\.html)\b/i.test(result.command ?? "");
+  if (isHtmlTask) {
+    const htmlFiles = (result.workspaceFiles ?? []).filter(file => /\.html?$/i.test(file.path));
     if (htmlFiles.length) {
       const blank = htmlFiles.filter(file => {
-        const source = String(file.content ?? "").replace(/<!--[\\s\\S]*?-->/g, "").trim();
-        return !/<(?:body|main|div|section|canvas|svg|button|h[1-6]|p|script|style)\\b/i.test(source) && source.length < 180;
+        const source = String(file.content ?? "").replace(/<!--[\s\S]*?-->/g, "").trim();
+        return !/<(?:body|main|div|section|canvas|svg|button|h[1-6]|p|script|style)\b/i.test(source) && source.length < 180;
       });
       if (blank.length) reasons.push(`HTML Preview ว่างหรือไม่มีเนื้อหาที่แสดงผล: ${blank.slice(0, 3).map(file => file.path).join(", ")}`);
     }
   }
+
   if (opts.requireWorkspace) {
     const sync = result.workspaceSync;
     if (!sync) reasons.push("ไม่มีหลักฐาน Neon Sync จากการรันนี้");
@@ -92,7 +96,8 @@ export function gateMessage(reasons: string[], attempt: number, runsLeft: number
     "If the repair and verification need separate commands, use separate <run> blocks: first edit/fix, then run the repaired target and inspect its real output.",
     "Do not merely explain the error, suggest a fix, or ask the user to fix it. Perform the fix in Sandbox when a run is available.",
     reasons.some((r) => r.includes("HTML file ถูกสร้างไม่ครบ"))
-      ? "HTML REPAIR: the generated file contains only the doctype. Regenerate the COMPLETE intended HTML from the original goal/context, write the full content with a safe file-write method (prefer Sandbox file APIs or printf/base64 over heredoc), then run/preview the repaired file and verify its real contents. Never repeat the empty/truncated write." : "",
+      ? "HTML REPAIR: the generated file contains only the doctype. Regenerate the COMPLETE intended HTML from the original goal/context, write the full content with a safe file-write method (prefer Sandbox file APIs or printf/base64 over heredoc), then run/preview the repaired file and verify its real contents. Never repeat the empty/truncated write."
+      : "",
     "Do not claim success from a command being issued or from text such as VERIFIED: true. Success requires the actual run evidence.",
     runsLeft > 0
       ? `You have ${runsLeft} sandbox run(s) left. Use the next run for the repair and verification.`

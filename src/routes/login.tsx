@@ -10,7 +10,7 @@ function LoginPage() {
   const { user, isPending } = useCurrentUserState();
 
   if (isPending) return null;
-  if (user) return <Navigate to="/" />;
+  if (user) return <Navigate to="/" search={{ view: "chat" }} />;
 
   return (
     <main className="grid min-h-dvh place-items-center bg-bg px-4 text-fg">

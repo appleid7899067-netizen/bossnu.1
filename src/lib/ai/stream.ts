@@ -77,7 +77,15 @@ export async function enrichMediaContext(messages: { role: "user" | "assistant";
         analyses.push("AUDIO TRANSCRIPT [" + file.name + "]:\\n" + (text.trim() || "[ไม่มีข้อความที่ตรวจพบ]"));
       } else {
         const result = await puter.ai.chat("วิเคราะห์รูปภาพนี้เพื่อช่วยตอบผู้ใช้ ระบุสิ่งที่เห็น ข้อความสำคัญ และรายละเอียดที่เกี่ยวข้องแบบกระชับ", file.content, { model: "gemini-3.8-flash", stream: false, normalize: true });
-        const text = typeof result === "string" ? result : String((result as Record<string, unknown>)?.message?.content ?? (result as Record<string, unknown>)?.text ?? result);
+        const response = asRecord(result);
+        const message = asRecord(response.message);
+        const text = typeof result === "string"
+          ? result
+          : typeof message.content === "string"
+            ? message.content
+            : typeof response.text === "string"
+              ? response.text
+              : "";
         analyses.push("IMAGE ANALYSIS [" + file.name + "]:\\n" + text.trim());
       }
     } catch (error) {

@@ -60,6 +60,34 @@ async function ensureBranch(repo: string, branch: string) {
   });
 }
 
+type GithubFile = { content: string; sha: string };
+
+async function readGithubFileOrNull(repo: string, path: string, branch: string): Promise<GithubFile | null> {
+  const { token } = config();
+  const response = await fetch(API + `/repos/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "bossnu-sali-agent",
+    },
+  });
+  if (response.status === 404) return null;
+  const text = await response.text();
+  let data: Record<string, unknown>;
+  try { data = text ? JSON.parse(text) as Record<string, unknown> : {}; }
+  catch { throw new Error("GitHub returned an unreadable file response"); }
+  if (!response.ok) {
+    const message = typeof data.message === "string" ? data.message : `GitHub contents API HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  const encoded = typeof data.content === "string" ? data.content.replace(/\s/g, "") : "";
+  return {
+    content: encoded ? Buffer.from(encoded, "base64").toString("utf8") : "",
+    sha: typeof data.sha === "string" ? data.sha : "",
+  };
+}
+
 export type GithubAgentCall = {
   action: "list" | "read_file" | "write_file" | "delete_file" | "create_branch" | "create_pr";
   path?: string;
@@ -82,23 +110,24 @@ export async function executeGithubAgent(call: GithubAgentCall) {
   if (call.action === "read_file") {
     const path = safePath(call.path || "");
     const branch = safeBranch(call.branch || await defaultBranch(repo));
-    const data = await gh(`/repos/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`);
-    const encoded = typeof data.content === "string" ? data.content.replace(/\\s/g, "") : "";
-    const content = encoded ? Buffer.from(encoded, "base64").toString("utf8") : "";
-    return { action: call.action, repo, branch, path, content: content.slice(0, 100000), sha: String(data.sha || "") };
+    const file = await readGithubFileOrNull(repo, path, branch);
+    if (!file) throw new Error("ไม่พบไฟล์บน branch นี้");
+    return { action: call.action, repo, branch, path, content: file.content.slice(0, 100000), sha: file.sha };
   }
 
   if (call.action === "create_branch") {
     const branch = safeBranch(call.branch);
     await ensureBranch(repo, branch);
-    return { action: call.action, repo, branch };
+    const ref = await gh(`/repos/${repo}/git/ref/heads/${encodeURIComponent(branch)}`);
+    const sha = String((ref.object as Record<string, unknown>)?.sha || "");
+    return { action: call.action, repo, branch, sha, verified: Boolean(sha), evidence: sha ? "GitHub ref read-back confirmed the branch and its commit SHA" : "GitHub branch ref did not include a commit SHA" };
   }
 
   if (call.action === "write_file" || call.action === "delete_file") {
     const path = safePath(call.path || "");
     const branch = safeBranch(call.branch);
     await ensureBranch(repo, branch);
-    const current = await gh(`/repos/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`).catch(() => null);
+    const current = await readGithubFileOrNull(repo, path, branch);
     if (call.action === "write_file") {
       if (typeof call.content !== "string") throw new Error("write_file ต้องมี content");
       const payload: Record<string, unknown> = {
@@ -108,14 +137,35 @@ export async function executeGithubAgent(call: GithubAgentCall) {
       };
       if (current && typeof current.sha === "string") payload.sha = current.sha;
       const data = await gh(`/repos/${repo}/contents/${encodeURIComponent(path)}`, { method: "PUT", body: JSON.stringify(payload) });
-      return { action: call.action, repo, branch, path, commit: (data.commit as any)?.sha || null, sha: data.content ? (data.content as any).sha : null };
+      const readBack = await readGithubFileOrNull(repo, path, branch);
+      const verified = readBack?.content === call.content;
+      return {
+        action: call.action,
+        repo,
+        branch,
+        path,
+        commit: (data.commit as any)?.sha || null,
+        sha: data.content ? (data.content as any).sha : null,
+        verified,
+        evidence: verified ? "GitHub contents API read-back exactly matched the written content" : "GitHub contents API read-back did not match the written content",
+      };
     }
     if (!current || typeof current.sha !== "string") throw new Error("ไม่พบไฟล์บน branch นี้");
     const data = await gh(`/repos/${repo}/contents/${encodeURIComponent(path)}`, {
       method: "DELETE",
       body: JSON.stringify({ message: `sali: delete ${path}`, sha: current.sha, branch }),
     });
-    return { action: call.action, repo, branch, path, commit: (data.commit as any)?.sha || null };
+    const readBack = await readGithubFileOrNull(repo, path, branch);
+    const verified = readBack === null;
+    return {
+      action: call.action,
+      repo,
+      branch,
+      path,
+      commit: (data.commit as any)?.sha || null,
+      verified,
+      evidence: verified ? "GitHub contents API confirmed the file is absent after deletion" : "GitHub contents API still returned the file after deletion",
+    };
   }
 
   if (call.action === "create_pr") {
@@ -123,8 +173,28 @@ export async function executeGithubAgent(call: GithubAgentCall) {
     const base = safeBranch(call.base || await defaultBranch(repo));
     const title = (call.title || "Sali Agent changes").slice(0, 180);
     const body = (call.body || "Changes created and verified by Sali Agent.").slice(0, 10000);
-    const data = await gh(`/repos/${repo}/pulls`, { method: "POST", body: JSON.stringify({ title, head, base, body }) });
-    return { action: call.action, repo, number: data.number, url: data.html_url, head, base };
+    const created = await gh(`/repos/${repo}/pulls`, { method: "POST", body: JSON.stringify({ title, head, base, body }) });
+    const number = typeof created.number === "number" ? created.number : null;
+    if (number === null) {
+      return { action: call.action, repo, number: created.number, url: created.html_url, head, base, verified: false, evidence: "GitHub did not return a pull request number" };
+    }
+    const readBack = await gh(`/repos/${repo}/pulls/${number}`);
+    const readBackHead = readBack.head && typeof readBack.head === "object" ? (readBack.head as Record<string, unknown>).ref : undefined;
+    const readBackBase = readBack.base && typeof readBack.base === "object" ? (readBack.base as Record<string, unknown>).ref : undefined;
+    const readBackUrl = typeof readBack.html_url === "string" ? readBack.html_url : "";
+    const verified = readBack.number === number && readBackHead === head && readBackBase === base && readBack.state === "open" && Boolean(readBackUrl);
+    return {
+      action: call.action,
+      repo,
+      number,
+      url: readBackUrl || created.html_url,
+      head,
+      base,
+      verified,
+      evidence: verified
+        ? "GitHub pull-request read-back confirmed the PR number, URL, head, base, and open state"
+        : "GitHub pull-request read-back did not match the requested head/base or open state",
+    };
   }
 
   throw new Error("ไม่รองรับ GitHub action นี้");

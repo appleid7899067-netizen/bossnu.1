@@ -9,7 +9,6 @@ import { ensureDbReady, getPglite } from "../db";
 import { emailAndPasswordEnabled } from "./email-password";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
 import { pgliteDialect } from "./pglite-dialect";
-import { PREVIEW_ALLOWED_HOSTS } from "./preview";
 
 // Kick (and share) PGLite bootstrap as soon as the auth server module loads.
 void ensureDbReady();
@@ -34,14 +33,9 @@ const env = (key: string): string | undefined => {
   return value ? value : undefined;
 };
 
-// Explicit off-switch. The deployer sets `VITE_AUTH_ENABLED=true` when it
-// provisions auth; set it to "false" to force auth off everywhere (dev user).
-const authDisabled = env("VITE_AUTH_ENABLED") === "false";
-
-// Broker federation creds: the deployer injects a per-app client when deployed;
-// otherwise fall back to the shared live-preview client, which the broker accepts
-// for any `*.grok-sandbox.com` callback (see `./preview`).
-/** Native Google/Grok upstreams are disabled. Puter owns browser authentication. */
+// Native Better Auth social providers are disabled; Puter owns browser sign-in.
+// Gate identities still receive a server-verified Better Auth session through
+// `gateIdentitySessions()` below.
 export const authConfigured = false;
 
 const databaseUrl = env("DATABASE_URL");
@@ -65,19 +59,6 @@ export const SESSION_TOKEN_COOKIE = "__Host-grok-auth.session_token";
 // Built separately so the `betterAuth({...})` call stays easy to edit without
 // breaking brackets (models often trip on the conditional plugin spread).
 export const auth = betterAuth({
-  ...(authConfigured
-    ? {
-        socialProviders: {
-          google: {
-            clientId: googleClientId as string,
-            clientSecret: googleClientSecret as string,
-            prompt: "select_account",
-            accessType: "offline",
-          },
-        },
-      }
-    : {}),
-
   baseURL: env("BETTER_AUTH_URL"),
   // Deployed apps inject BETTER_AUTH_SECRET. Preview: process-stable secret on
   // globalThis so HMR doesn't invalidate PGLite-backed sessions (see above).

@@ -14,16 +14,29 @@ import { isMigrationFile, migrationName, pendingMigrations } from "./migration-p
 import { projectRoot } from "./with-app-env.mjs";
 
 const AUTH_MIGRATION = "0001_auth.sql";
+const AUTH_SCHEMA_COPY = "0002_auth_schema.sql";
+
+function normalizeSql(sql) {
+  return sql
+    .split(/\r?\n/)
+    .filter((line) => !line.trimStart().startsWith("--"))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 /**
- * The auth-on copy of the Better Auth schema and its source, or null when the
- * app has not turned sign-in on (the shipped state).
+ * The active workspace's top-level production schema and its canonical source,
+ * normalized to compare SQL rather than their explanatory comments.
  */
 function authSchemaCopy(root) {
-  const copy = join(root, "migrations", AUTH_MIGRATION);
+  const copy = join(root, "migrations", AUTH_SCHEMA_COPY);
   const source = join(root, "migrations/auth", AUTH_MIGRATION);
   if (!existsSync(copy) || !existsSync(source)) return null;
-  return { copy: readFileSync(copy, "utf8"), source: readFileSync(source, "utf8") };
+  return {
+    copy: normalizeSql(readFileSync(copy, "utf8")),
+    source: normalizeSql(readFileSync(source, "utf8")),
+  };
 }
 
 test("_migrations keys on basename, not path", () => {
@@ -56,38 +69,39 @@ test("non-.sql entries are dropped (readdir also yields the auth/ directory)", (
   assert.deepEqual(pendingMigrations(["auth", "README.md"], []), []);
 });
 
-test("the auth schema ships outside the globbed directory", () => {
+test("the canonical auth schema stays nested and one production copy is globbed", () => {
   const migrationsDir = join(projectRoot(), "migrations");
-  // App migrations (e.g. 999_boss_workspace.sql) may live here; the auth
-  // schema must not, or it would run twice under different basenames.
   const topLevel = pendingMigrations(readdirSync(migrationsDir), []).map((m) => m.name);
-  assert.ok(!topLevel.some((name) => /auth/i.test(name)), `auth schema leaked into globbed dir: ${topLevel}`);
-  assert.ok(readdirSync(join(migrationsDir, "auth")).includes("0001_auth.sql"));
+  const authMigrations = topLevel.filter((name) => /auth/i.test(name));
+
+  assert.deepEqual(authMigrations, [AUTH_SCHEMA_COPY]);
+  assert.ok(readdirSync(join(migrationsDir, "auth")).includes(AUTH_MIGRATION));
 });
 
-test("this workspace's auth schema copy is byte-identical to its source", () => {
-  // An edited copy diverges silently: basename keying skips it on a database
-  // that already ran the original, and applies it on a fresh PGLite preview.
+test("this workspace's production auth migration matches the canonical source SQL", () => {
   const pair = authSchemaCopy(projectRoot());
-  if (pair === null) return; // sign-in off — nothing has been copied up
+  assert.ok(pair, "the configured auth-on workspace must ship its production schema copy");
   assert.equal(
     pair.copy,
     pair.source,
-    "migrations/0001_auth.sql has been edited — it must stay a verbatim copy of migrations/auth/0001_auth.sql",
+    "migrations/0002_auth_schema.sql has drifted from migrations/auth/0001_auth.sql",
   );
 });
 
-test("the copy check reads both files and catches an edit", () => {
+test("the production-copy check reads both files and catches schema drift", () => {
   const root = mkdtempSync(join(tmpdir(), "auth-schema-"));
   mkdirSync(join(root, "migrations/auth"), { recursive: true });
   writeFileSync(join(root, "migrations/auth", AUTH_MIGRATION), "create table t ();\n");
   assert.equal(authSchemaCopy(root), null);
 
-  writeFileSync(join(root, "migrations", AUTH_MIGRATION), "create table t ();\n");
+  writeFileSync(
+    join(root, "migrations", AUTH_SCHEMA_COPY),
+    "-- deployed copy\ncreate table t ();\n",
+  );
   const same = authSchemaCopy(root);
   assert.equal(same.copy, same.source);
 
-  writeFileSync(join(root, "migrations", AUTH_MIGRATION), "create table t (x int);\n");
+  writeFileSync(join(root, "migrations", AUTH_SCHEMA_COPY), "create table t (x int);\n");
   const drifted = authSchemaCopy(root);
   assert.notEqual(drifted.copy, drifted.source);
 });
