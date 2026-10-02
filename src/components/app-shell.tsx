@@ -200,16 +200,15 @@ export function AppShell({ search }: { search: Search }) {
     };
     const cleanWorkspaceLinks = (value: string) => value
       // Keep generated work inside Bossnu. Never expose local server URLs or launch commands.
-      .replace(/https?:\\/\\/localhost(?::\\d+)?\\/[^\\s)\\]]*/gi, "")
-      .replace(/เปิดที่\\s*:\\s*https?:\\/\\/localhost(?::\\d+)?[^\\n]*/gi, "เปิดดูได้จาก Live Preview ใน Bossnu")
-      .replace(/เปิดเซิร์ฟเวอร์[^\\n]*(?:\\n|$)/gi, "")
-      .replace(/<run\\b[^>]*>[\\s\\S]*?<\\/run>/gi, "")
-      .replace(/<\\/?run\\b[^>]*>/gi, "")
-      // Tool/server implementation details should stay in the activity layer, not the chat bubble.
-      .replace(/(?:python3?|node|npx)\\s+-m\\s+http\\.server[^\\n]*/gi, "")
-      .replace(/Server running at\\s+https?:\\/\\/localhost[^\\n]*/gi, "")
-      .replace(/(?:cd\\s+[^\\n]*project[^\\n]*&&\\s*)?(?:node|python3?|npx)\\s+-e\\s+[\\s\\S]*?server\\.listen\\([^\\n]*/gi, "")
-      .replace(/(?:\\r?\\n){3,}/g, "\\n\\n")
+      .replace(/https?:\/\/localhost(?::\d+)?\/[^\s)\]]*/gi, "")
+      .replace(/เปิดที่\s*:\s*https?:\/\/localhost(?::\d+)?[^\n]*/gi, "เปิดดูได้จาก Live Preview ใน Bossnu")
+      .replace(/เปิดเซิร์ฟเวอร์[^\n]*(?:\n|$)/gi, "")
+      .replace(/<run\b[^>]*>[\s\S]*?<\/run>/gi, "")
+      .replace(/<\/?run\b[^>]*>/gi, "")
+      .replace(/(?:python3?|node|npx)\s+-m\s+http\.server[^\n]*/gi, "")
+      .replace(/Server running at\s+https?:\/\/localhost[^\n]*/gi, "")
+      .replace(/(?:cd\s+[^\n]*project[^\n]*&&\s*)?(?:node|python3?|npx)\s+-e\s+[\s\S]*?server\.listen\([^\n]*/gi, "")
+      .replace(/(?:\r?\n){3,}/g, "\n\n")
       .trim();
     const flushReplyNow = () => {
       if (replyTimer !== null) {
