@@ -41,7 +41,7 @@ export function formatBytes(bytes: number) {
 
 export type AttachmentResult = { added: ChatAttachment[]; errors: string[] };
 
-/** Reads user-picked files as text, enforcing a 25 MB per-file limit. */
+/** Reads text, image and audio attachments, enforcing existing size limits. */
 export async function readAttachments(files: Iterable<File>, existing: ChatAttachment[]): Promise<AttachmentResult> {
   const added: ChatAttachment[] = [];
   const errors: string[] = [];
