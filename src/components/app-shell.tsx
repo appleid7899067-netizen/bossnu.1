@@ -329,6 +329,7 @@ export function AppShell({ search }: { search: Search }) {
                   command: call.command,
                   status: "Preview พร้อมแล้ว",
                   previewHtml: sandboxPreviewDocument("html", html),
+                  previewPath: htmlPath,
                 });
                 append(`เปิด Live Preview: ${htmlPath}\\n\\n`);
               } else {
@@ -887,6 +888,7 @@ ${message}`); toast.error(message); }
                 messages={activeChat?.messages ?? []}
                 streamingId={streamingId}
                 sandboxRun={sandboxRun}
+                workspaceId={agentWorkspaceIdFor(currentUser?.id, search.c ?? "default")}
                 busy={busyChat}
                 onDeleteMessage={(messageId) => { if (activeChat) store.deleteMessage(activeChat.id, messageId); }}
                 onEditMessage={editAndResend}
