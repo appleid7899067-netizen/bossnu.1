@@ -406,7 +406,7 @@ export function Composer({
             </button>
           ) : null}
           {onSendToGpt ? (
-            <button type="button" aria-label="ส่งงานให้ GPT" title="ส่งงานนี้ให้ GPT ตรวจและทำต่อ" onClick={onSendToGpt} disabled={disabled || !hasContent || busy} className="grid size-10 shrink-0 place-items-center rounded-xl text-muted transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-40">
+            <button type="button" aria-label="ส่งงานให้ GPT" title="ส่งงานนี้ให้ GPT ตรวจและทำต่อ" onClick={onSendToGpt} disabled={disabled || busy} className="grid size-10 shrink-0 place-items-center rounded-xl text-muted transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-40">
               <span className="text-[11px] font-bold tracking-tight">GPT</span>
             </button>
           ) : null}
