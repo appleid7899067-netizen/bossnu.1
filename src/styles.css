@@ -1347,3 +1347,72 @@ html[data-theme="dark"] .sali-result-output {
 @media (prefers-reduced-motion:reduce){
   .sali-command-live-dot{animation:none}
 }
+
+/* ================================================================
+   BOSSNU / SALI 2026 — unified command-center UI
+   Content first • one workspace • compact chrome • mobile first
+   ================================================================ */
+:root{
+  --sali-sidebar:224px;
+  --sali-glow:color-mix(in srgb,var(--color-primary) 18%,transparent);
+}
+body{background:var(--color-bg)}
+button,input,textarea,select{-webkit-tap-highlight-color:transparent}
+aside{
+  width:var(--sali-sidebar)!important;
+  background:color-mix(in srgb,var(--color-bg) 94%,var(--color-primary) 6%)!important;
+  border-color:color-mix(in srgb,var(--color-border) 72%,transparent)!important;
+}
+aside>div:first-child{padding:14px 14px 10px!important}
+aside nav{margin-top:10px!important;padding-inline:10px!important}
+aside nav button,aside nav a{
+  height:38px!important;border-radius:11px!important;font-size:12.5px!important;gap:9px!important
+}
+aside nav button svg,aside nav a svg{width:15px!important;height:15px!important}
+aside .accent-gradient{
+  height:40px!important;border-radius:11px!important;font-size:12.5px!important;
+  box-shadow:0 8px 28px var(--sali-glow)!important
+}
+aside input[type=search]{height:34px!important;border-radius:10px!important;font-size:12px!important}
+aside .group.relative>button:first-child{min-height:36px!important;padding-block:7px!important;font-size:12px!important}
+.chat-scroll{
+  background:radial-gradient(900px 420px at 50% -180px,var(--sali-glow),transparent 65%),var(--color-bg)!important
+}
+.chat-scroll>div{max-width:980px!important;padding-inline:18px!important;gap:20px!important}
+.sali-command-center{
+  border-radius:22px!important;padding:28px!important;
+  border:1px solid color-mix(in srgb,var(--color-border) 68%,transparent)!important;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--color-surface) 96%,var(--color-primary) 4%),var(--color-surface))!important;
+  box-shadow:0 24px 80px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.035)
+}
+.sali-command-copy h1{font-size:clamp(24px,4vw,38px)!important;letter-spacing:-.035em!important}
+.sali-command-copy p{font-size:12.5px!important;color:var(--color-muted)!important}
+.sali-command-flow{display:flex!important;flex-wrap:wrap!important;gap:5px!important;margin-top:22px!important}
+.sali-command-step{font-size:9px!important;letter-spacing:.08em!important}
+.sali-command-step i{opacity:.3;margin-inline:3px!important}
+.sali-command-step b{
+  border:1px solid color-mix(in srgb,var(--color-primary) 22%,var(--color-border))!important;
+  background:color-mix(in srgb,var(--color-primary) 5%,var(--color-surface))!important;
+  border-radius:999px!important;padding:5px 7px!important
+}
+.chat-scroll .assistant-prose{font-size:13px!important;line-height:1.72!important}
+.sali-devlog,.sali-summary{
+  border-radius:14px!important;
+  border-color:color-mix(in srgb,var(--color-primary) 18%,var(--color-border))!important;
+  background:color-mix(in srgb,var(--color-surface) 96%,var(--color-primary) 4%)!important
+}
+.sali-devlog{box-shadow:0 12px 40px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.025)}
+form:has(textarea){border-radius:20px!important}
+textarea{font-size:13px!important;line-height:1.55!important}
+.card-lift,.aurora{border-radius:15px}
+@media(max-width:767px){
+  aside{width:min(86vw,310px)!important}
+  .chat-scroll>div{padding:12px 10px 116px!important;gap:15px!important}
+  .sali-command-center{padding:20px!important;border-radius:18px!important}
+  .sali-command-copy h1{font-size:25px!important}
+  .sali-command-flow{gap:4px!important;max-height:64px;overflow:hidden}
+  .sali-command-step{font-size:8px!important}
+  .chat-scroll .assistant-prose{font-size:12.5px!important}
+  .sali-devlog{font-size:11px!important}
+}
+@media(pointer:coarse){button{min-height:36px}}
