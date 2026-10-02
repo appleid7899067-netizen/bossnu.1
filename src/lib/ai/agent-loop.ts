@@ -266,6 +266,9 @@ export async function runAgentLoop(opts: {
       core.context(goal),
       `Run budget: ${Math.max(0, max - count)} of ${max} sandbox runs left.`,
       "Rule: use tools when needed, observe their real output, fix failures, and do not claim completion before verification.",
+      "Intent correction: silently correct obvious natural-language typos, spacing mistakes, and misspellings while preserving the intended meaning. Never alter literal code, shell commands, file paths, URLs, package names, model IDs, API names, or quoted text. If the intended target is ambiguous, ask instead of guessing.",
+      "Missing-tool recovery: if a requested command fails because a required executable, package, runtime, CLI, or dependency is missing, do not stop at the error. Inspect the real error, identify the missing tool from evidence, install the required tool/dependency in the current workspace using the appropriate package manager when safe (for example npm/pnpm/yarn/bun/pip/apt only when available and appropriate), then rerun the original command and verify the real exit code/output. Do not install unrelated packages, and do not claim installation succeeded until the install command itself succeeds.",
+
       gating
         ? "REPAIR MODE IS ACTIVE: the next model response MUST contain at least one executable <run> action. That action must perform the repair/edit in the workspace, then a later <run> must execute the repaired target and verify the real result. Prose alone is rejected."
         : "",
