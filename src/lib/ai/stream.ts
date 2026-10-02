@@ -20,6 +20,17 @@ function isGithubHealthIntent(input: string) {
     || /(?:read|write|commit|verify|cleanup).*(?:github)/i.test(normalized);
 }
 
+async function runLiveWebSearch(query: string, signal?: AbortSignal) {
+  const response = await fetch("/api/web-search", { method: "POST", credentials: "include", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify({ query }), signal });
+  const data = await response.json().catch(() => null) as Record<string, unknown> | null;
+  if (!response.ok || data?.ok !== true) throw new Error(typeof data?.error === "string" ? data.error : `Web search HTTP ${response.status}`);
+  return data;
+}
+
+function shouldUseLiveWeb(query: string) {
+  return /(?:ล่าสุด|เรียล.?ไทม์|ตอนนี้|วันนี้|เมื่อกี้|ข่าว|ราคา|หุ้น|คริปโต|สภาพอากาศ|พยากรณ์|ตาราง|คะแนน|ผลแข่ง|กำลังเกิด|current|latest|today|now|live|real[- ]?time|news|price|stock|weather|score|schedule|recent|search|ค้นหา|เช็คเว็บ|ตรวจเว็บ|บนเว็บ)/i.test(query);
+}
+
 async function runGithubHealth(signal?: AbortSignal) {
   const response = await fetch("/api/github/health", {
     method: "POST",
@@ -175,6 +186,22 @@ export async function streamChat(opts: {
       return;
     }
 
+    let liveWebContext = "";
+    let liveWebSources: Array<{ title: string; url: string }> = [];
+    if (opts.tools && shouldUseLiveWeb(latestUser)) {
+      try {
+        opts.onEvent({ type: "thinking", text: "🌐 Live Web • กำลังดึงข้อมูลล่าสุด..." });
+        const web = await runLiveWebSearch(latestUser, opts.signal);
+        if (web.searched && typeof web.answer === "string" && web.answer.trim()) {
+          liveWebContext = `LIVE WEB RESULTS (retrieved ${String(web.retrievedAt ?? new Date().toISOString())}):\n${web.answer}`;
+          liveWebSources = Array.isArray(web.results) ? web.results.filter((item): item is { title: string; url: string } => Boolean(item && typeof item.title === "string" && typeof item.url === "string")).slice(0, 8) : [];
+          opts.onEvent({ type: "thinking", text: `🌐 Live Web • พบ ${liveWebSources.length} แหล่งข้อมูล` });
+        }
+      } catch {
+        opts.onEvent({ type: "thinking", text: "🌐 Live Web • ดึงเว็บไม่สำเร็จ จึงตอบต่อจากโมเดล" });
+      }
+    }
+
     const puter = await ensurePuterSignedIn();
     if (opts.signal?.aborted) return;
 
@@ -201,6 +228,7 @@ export async function streamChat(opts: {
       learnedSkills ? `ทักษะจากโค้ดที่เคยทดสอบผ่าน:\n${learnedSkills}` : "ยังไม่มีทักษะโค้ดที่ทดสอบผ่าน",
       "ห้ามอ้างว่าทำสิ่งที่ยังไม่ได้ทำจริง",
       buildSkillContext(latestUser),
+      liveWebContext ? `ข้อมูลจาก Live Web ที่ดึงมาแล้ว ห้ามแต่งเติมข้อเท็จจริงเกี่ยวกับข้อมูลปัจจุบันนอกแหล่งนี้:\n${liveWebContext}` : "",
       opts.tools ? SANDBOX_TOOL_PROMPT + "\n" + GITHUB_TOOL_PROMPT : "โหมดสนทนาปกติ: ตอบด้วย Puter อย่างเดียว ห้ามสร้างหรือเรียก Sandbox, terminal, GitHub หรือ tool execution",
     ].filter(Boolean).join("\n");
 
@@ -293,6 +321,9 @@ export async function streamChat(opts: {
     }
 
     if (activeBlock !== null) opts.onEvent({ type: "block_stop", index: activeBlock });
+    if (liveWebSources.length) {
+      opts.onEvent({ type: "text", text: `\n\n**แหล่งข้อมูล Live Web:**\n${liveWebSources.map(source => `- [${source.title}](${source.url})`).join("\n")}\n` });
+    }
     if (!finished) opts.onEvent({ type: "done", stopReason });
   } catch (err) {
     if (opts.signal?.aborted) return;
