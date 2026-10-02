@@ -476,7 +476,7 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
   return (
     <section aria-label="SALI live stream" className={`sali-devlog mb-3${live ? " sali-devlog-live" : " sali-devlog-done"}`}>
       <div className="sali-devlog-head">
-        <span className="sali-devlog-title">{live ? "สลี่กำลังทำงาน" : "สลี่ทำงานเสร็จแล้ว"}</span>
+        <span className="sali-devlog-title">{live ? "สลี่กำลังทำงาน" : "สลี่ทำงานเสร็จแล้ว"}</span><span className="sali-premium-badge">PREMIUM SANDBOX • E2B</span>
         <span className="sali-devlog-headline" aria-hidden="true" />
         {live ? <span className="sali-live-cursor" aria-label="กำลังทำงาน" /> : <span className="sali-summary-mark" aria-label="เสร็จแล้ว">✓</span>}
       </div>
