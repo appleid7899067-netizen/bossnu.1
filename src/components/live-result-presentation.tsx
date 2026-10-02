@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { ChatActivity } from "@/lib/types";
 
 type Props = { activities: ChatActivity[]; live: boolean };
