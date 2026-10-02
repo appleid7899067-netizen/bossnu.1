@@ -76,7 +76,7 @@ export function ChatThread({
 
   return (
     <div ref={scroller} onScroll={onScroll} className="chat-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-[#0b0712]">
-      <div className="mx-auto flex w-full max-w-[1400px] min-w-0 flex-col gap-4 px-3 py-4 sm:gap-5 sm:px-6 sm:py-5 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[980px] min-w-0 flex-col gap-4 px-3 py-4 sm:gap-5 sm:px-6 sm:py-5 lg:px-8">
         {messages.length === 0 ? (
           <section className="sali-command-center lumina-rise" aria-label="ห้องแชทหลักของสลี่">
             <div className="sali-command-orbit" aria-hidden="true"><span /><span /><span /></div>
