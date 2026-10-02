@@ -31,7 +31,8 @@ import { messageForModel } from "@/lib/attachments";
 import { conversationToMarkdown } from "@/lib/store";
 import { useAppearance } from "@/lib/use-appearance";
 import { cn, uid } from "@/lib/utils";
-import { detectSandboxInput, shouldExecuteSandboxInput } from "@/lib/sandbox/detect";
+import { assessSandboxRisk, detectSandboxInput, shouldExecuteSandboxInput } from "@/lib/sandbox/detect";
+import { hasGithubIntent } from "@/lib/ai/tool-router";
 import { sandboxClient } from "@/lib/sandbox-client";
 import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
 import { PUTER_MODELS } from "@/lib/ai/models";
@@ -161,7 +162,8 @@ export function AppShell({ search }: { search: Search }) {
     const content = text.trim();
     if (!content && !files.length) return;
     const detection = detectSandboxInput(content);
-    const executionRequested = forceExecution || shouldExecuteSandboxInput(content, detection);
+    const sandboxIntent = shouldExecuteSandboxInput(content, detection);
+    const executionRequested = forceExecution || sandboxIntent || hasGithubIntent(content);
     if (detection.command && detection.dangerous && !allowDangerous) {
       setDangerousApproval({ content, chatId, mode, attachments: files, reason: detection.riskReason ?? "คำสั่งนี้อาจกระทบไฟล์" });
       return;
@@ -175,15 +177,6 @@ export function AppShell({ search }: { search: Search }) {
     const assistantId = store.startAssistant(id);
     let history = (useAppStore.getState().conversations.find(c => c.id === id)?.messages ?? [])
       .filter(m => m.id !== assistantId && (m.content || m.attachments?.length)).map(m => ({ role: m.role, content: messageForModel(m) }));
-    if (files.some(file => file.kind === "image" || file.kind === "audio" || file.mimeType?.startsWith("image/") || file.mimeType?.startsWith("audio/"))) {
-      const mediaLogId = startStreamLog("puter", "Media • วิเคราะห์รูป/เสียง…");
-      try {
-        history = await enrichMediaContext(history, files);
-        updateStreamLog(mediaLogId, "puter", "done", "Media • วิเคราะห์เสร็จแล้ว", 0);
-      } catch (error) {
-        updateStreamLog(mediaLogId, "puter", "error", error instanceof Error ? error.message : "Media analysis failed", 0);
-      }
-    }
     const ac = new AbortController();
     abortRef.current = ac;
     setDraft(""); setAttachments([]); setActiveTool("auto"); setActiveRuns((count) => count + 1); setStreamingId(assistantId); setSandboxRun(null);
@@ -264,6 +257,15 @@ export function AppShell({ search }: { search: Search }) {
       if (existing !== undefined) return;
       streamLogTimers.set(activityId, window.setTimeout(() => flushStreamLog(activityId), 150));
     };
+    if (files.some(file => file.kind === "image" || file.kind === "audio" || file.mimeType?.startsWith("image/") || file.mimeType?.startsWith("audio/"))) {
+      const mediaLogId = startStreamLog("puter", "Media • วิเคราะห์รูป/เสียง…");
+      try {
+        history = await enrichMediaContext(history, files);
+        updateStreamLog(mediaLogId, "puter", "done", "Media • วิเคราะห์เสร็จแล้ว", 0);
+      } catch (error) {
+        updateStreamLog(mediaLogId, "puter", "error", error instanceof Error ? error.message : "Media analysis failed", 0);
+      }
+    }
     const tools = executionRequested;
     const notifyProjectChanged = (path?: string) => {
       window.dispatchEvent(new CustomEvent("bossnu:workspace-changed", { detail: { workspaceId, path } }));
@@ -273,8 +275,12 @@ export function AppShell({ search }: { search: Search }) {
         channel.close();
       }
     };
-    const execute = async (call: RunCall) => {
+    const execute = async (call: RunCall, approved?: boolean): Promise<ToolResult> => {
       ac.signal.throwIfAborted();
+      const risk = assessSandboxRisk(call.command);
+      if (risk.dangerous && approved !== true) {
+        return { status: "error", exitCode: 126, error: `Requires user approval: ${risk.riskReason ?? "dangerous command"}` };
+      }
       let output = "";
       let outputTimer: number | null = null;
       const startedAt = Date.now();
@@ -300,7 +306,7 @@ export function AppShell({ search }: { search: Search }) {
       };
       try {
         const result = await sandboxClient.executeStream(call.command, {
-          workspace: workspaceId, type: call.language, signal: ac.signal, allowDangerous: true,
+          workspace: workspaceId, type: call.language, signal: ac.signal, allowDangerous: approved === true,
           onEvent: event => {
             if (ac.signal.aborted) return;
             if (event.type === "status" && event.message) {
@@ -426,7 +432,19 @@ export function AppShell({ search }: { search: Search }) {
         notifyProjectChanged(projectPath);
         pushActivity({ kind: "files", files: [{ path: projectPath, action: call.action === "delete_file" ? "deleted" : call.action === "read_file" ? "added" : "modified" }] });
       }
-      return { status: "success", output: JSON.stringify(data.result).slice(-30000), exitCode: 0, durationMs: 0 };
+      const githubResult = (data.result ?? {}) as Record<string, unknown>;
+      const mutating = ["write_file", "delete_file", "create_branch", "create_pr"].includes(call.action);
+      const verificationNotes = Array.isArray(githubResult.evidence)
+        ? githubResult.evidence.filter((item): item is string => typeof item === "string").slice(0, 6)
+        : [];
+      return {
+        status: "success",
+        output: JSON.stringify(data.result).slice(-30000),
+        exitCode: 0,
+        durationMs: 0,
+        verified: mutating ? githubResult.verified === true : true,
+        evidence: verificationNotes,
+      };
     };
     const persistJournal = async () => {
       try {
@@ -487,7 +505,7 @@ export function AppShell({ search }: { search: Search }) {
         append("แสดง Live Preview ในแชตแล้วค่ะ\n\n");
       }
       await runAgentLoop({
-        messages: history, signal: ac.signal, tools,
+        messages: history, signal: ac.signal, tools, sandboxIntent,
         maxRuns: 11,
         execute,
         executeGithub,
@@ -499,27 +517,44 @@ export function AppShell({ search }: { search: Search }) {
           const labels: Record<AgentPhase, string> = {
             goal: "🎯 Goal • เป้าหมาย",
             plan: "🧠 Plan • วางแผน",
+            discover: "🔎 Discover • อ่าน Workspace",
+            "select-tool": "🧭 Select Tool • เลือกเครื่องมือ",
             act: "🛠️ Act • ลงมือทำ",
             run: "💻 Run • รัน Sandbox",
             observe: "👀 Observe • อ่านผลจริง",
+            analyze: "🔬 Analyze • วิเคราะห์หลักฐาน",
             verify: "🔍 Verify • ตรวจหลักฐาน",
-            fix: "🐛 Fix • แก้และรันใหม่",
-            answer: "💬 Answer • ตอบในแชต",
+            fix: "🛠️ Repair • ซ่อมและรันใหม่",
+            answer: "💬 Answer • สรุปตามหลักฐาน",
           };
           pushActivity({ kind: "phase", phase, label: detail || labels[phase] });
           const statusVoice: Partial<Record<AgentPhase, string>> = {
             goal: "สลี่รับงานแล้วค่ะ",
             plan: "สลี่กำลังวางแผนงานนะคะ",
+            discover: "สลี่กำลังอ่าน Workspace และความจำค่ะ",
+            "select-tool": "สลี่กำลังเลือกเครื่องมือที่เหมาะสมค่ะ",
             act: "สลี่กำลังลงมือทำค่ะ",
             run: "สลี่กำลังรันงานอยู่นะคะ",
             observe: "สลี่กำลังอ่านผลจริงค่ะ",
+            analyze: "สลี่กำลังวิเคราะห์ผลที่พบค่ะ",
             verify: "สลี่กำลังตรวจสอบหลักฐานค่ะ",
             fix: "งานยังไม่ผ่านค่ะ สลี่กำลังแก้ไขให้นะคะ",
-            answer: "ตรวจสอบเสร็จแล้วค่ะ",
+            answer: "สลี่กำลังสรุปผลตามหลักฐานค่ะ",
           };
           if (statusVoice[phase]) speakStatus(statusVoice[phase]!);
         },
         onText: text => { if (text.startsWith("\\n\\n```sandbox")) return; append(text); },
+        onEvidence: evidence => pushActivity({
+          kind: "evidence",
+          tool: evidence.tool,
+          stage: evidence.stage,
+          action: evidence.action,
+          what: evidence.what,
+          where: evidence.where,
+          result: evidence.result,
+          evidence: evidence.evidence,
+          status: evidence.status,
+        }),
         onSkillSaved: (path, saved) => pushActivity({ kind: "skill", path, status: saved ? "saved" : "failed" }),
         model: async (messages, onText) => {
           let failure = "";
@@ -597,9 +632,10 @@ ${message}`); toast.error(message); }
 
     const current = useAppStore.getState().conversations.find(chat => chat.id === id);
     const lastAssistant = [...(current?.messages ?? [])].reverse().find(message => message.role === "assistant");
-    const failedActivities = (lastAssistant?.activities ?? []).filter(activity =>
-      (activity.kind === "command" && (activity.status === "error" || activity.exitCode !== 0)) ||
-      (activity.kind === "phase" && /ไม่ผ่าน|failed|error/i.test(activity.label))
+    const failedActivities = (lastAssistant?.activities ?? []).filter(
+      (activity): activity is Extract<ChatActivity, { kind: "command" | "phase" }> =>
+        (activity.kind === "command" && (activity.status === "error" || activity.exitCode !== 0)) ||
+        (activity.kind === "phase" && /ไม่ผ่าน|failed|error/i.test(activity.label)),
     );
     const evidence = failedActivities.slice(-4).map(activity => {
       if (activity.kind === "command") {

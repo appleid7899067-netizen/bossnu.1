@@ -2,10 +2,8 @@ import { createMiddleware } from "@tanstack/react-start";
 
 /**
  * Auth middleware for server functions — the standard way to get the caller's
- * verified user id. When deployed the session cookie is same-origin and rides
- * along automatically. In the live preview the client also forwards the bearer
- * token (partitioned cookies) via the `.client` hook below — call sites do not
- * thread it themselves.
+ * verified user id. The request's Better Auth session or signed platform gate
+ * identity is resolved server-side; callers never supply a user id or token.
  *
  *   import { createServerFn } from "@tanstack/react-start";
  *   import { getSql } from "@/lib/db";
@@ -25,23 +23,14 @@ import { createMiddleware } from "@tanstack/react-start";
  * all. On the auth-on path, use it on every server function that touches
  * per-user data and scope every query by `context.userId`.
  */
-export const authMiddleware = createMiddleware({ type: "function" })
-  .client(async ({ next }) => {
-    // Live preview (partitioned iframe): the session rides a bearer token, not a
-    // cookie, so forward it to the server. Null when deployed (cookie auth), so
-    // this is a no-op there.
-    const { getBearerToken } = await import("./client");
-    return next({ sendContext: { bearerToken: getBearerToken() ?? undefined } });
-  })
-  .server(async ({ next, context }) => {
-    // ONLY import `*.server` modules here. This file is dual client/server
-    // (bearer hook on the client). A plain `./isolation` path was renamed to
-    // `isolation.server.ts` — keep this import in sync so image `tsc` resolves
-    // it, and so Vite does not ship `@tanstack/react-start/server` to the browser.
+export const authMiddleware = createMiddleware({ type: "function" }).server(
+  async ({ next }) => {
+    // This is server-only: the verified identity comes from the request cookie
+    // or the platform's signed gate header, never from client-supplied context.
     const { assertSameSiteRequest } = await import("./isolation.server");
     const { requireUserId } = await import("./verify.server");
-    // Reject scripted cross-site/sibling requests before touching per-user data.
     assertSameSiteRequest();
-    const userId = await requireUserId(context.bearerToken);
+    const userId = await requireUserId();
     return next({ context: { userId } });
-  });
+  },
+);

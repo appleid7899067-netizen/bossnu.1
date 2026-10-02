@@ -17,6 +17,12 @@ const execFileAsync = promisify(execFile);
 const WRAPPER = join(projectRoot(), "scripts/with-app-env.mjs");
 const PRINT_FLAG = "process.stdout.write(String(process.env.VITE_AUTH_ENABLED));";
 
+function envWithoutAuthOverride() {
+  const env = { ...process.env };
+  delete env.VITE_AUTH_ENABLED;
+  return env;
+}
+
 function makeWorkspace(appEnvJson) {
   const root = mkdtempSync(join(tmpdir(), "app-env-"));
   if (appEnvJson !== undefined) {
@@ -59,8 +65,11 @@ test("an explicit process-env override wins over the file", () => {
   assert.equal(merged.PATH, "/usr/bin");
 });
 
-test("the template ships auth off", () => {
-  assert.deepEqual(readAppEnv(projectRoot()), { VITE_AUTH_ENABLED: "false", VITE_SANDBOX_RUNNER_URL: "https://bossnu1-bash-runner.onrender.com" });
+test("this workspace's app env enables auth and configures its runner", () => {
+  assert.deepEqual(readAppEnv(projectRoot()), {
+    VITE_AUTH_ENABLED: "true",
+    VITE_SANDBOX_RUNNER_URL: "https://bossnu1-bash-runner.onrender.com",
+  });
 });
 
 test("vite loadEnv resolves the wrapped value", () => {
@@ -74,22 +83,21 @@ test("vite loadEnv resolves the wrapped value", () => {
 });
 
 test("the wrapped command runs with the app env applied", async () => {
-  const { stdout } = await execFileAsync(process.execPath, [
-    WRAPPER,
+  const { stdout } = await execFileAsync(
     process.execPath,
-    "-e",
-    PRINT_FLAG,
-  ]);
-  assert.equal(stdout, "false");
+    [WRAPPER, process.execPath, "-e", PRINT_FLAG],
+    { env: envWithoutAuthOverride() },
+  );
+  assert.equal(stdout, "true");
 });
 
 test("the wrapped command sees an explicit override, not the file value", async () => {
   const { stdout } = await execFileAsync(
     process.execPath,
     [WRAPPER, process.execPath, "-e", PRINT_FLAG],
-    { env: { ...process.env, VITE_AUTH_ENABLED: "true" } },
+    { env: { ...envWithoutAuthOverride(), VITE_AUTH_ENABLED: "false" } },
   );
-  assert.equal(stdout, "true");
+  assert.equal(stdout, "false");
 });
 
 test("the wrapper propagates the command's exit code", async () => {
@@ -118,11 +126,10 @@ test("the CLI still runs when invoked through a symlinked path", async () => {
   // turns the wrapper into a no-op that exits 0 without starting anything.
   const link = join(mkdtempSync(join(tmpdir(), "app-env-link-")), "scripts");
   symlinkSync(join(projectRoot(), "scripts"), link);
-  const { stdout } = await execFileAsync(process.execPath, [
-    join(link, "with-app-env.mjs"),
+  const { stdout } = await execFileAsync(
     process.execPath,
-    "-e",
-    PRINT_FLAG,
-  ]);
-  assert.equal(stdout, "false");
+    [join(link, "with-app-env.mjs"), process.execPath, "-e", PRINT_FLAG],
+    { env: envWithoutAuthOverride() },
+  );
+  assert.equal(stdout, "true");
 });

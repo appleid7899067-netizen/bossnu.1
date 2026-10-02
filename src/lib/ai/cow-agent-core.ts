@@ -1,4 +1,4 @@
-export type CowPhase = "goal" | "plan" | "act" | "run" | "observe" | "verify" | "fix" | "answer";
+export type CowPhase = "goal" | "plan" | "discover" | "select-tool" | "act" | "run" | "observe" | "analyze" | "verify" | "fix" | "answer";
 export type CowMemory = { key: string; value: string; source: "conversation" | "run" | "user"; updatedAt: number };
 export type CowTask = { id: string; goal: string; status: "active" | "done" | "failed"; attempts: number; createdAt: number; updatedAt: number };
 
@@ -47,7 +47,7 @@ export class CowAgentCore {
 }
 
 export function buildCowPlan(goal: string, skills: string[]): string[] {
-  const plan = ["เข้าใจเป้าหมาย", "เลือกความสามารถและเครื่องมือ", "ลงมือทำ", "รันและอ่านผล", "ตรวจสอบผล"];
-  if (skills.includes("Debugging") || /error|พัง|ผิดพลาด|debug/i.test(goal)) plan.splice(3, 0, "วิเคราะห์ข้อผิดพลาดและแก้ไข");
+  const plan = ["จับเป้าหมาย", "อ่าน Workspace, skills และ memory", "เลือกเครื่องมือที่ได้รับอนุญาต", "ลงมือทำ", "รันและสังเกตผลจริง", "ตรวจหลักฐาน"];
+  if (skills.includes("Debugging") || /error|พัง|ผิดพลาด|debug|repair|fix|แก้/i.test(goal)) plan.splice(4, 0, "วิเคราะห์สาเหตุและซ่อมก่อนรันซ้ำ");
   return plan;
 }

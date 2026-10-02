@@ -55,8 +55,34 @@ test("evidence: incomplete snapshot fails the gate", () => {
   assert.equal(v.passed, false);
 });
 
-test("evidence: workspace not required ignores sync", () => {
+test("evidence: workspace not required ignores sync but still requires exit-zero proof", () => {
   assert.equal(evaluateEvidence({ status: "success", exitCode: 0 }, { requireWorkspace: false }).passed, true);
+  const missingExit = evaluateEvidence({ status: "success" }, { requireWorkspace: false });
+  assert.equal(missingExit.passed, false);
+  assert.ok(missingExit.reasons.join(" ").includes("exit code"));
+});
+
+test("evidence: HTML command and file detection rejects a doctype-only document", () => {
+  const byLanguage = evaluateEvidence({
+    status: "success", exitCode: 0, language: "html",
+    workspaceFiles: [{ path: "project/index.html", content: "<!doctype html>" }],
+  }, { requireWorkspace: false });
+  assert.equal(byLanguage.passed, false);
+  assert.match(byLanguage.reasons.join(" "), /HTML Preview ว่าง/);
+
+  const byCommand = evaluateEvidence({
+    status: "success", exitCode: 0, command: "printf '<!doctype html>' > project/index.html",
+    workspaceFiles: [{ path: "project/index.html", content: "<!doctype html>" }],
+  }, { requireWorkspace: false });
+  assert.equal(byCommand.passed, false);
+});
+
+test("evidence: renderable HTML with real content passes the HTML integrity check", () => {
+  const verdict = evaluateEvidence({
+    status: "success", exitCode: 0, language: "html",
+    workspaceFiles: [{ path: "project/index.html", content: "<!doctype html><html><body><main><h1>Flood monitor</h1></main></body></html>" }],
+  }, { requireWorkspace: false });
+  assert.deepEqual(verdict, { passed: true, reasons: [] });
 });
 
 test("completion claims are detected, negations are not", () => {
@@ -115,7 +141,7 @@ test("gate: model that keeps claiming done gets an honest unverified answer", as
 test("gate: honest non-claiming explanation is kept in the unverified answer", async () => {
   let output = "";
   await runAgentLoop({
-    messages: [{ role: "user", content: "x" }], signal: new AbortController().signal, tools: true, requireWorkspaceSync: true,
+    messages: [{ role: "user", content: "Run tests" }], signal: new AbortController().signal, tools: true, requireWorkspaceSync: true,
     model: async (messages, emit) => { emit(messages.some(m => m.content.includes("UNTRUSTED")) ? "ยังไม่สำเร็จ เพราะ npm ติดตั้งไม่ได้" : block); },
     execute: async () => failing,
     onText: s => { output += s; },
@@ -125,7 +151,7 @@ test("gate: honest non-claiming explanation is kept in the unverified answer", a
 
 test("gate: sync not verified blocks completion even if the command succeeded", async () => {
   const summary = await runAgentLoop({
-    messages: [{ role: "user", content: "x" }], signal: new AbortController().signal, tools: true, requireWorkspaceSync: true, maxRuns: 1,
+    messages: [{ role: "user", content: "Run tests" }], signal: new AbortController().signal, tools: true, requireWorkspaceSync: true, maxRuns: 1,
     model: async (messages, emit) => { emit(messages.some(m => m.content.includes("UNTRUSTED")) ? "done" : block); },
     execute: async () => ({ status: "success", exitCode: 0, workspaceSync: { verified: false, complete: true, missing: ["project/x"] } }),
     onText: () => {},
@@ -136,8 +162,8 @@ test("gate: sync not verified blocks completion even if the command succeeded", 
 test("gate: a failing prior auto-run must be fixed before answering", async () => {
   let runs = 0;
   const summary = await runAgentLoop({
-    messages: [{ role: "user", content: "x" }], signal: new AbortController().signal, tools: true, requireWorkspaceSync: true, priorResult: failing,
-    model: async (messages, emit) => { emit(messages.at(-1)!.content.includes("VERIFICATION GATE") ? block : messages.at(-1)!.content.includes("UNTRUSTED") ? "ok" : "เสร็จแล้ว"); },
+    messages: [{ role: "user", content: "Run tests" }], signal: new AbortController().signal, tools: true, requireWorkspaceSync: true, priorResult: failing,
+    model: async (messages, emit) => { emit(messages[0].content.includes("REPAIR MODE IS ACTIVE") ? block : messages.at(-1)!.content.includes("UNTRUSTED") ? "ok" : "เสร็จแล้ว"); },
     execute: async () => { runs++; return ok; },
     onText: () => {},
   });
@@ -164,7 +190,7 @@ test("loop: verified project runs persist a reusable skill in Agent Workspace", 
   const { ws, log, files } = memoryWorkspace();
   let context = "";
   await runAgentLoop({
-    messages: [{ role: "user", content: "go" }], signal: new AbortController().signal, tools: true, workspace: ws, requireWorkspaceSync: true,
+    messages: [{ role: "user", content: "Run echo hi" }], signal: new AbortController().signal, tools: true, workspace: ws, requireWorkspaceSync: true,
     model: async (messages, emit) => { context = messages[0].content; emit(messages.some(m => m.content.includes("UNTRUSTED")) ? "ผ่าน" : block); },
     execute: async () => ok, onText: () => {},
   });
@@ -218,7 +244,7 @@ test("loop: unverified sync never becomes a reusable skill", async () => {
 test("loop: maxRuns is clamped to 11", async () => {
   let runs = 0;
   const summary = await runAgentLoop({
-    messages: [], signal: new AbortController().signal, tools: true, maxRuns: 99,
+    messages: [{ role: "user", content: "Run the test command" }], signal: new AbortController().signal, tools: true, maxRuns: 99,
     model: async (_m, emit) => emit(block), execute: async () => { runs++; return { status: "success", exitCode: 0 }; }, onText: () => {},
   });
   assert.equal(runs, 11);

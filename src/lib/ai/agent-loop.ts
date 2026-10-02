@@ -3,6 +3,9 @@ import type { RunCall, ToolResult } from "./sandbox-tool.ts";
 import { CowAgentCore, buildCowPlan } from "./cow-agent-core.ts";
 import { selectSkills } from "../skills/index.ts";
 import { failureSignature, parseFailureMemory, type FailureMemory } from "./memory-ledger.ts";
+import { MAX_TOOL_ROUTE_REJECTIONS, routeAgentTools } from "./tool-router.ts";
+import { AutoInstallBudget, installCommandPassed, planMissingToolInstall } from "./repair-engine.ts";
+import { buildGithubEvidence, buildSandboxEvidence, evaluateGithubEvidence, type AgentEvidence } from "./evidence-engine.ts";
 import {
   MAX_GATE_REJECTIONS,
   claimsCompletion,
@@ -22,7 +25,7 @@ function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 export type AgentMessage = { role: "user" | "assistant"; content: string };
-export type AgentPhase = "goal" | "plan" | "act" | "run" | "observe" | "verify" | "fix" | "answer";
+export type AgentPhase = "goal" | "discover" | "select-tool" | "plan" | "act" | "run" | "observe" | "analyze" | "verify" | "fix" | "answer";
 
 /**
  * Persistent Agent Home used by the loop. Injected (HTTP in the browser, DB on
@@ -50,6 +53,8 @@ export type AgentLoopSummary = {
   status: AgentLoopStatus;
   runs: number;
   rejections: number;
+  autoInstallAttempts: number;
+  evidence: AgentEvidence[];
   lastVerdict: EvidenceVerdict | null;
 };
 
@@ -58,12 +63,31 @@ export type AgentLoopSummary = {
 // ceiling, not a requirement to spend all rounds.
 export const DEFAULT_MAX_RUNS = 11;
 export const MAX_RUNS_CAP = 11;
+export const MAX_GITHUB_ACTIONS_PER_TASK = 8;
 
 export function redactSensitiveCommand(command: string) {
   return command
     .replace(/(--?(?:api[-_]?key|access[-_]?token|auth(?:orization)?|password|passwd|secret|credential|private[-_]?key)(?:=|\s+))("[^"]*"|'[^']*'|[^\s]+)/gi, "$1[REDACTED]")
     .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [REDACTED]")
     .replace(/\b(token|password|secret)\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;]+)/gi, "$1=[REDACTED]");
+}
+
+function verdictForSandbox(call: RunCall | undefined, result: ToolResult, requireWorkspace: boolean): EvidenceVerdict {
+  return evaluateEvidence({
+    ...result,
+    ...(call ? { language: call.language, command: call.command } : {}),
+  }, { requireWorkspace });
+}
+
+function githubRepairGateMessage(reasons: string[], attempt: number, actions: string[]) {
+  return [
+    `GITHUB REPAIR GATE — rejection ${attempt}/${MAX_GATE_REJECTIONS}`,
+    "The last GitHub action did not pass server-side verification. Treat the requested change as unfinished.",
+    ...reasons.map(reason => `- ${reason}`),
+    `The next response must contain a corrective <github> action from this allow-list: ${actions.join(", ") || "none"}.`,
+    "Read the current repository state first when useful. Keep the correction within the user's request, then wait for independent GitHub read-back/creation evidence.",
+    "Do not claim that the failed GitHub action succeeded, and do not substitute a Sandbox-only result for GitHub verification.",
+  ].join("\\n");
 }
 
 function verifiedResultText(result: ToolResult, requireWorkspace: boolean) {
@@ -139,6 +163,8 @@ export async function runAgentLoop(opts: {
   messages: AgentMessage[];
   signal: AbortSignal;
   tools: boolean;
+  /** Explicit sandbox intent confirmed by the caller's input detector. */
+  sandboxIntent?: boolean;
   model: (messages: AgentMessage[], onText: (text: string) => void) => Promise<void>;
   execute: (call: RunCall, approved?: boolean) => Promise<ToolResult>;
   executeGithub?: (call: GithubCall) => Promise<ToolResult>;
@@ -147,6 +173,7 @@ export async function runAgentLoop(opts: {
   initialCallApproved?: boolean;
   onText: (text: string) => void;
   onPhase?: (phase: AgentPhase, detail?: string) => void;
+  onEvidence?: (evidence: AgentEvidence) => void;
   onSkillSaved?: (path: string, saved: boolean) => void;
   maxRuns?: number;
   workspace?: AgentWorkspace | null;
@@ -160,6 +187,7 @@ export async function runAgentLoop(opts: {
   const selectedSkills = selectSkills(goal, 5);
   const workspace = opts.workspace ?? null;
   const requireWorkspace = Boolean(opts.requireWorkspaceSync);
+  const route = routeAgentTools(goal, { sandbox: opts.tools, github: Boolean(opts.executeGithub) }, { sandboxIntent: opts.sandboxIntent });
   const safely = async <T,>(work: () => Promise<T>, fallback: T): Promise<T> => {
     try { return await work(); } catch { return fallback; }
   };
@@ -167,10 +195,18 @@ export async function runAgentLoop(opts: {
   const core = new CowAgentCore(goal);
   const plan = buildCowPlan(goal, selectedSkills.map(skill => skill.name));
   const max = Math.min(MAX_RUNS_CAP, Math.max(0, Math.floor(opts.maxRuns ?? DEFAULT_MAX_RUNS)));
+  const autoInstallBudget = new AutoInstallBudget();
+  const verifiedGithubActions = new Set<GithubCall["action"]>();
+  const evidenceRecords: AgentEvidence[] = [];
+  let githubActionCount = 0;
+  let githubRequirementRejections = 0;
+  let evidenceSequence = 0;
   let count = 0;
   let rejections = 0;
+  let routeRejections = 0;
   let initialCallPending = opts.initialCall ?? null;
-  let lastVerdict: EvidenceVerdict | null = opts.priorResult ? evaluateEvidence(opts.priorResult, { requireWorkspace }) : null;
+  let lastVerdict: EvidenceVerdict | null = opts.priorResult ? verdictForSandbox(opts.initialCall, opts.priorResult, requireWorkspace) : null;
+  let lastEvidenceTool: "sandbox" | "github" | null = opts.priorResult ? "sandbox" : null;
   // A passing run is only a candidate until the loop reaches its final
   // verification boundary. Never persist a Verified Skill mid-recovery.
   let pendingVerified: { call: RunCall; result: ToolResult } | null =
@@ -178,8 +214,12 @@ export async function runAgentLoop(opts: {
       ? { call: opts.initialCall, result: opts.priorResult }
       : null;
 
-  opts.onPhase?.("goal", "🎯 เป้าหมาย • รับคำสั่งจากผู้ใช้");
+  opts.onPhase?.("goal", "🎯 Goal • รับคำสั่งจากผู้ใช้");
   opts.onText(`\n> 🎯 เป้าหมาย: ${goal.slice(0, 300)}\n`);
+  core.setPhase("plan");
+  opts.onPhase?.("plan", `🧠 Plan • ${plan.join(" → ")}`);
+  core.setPhase("discover");
+  opts.onPhase?.("discover", "🔎 Discover • ตรวจ Workspace, skills และ memory ที่เกี่ยวข้อง");
   const environmentHash = "bossnu-sandbox-v1";
   const workspaceContext = workspace ? await safely(() => workspace.context(goal), "Persistent Workspace โหลดไม่สำเร็จ") : "ไม่มี Persistent Workspace";
   const memoryRows = workspace?.recall ? await safely(() => workspace.recall!(goal, 24), []) : [];
@@ -187,11 +227,63 @@ export async function runAgentLoop(opts: {
     .filter(row => row.key.startsWith("failure:"))
     .map(row => parseFailureMemory(row.value))
     .filter((item): item is FailureMemory => item !== null);
+  core.setPhase("select-tool");
+  opts.onPhase?.("select-tool", `🧭 Select Tool • ${route.selected.length ? route.selected.join(" + ") : "ไม่มี tool ที่ได้รับอนุญาต"}${route.unavailable.length ? ` • unavailable: ${route.unavailable.join(", ")}` : ""}`);
   if (workspace) {
     await safely(() => workspace.startTask(goal, core.task.id), undefined);
     await safely(() => workspace.remember("semantic:goal:" + core.task.id, JSON.stringify({ statement: goal.slice(0, 4000), source: "user", confidence: 1, environmentHash, createdAt: Date.now() }), "semantic"), undefined);
     await safely(() => workspace.remember("episode:" + core.task.id + ":goal", JSON.stringify({ phase: "perceive", goal: goal.slice(0, 4000), timestamp: Date.now(), memoryHits: memoryRows.length }), "episode"), undefined);
   }
+
+  const executeSandboxAction = async (
+    call: RunCall,
+    stage: AgentEvidence["stage"] = "execution",
+    approved?: boolean,
+  ): Promise<{ result: ToolResult; observed: string; verdict: EvidenceVerdict } | null> => {
+    if (opts.signal.aborted || count >= max) return null;
+    count++;
+    core.attempt();
+    core.setPhase("act");
+    opts.onPhase?.("act", stage === "auto-install" ? "🧰 Act • ติดตั้ง dependency ที่ตรวจพบจาก error จริง" : "🛠️ Act • กำลังลงมือ");
+    core.setPhase("run");
+    opts.onPhase?.("run", `💻 Run • ${stage === "auto-install" ? "Auto-install" : call.language} (${count}/${max})`);
+
+    let result: ToolResult;
+    try {
+      result = await opts.execute(call, approved);
+    } catch (error) {
+      result = { status: opts.signal.aborted ? "aborted" : "error", error: error instanceof Error ? error.message : String(error) };
+    }
+    if (opts.signal.aborted) result = { ...result, status: "aborted" };
+
+    core.setPhase("observe");
+    opts.onPhase?.("observe", stage === "auto-install" ? "👀 Observe • อ่านผลการติดตั้งจริง" : "👀 Observe • Sandbox ตอบกลับแล้ว กำลังอ่านผลจริง...");
+    const observed = modelResult(call, result);
+    core.remember(`run-${count}`, observed, "run");
+    if (workspace) await safely(() => workspace.remember(`run-${count}`, observed, "run"), undefined);
+    if (opts.signal.aborted) return { result, observed, verdict: { passed: false, reasons: ["ผู้ใช้หยุดการทำงาน"] } };
+
+    // An install command is a recovery step, never final task proof. It only
+    // needs a real exit-zero result before Sali retries the original request.
+    const verdict = evaluateEvidence(
+      { ...result, language: call.language, command: call.command },
+      { requireWorkspace: stage === "auto-install" ? false : requireWorkspace },
+    );
+    core.setPhase("verify");
+    opts.onPhase?.("verify", stage === "auto-install"
+      ? verdict.passed ? "🔍 Verify • ติดตั้งผ่าน; ต้องรันเป้าหมายเดิมเพื่อยืนยัน" : `🔍 Verify • ติดตั้งไม่ผ่าน: ${verdict.reasons[0]}`
+      : verdict.passed
+        ? requireWorkspace ? "🔍 Verify • รันผ่าน + Neon อ่านกลับตรงกับ Sandbox" : "🔍 Verify • รันผ่าน"
+        : `🔍 Verify • ไม่ผ่าน: ${verdict.reasons[0]}`);
+
+    lastEvidenceTool = "sandbox";
+    const evidence = buildSandboxEvidence(call, result, verdict, ++evidenceSequence, { stage });
+    evidenceRecords.push(evidence);
+    if (evidenceRecords.length > 80) evidenceRecords.splice(0, evidenceRecords.length - 80);
+    opts.onEvidence?.(evidence);
+    if (workspace) await safely(() => workspace.remember(`evidence:${core.task.id}:${evidence.id}`, JSON.stringify(evidence), "episode"), undefined);
+    return { result, observed, verdict };
+  };
 
   const finish = async (status: AgentLoopStatus): Promise<AgentLoopSummary> => {
     if (status === "verified" || status === "answered") {
@@ -222,6 +314,8 @@ export async function runAgentLoop(opts: {
         `Goal: ${goal.slice(0, 500)}`,
         `Runs: ${count}/${max}`,
         `Verification rejections: ${rejections}`,
+        `Auto-install attempts: ${autoInstallBudget.usedAttempts}`,
+        `Evidence records: ${evidenceRecords.length}`,
         `Last verdict: ${lastVerdict?.passed ? "passed" : lastVerdict ? "failed" : "not-run"}`,
         `Evidence: ${reasons}`,
         outcome === "success"
@@ -231,8 +325,15 @@ export async function runAgentLoop(opts: {
       await safely(() => workspace.remember(learningKey, learningValue, "run"), undefined);
       await safely(() => workspace.updateTask(core.task.id, status === "verified" || status === "answered" ? "done" : "failed", core.task.attempts), undefined);
     }
-    return { status, runs: count, rejections, lastVerdict };
+    return { status, runs: count, rejections, autoInstallAttempts: autoInstallBudget.usedAttempts, evidence: evidenceRecords.slice(-80), lastVerdict };
   };
+
+  if (!route.selected.length && route.unavailable.length) {
+    const reason = route.reasons.join("; ") || `tool unavailable: ${route.unavailable.join(", ")}`;
+    opts.onPhase?.("answer", "💬 Answer • tool ที่ต้องใช้ยังไม่เชื่อมต่อ");
+    opts.onText(`\n> ยังดำเนินการไม่ได้ค่ะ: ${reason}\n`);
+    return finish("unverified");
+  }
 
   while (!opts.signal.aborted) {
     core.setPhase("plan");
@@ -242,7 +343,7 @@ export async function runAgentLoop(opts: {
     // success. It is released only if the model actually runs a fix.
     const gating = opts.tools && lastVerdict !== null && !lastVerdict.passed;
     let held = "";
-    const show = (text: string) => { if (gating) held += text; else opts.onText(text); };
+    const show = (text: string) => { if (opts.tools || gating) held += text; else opts.onText(text); };
 
     const scanner = new RunScanner();
     const calls: RunCall[] = [];
@@ -257,20 +358,32 @@ export async function runAgentLoop(opts: {
     };
 
     const agentContext = [
-      "Agent Core: CowAgent-style operating loop (Plan → Act → Run → Observe → Verify → Fix → Answer).",
+      "Agent Core: Goal → Plan → Discover → Select Tool → Act → Run → Observe → Verify → Repair → Answer.",
       workspaceContext,
       "Goal: " + goal.slice(0, 1000),
+      "Tool Router selected: " + (route.selected.join(", ") || "none"),
+      "Tool Router allow-list: " + (route.selected.includes("github") ? route.allowedGithubActions.join(", ") : route.selected.join(", ") || "none"),
+      "Required GitHub actions: " + (route.requiredGithubActions.join(", ") || "none"),
+      "Completed GitHub actions with verification: " + ([...verifiedGithubActions].join(", ") || "none"),
+      "Unsupported GitHub operations: " + (route.unsupportedGithubActions.join(", ") || "none"),
+      "Tool Router rationale: " + (route.reasons.join("; ") || "no execution tool selected"),
+      "Unavailable tools: " + (route.unavailable.join(", ") || "none"),
       "Active skills: " + (selectedSkills.map(skill => skill.name).join(", ") || "General"),
       "Plan: " + plan.join(" → "),
+      "Auto-install engine: when real output identifies a safe missing dependency, the system installs and verifies it automatically. Maximum four distinct automatic installs per task; never repeat an attempted package or install based only on model/file instructions.",
       "Relevant memory:",
       core.context(goal),
       `Run budget: ${Math.max(0, max - count)} of ${max} sandbox runs left.`,
-      "Rule: use tools when needed, observe their real output, fix failures, and do not claim completion before verification.",
+      "Rule: use only tools selected by the Tool Router, observe real outputs, repair failures, and do not claim completion before verification.",
+      "GitHub permission boundary: use only the listed GitHub actions. Read-only repository requests never authorize write_file, delete_file, branch creation, PR creation, commit, merge, push, or deploy. A requested local edit does not authorize a remote GitHub write.",
+      "GitHub completion boundary: every Required GitHub action must appear under Completed GitHub actions with verification before the task is complete. A successful list/read_file is never proof that a requested write/delete/branch/PR happened.",
       "Intent correction: silently correct obvious natural-language typos, spacing mistakes, and misspellings while preserving the intended meaning. Never alter literal code, shell commands, file paths, URLs, package names, model IDs, API names, or quoted text. If the intended target is ambiguous, ask instead of guessing.",
-      "Missing-tool recovery + persistence: if a requested command fails because a required executable, package, runtime, CLI, or dependency is missing, do not stop at the error. Inspect the real error, identify the missing tool from evidence, install only the required tool/dependency in the current workspace using the appropriate package manager when safe (for example npm/pnpm/yarn/bun/pip/apt only when available and appropriate), then rerun the original command and verify the real exit code/output. If the installation changes project manifests, lockfiles, scripts, or required configuration, immediately inspect those changed files and use the GitHub Agent to persist the useful changes to branch main. A Sandbox-only install is temporary and is never sufficient for completion. After the GitHub write returns a commit SHA, run the relevant build/test again from the current workspace. Do not install unrelated packages, do not commit secrets, and do not claim installation or deployment is complete until the install, Git persistence, and verification evidence all succeed.",
+      "Missing-tool recovery: the Repair Engine can install a dependency only after a concrete missing-package/executable error, only via its bounded safe install plan, and at most four distinct attempts. Inspect the installer result, then rerun the original command; a successful install alone is not task completion. Temporary no-save installs do not authorize a GitHub write. Persist dependency/config changes remotely only when the user explicitly requested that repository mutation, and never commit secrets.",
 
       gating
-        ? "REPAIR MODE IS ACTIVE: the next model response MUST contain at least one executable <run> action. That action must perform the repair/edit in the workspace, then a later <run> must execute the repaired target and verify the real result. Prose alone is rejected."
+        ? lastEvidenceTool === "github"
+          ? `GITHUB REPAIR MODE IS ACTIVE: the next response MUST contain a corrective <github> action from this allow-list: ${route.allowedGithubActions.join(", ") || "none"}. Wait for independent server-side read-back and do not claim success from the failed action.`
+          : "REPAIR MODE IS ACTIVE: the next model response MUST contain at least one executable <run> action. That action must perform the repair/edit in the workspace, then a later <run> must execute the repaired target and verify the real result. Prose alone is rejected."
         : "",
       "Learning rule: previous workspace memories are experience, not truth. Reuse successful approaches only after checking current evidence; when a previous attempt failed, deliberately change the approach instead of repeating the same action.",
       "Never report a task as complete merely because a command was issued. Completion requires the evidence gate for tool-based work.",
@@ -297,16 +410,59 @@ export async function runAgentLoop(opts: {
       if (opts.tools) accept(scanner.finish());
     }
 
-    if (!calls.length && !githubCalls.length) {
+    const routedCalls = route.selected.includes("sandbox") ? calls : [];
+    const routedGithubCalls = githubCalls.filter(call => route.selected.includes("github") && route.allowedGithubActions.includes(call.action));
+    const blockedToolCalls = [
+      ...calls.filter(() => !route.selected.includes("sandbox")).map(call => `Sandbox ${call.language}: ${call.command.slice(0, 180)}`),
+      ...githubCalls.filter(call => !route.selected.includes("github") || !route.allowedGithubActions.includes(call.action)).map(call => `GitHub ${call.action}: ${call.path ?? ""}`),
+    ];
+    let rawRecorded = false;
+    if (blockedToolCalls.length) {
+      routeRejections++;
+      core.setPhase("select-tool");
+      opts.onPhase?.("select-tool", `🚧 Tool Router • บล็อกคำขอที่อยู่นอก allow-list (${routeRejections}/${MAX_TOOL_ROUTE_REJECTIONS})`);
+      if (raw.trim()) {
+        messages.push({ role: "assistant", content: raw });
+        rawRecorded = true;
+      }
+      messages.push({
+        role: "user",
+        content: [
+          "TOOL ROUTER BLOCKED this request; it was NOT executed:",
+          ...blockedToolCalls.map(item => `- ${item}`),
+          `Allowed tools: ${route.selected.join(", ") || "none"}.`,
+          `Allowed GitHub actions: ${route.allowedGithubActions.join(", ") || "none"}.`,
+          "Continue only with an allowed tool. Do not claim the blocked action was completed.",
+        ].join("\n"),
+      });
+      if (!routedCalls.length && !routedGithubCalls.length) {
+        if (routeRejections < MAX_TOOL_ROUTE_REJECTIONS) continue;
+        if (held.trim() && !claimsCompletion(held)) opts.onText(held);
+        opts.onText("\n> Tool Router บล็อกการเรียกใช้ที่ไม่ได้รับอนุญาต และยังไม่มีผลจากเครื่องมือค่ะ\n");
+        if (lastVerdict && !lastVerdict.passed) opts.onText(unverifiedNotice(lastVerdict.reasons));
+        opts.onPhase?.("answer", "💬 Answer • ไม่มีหลักฐานจาก tool ที่ได้รับอนุญาต");
+        return finish("unverified");
+      }
+    }
+
+    if (!routedCalls.length && !routedGithubCalls.length) {
       if (gating && lastVerdict) {
         // The model tried to answer while the evidence is failing.
         rejections++;
         const runsLeft = max - count;
+        const githubRepair = lastEvidenceTool === "github";
+        const canRepair = githubRepair
+          ? route.selected.includes("github") && route.allowedGithubActions.length > 0
+          : runsLeft > 0;
         core.setPhase("verify");
-        if (rejections < MAX_GATE_REJECTIONS && runsLeft > 0) {
-          opts.onPhase?.("verify", `🚧 Verification Gate • ยังไม่ผ่าน (${rejections}/${MAX_GATE_REJECTIONS}) ให้ Fix → Run → Verify ใหม่`);
-          messages.push({ role: "assistant", content: raw || "(no answer)" });
-          messages.push({ role: "user", content: gateMessage(lastVerdict.reasons, rejections, runsLeft) });
+        if (rejections < MAX_GATE_REJECTIONS && canRepair) {
+          opts.onPhase?.("verify", githubRepair
+            ? `🚧 GitHub Verification Gate • ยังไม่ผ่าน (${rejections}/${MAX_GATE_REJECTIONS}) ให้แก้และอ่านกลับใหม่`
+            : `🚧 Verification Gate • ยังไม่ผ่าน (${rejections}/${MAX_GATE_REJECTIONS}) ให้ Fix → Run → Verify ใหม่`);
+          if (!rawRecorded) messages.push({ role: "assistant", content: raw || "(no answer)" });
+          messages.push({ role: "user", content: githubRepair
+            ? githubRepairGateMessage(lastVerdict.reasons, rejections, route.allowedGithubActions)
+            : gateMessage(lastVerdict.reasons, rejections, runsLeft) });
           continue;
         }
         if (held.trim() && !claimsCompletion(held)) opts.onText(held);
@@ -315,14 +471,52 @@ export async function runAgentLoop(opts: {
         if (workspace) await safely(() => workspace.remember("latest-unverified", lastVerdict!.reasons.join("\n"), "run"), undefined);
         return finish("unverified");
       }
+      const pendingGithubActions = route.requiredGithubActions.filter(action => !verifiedGithubActions.has(action));
+      if (pendingGithubActions.length) {
+        const reason = `GitHub request is incomplete: verified action(s) still required: ${pendingGithubActions.join(", ")}.`;
+        const canPerformRequiredActions = route.selected.includes("github")
+          && pendingGithubActions.every(action => route.allowedGithubActions.includes(action));
+        if (githubRequirementRejections < MAX_GATE_REJECTIONS && canPerformRequiredActions) {
+          githubRequirementRejections++;
+          rejections++;
+          opts.onPhase?.("analyze", `🔎 Analyze • ยังต้องทำ GitHub action: ${pendingGithubActions.join(", ")}`);
+          if (!rawRecorded) messages.push({ role: "assistant", content: raw || "(no answer)" });
+          messages.push({ role: "user", content: [
+            "GITHUB TASK INCOMPLETE — a read/list result is not proof that the requested mutation happened.",
+            `Required verified action(s): ${pendingGithubActions.join(", ")}.`,
+            `Allowed actions: ${route.allowedGithubActions.join(", ")}.`,
+            "Perform the requested action, wait for server-side read-back/creation proof, then answer. Do not claim completion yet.",
+          ].join("\n") });
+          continue;
+        }
+        lastVerdict = { passed: false, reasons: [reason] };
+        if (held.trim() && !claimsCompletion(held)) opts.onText(held);
+        opts.onText(unverifiedNotice([reason]));
+        opts.onPhase?.("answer", "💬 Answer • GitHub task ยังไม่ครบ");
+        return finish("unverified");
+      }
+      if (route.unsupportedGithubActions.length) {
+        const reason = `GitHub Agent does not support the requested operation: ${route.unsupportedGithubActions.join(", ")}.`;
+        lastVerdict = { passed: false, reasons: [reason] };
+        if (held.trim() && !claimsCompletion(held)) opts.onText(held);
+        opts.onText(unverifiedNotice([reason]));
+        opts.onPhase?.("answer", "💬 Answer • GitHub operation ไม่รองรับ");
+        return finish("unverified");
+      }
       const verified = Boolean(lastVerdict?.passed);
+      if (opts.tools && route.selected.length > 0 && !verified) {
+        if (held.trim() && !claimsCompletion(held)) opts.onText(held);
+        const reason = "ยังไม่มีการเรียกใช้ tool จึงไม่มีหลักฐานยืนยันผลการทำงาน";
+        opts.onText(unverifiedNotice([reason]));
+        opts.onPhase?.("answer", "💬 Answer • ยังไม่มีหลักฐานจาก tool");
+        if (workspace) await safely(() => workspace.remember("latest-unverified", reason, "run"), undefined);
+        return finish("unverified");
+      }
+      if (held.trim()) opts.onText(held);
       if (workspace && raw.trim()) await safely(() => workspace.remember("latest-answer", raw, "conversation"), undefined);
-      opts.onPhase?.("answer", verified ? "💬 Answer • ตอบผลที่ตรวจแล้ว" : "💬 Answer • ตอบผลการสนทนา");
+      opts.onPhase?.("answer", verified ? "💬 Answer • ตอบผลที่ตรวจแล้ว" : "💬 Answer • ตอบในแชต");
       // A successful Sandbox run can legitimately leave the model with no
-      // final prose (for example when the terminal result itself is the
-      // evidence). Never let the UI interpret that verified state as a
-      // failed/empty answer. Emit a deterministic answer from the evidence
-      // gate so the verified result reaches the user.
+      // final prose. Never interpret a missing answer as a failed command.
       if (verified && !raw.trim()) {
         opts.onText(verifiedResultText(opts.priorResult ?? { status: "success", exitCode: 0 }, requireWorkspace));
       }
@@ -331,21 +525,31 @@ export async function runAgentLoop(opts: {
 
     // Tool-call turns are internal execution traffic. Keep them in the live Activity box;
     // only a no-tool turn is allowed to become the final Summary message.
-    if (raw.trim()) messages.push({ role: "assistant", content: raw });
+    if (raw.trim() && !rawRecorded) messages.push({ role: "assistant", content: raw });
     if (raw.trim()) {
       core.remember("latest-plan", raw, "conversation");
       if (workspace) await safely(() => workspace.remember("latest-plan", raw, "conversation"), undefined);
     }
 
-    for (let index = 0; index < githubCalls.length; index++) {
-      const call = githubCalls[index];
+    let githubNeedsRepair = false;
+    for (let index = 0; index < routedGithubCalls.length; index++) {
+      const call = routedGithubCalls[index];
       if (opts.signal.aborted) return finish("aborted");
+      if (githubActionCount >= MAX_GITHUB_ACTIONS_PER_TASK) {
+        const reason = `GitHub Agent reached its ${MAX_GITHUB_ACTIONS_PER_TASK}-action task limit before all requested work was verified.`;
+        lastVerdict = { passed: false, reasons: [reason] };
+        opts.onPhase?.("answer", "💬 Answer • ถึงขีดจำกัดการทำงานของ GitHub");
+        opts.onText(unverifiedNotice([reason]));
+        return finish("unverified");
+      }
+      githubActionCount++;
+      core.attempt();
       if (!opts.executeGithub) {
         opts.onText("\n⚠️ GitHub Agent ยังไม่ได้เชื่อมต่อในเซิร์ฟเวอร์ค่ะ\n");
         return finish("unverified");
       }
       core.setPhase("act");
-      opts.onPhase?.("act", "🛠️ Act • กำลังแก้ไข GitHub");
+      opts.onPhase?.("act", "🛠️ Act • กำลังเรียก GitHub ตาม allow-list");
       opts.onPhase?.("run", `🐙 GitHub • ${call.action}`);
       let result: ToolResult;
       try { result = await opts.executeGithub(call); }
@@ -353,21 +557,30 @@ export async function runAgentLoop(opts: {
       core.setPhase("observe");
       opts.onPhase?.("observe", "👀 Observe • อ่านผลจาก GitHub");
       opts.onText("\n```github\n" + JSON.stringify(result).slice(-20000) + "\n```\n");
-      lastVerdict = { passed: result.status === "success" || result.status === "ok", reasons: result.status === "success" || result.status === "ok" ? [] : [result.error || "GitHub operation failed"] };
+      lastEvidenceTool = "github";
+      lastVerdict = evaluateGithubEvidence(call, result);
+      if (lastVerdict.passed) verifiedGithubActions.add(call.action);
       core.setPhase("verify");
-      opts.onPhase?.("verify", lastVerdict.passed ? "🔍 Verify • GitHub ยืนยันผลแล้ว" : "🔍 Verify • GitHub ไม่ผ่าน");
+      opts.onPhase?.("verify", lastVerdict.passed ? "🔍 Verify • GitHub ยืนยันผลแล้ว" : `🔍 Verify • GitHub ไม่ผ่าน: ${lastVerdict.reasons[0]}`);
+      const evidence = buildGithubEvidence(call, result, lastVerdict, ++evidenceSequence);
+      evidenceRecords.push(evidence);
+      if (evidenceRecords.length > 80) evidenceRecords.splice(0, evidenceRecords.length - 80);
+      opts.onEvidence?.(evidence);
+      if (workspace) await safely(() => workspace.remember(`evidence:${core.task.id}:${evidence.id}`, JSON.stringify(evidence), "episode"), undefined);
       pendingVerified = null;
       if (!lastVerdict.passed) {
+        githubNeedsRepair = true;
         core.setPhase("fix");
-        opts.onPhase?.("fix", "🐛 Fix • แก้ปัญหา GitHub แล้วลองใหม่");
-        messages.push({ role: "user", content: `GITHUB FAILED:\n${lastVerdict.reasons.join("\n")}\nFix the GitHub operation and try again.` });
+        opts.onPhase?.("fix", "🐛 Repair • GitHub action ยังไม่ผ่านหลักฐาน");
+        messages.push({ role: "user", content: `GITHUB FAILED:\n${lastVerdict.reasons.join("\n")}\nRepair this GitHub action only if it is allowed; then verify the result again.` });
         break;
       }
       messages.push({ role: "user", content: `GITHUB RESULT: ${JSON.stringify(result).slice(-12000)}` });
     }
+    if (githubNeedsRepair) continue;
 
-    for (let index = 0; index < calls.length; index++) {
-      const call = calls[index];
+    for (let index = 0; index < routedCalls.length; index++) {
+      const call = routedCalls[index];
       if (opts.signal.aborted) return finish("aborted");
 
       if (count >= max) {
@@ -388,61 +601,80 @@ export async function runAgentLoop(opts: {
         messages.push({ role: "user", content: "BLACKLISTED STRATEGY: " + candidateSignature + "\nDo not execute this same action. Use a materially different runtime/command/approach and verify it." });
         continue;
       }
-      count++;
-      core.attempt();
-      core.setPhase("act");
-      opts.onPhase?.("act", "🛠️ Act • กำลังลงมือ");
-      opts.onPhase?.("run", `💻 Run • กำลังรัน ${call.language} (${count}/${max})`);
-      // Push an immediate visible heartbeat before the sandbox call. The
-      // executor can take several seconds before its first terminal event,
-      // so the chat must never look frozen during Run.
-
-      let result: ToolResult;
-      try {
-        result = await opts.execute(call, forcedCall === call ? opts.initialCallApproved : undefined);
-      } catch (error) {
-        result = { status: opts.signal.aborted ? "aborted" : "error", error: error instanceof Error ? error.message : String(error) };
-      }
-      if (opts.signal.aborted) result = { ...result, status: "aborted" };
-
-      core.setPhase("observe");
-      opts.onPhase?.("observe", "👀 Observe • Sandbox ตอบกลับแล้ว กำลังอ่านผลจริง...");
-      const observed = modelResult(call, result);
-      core.remember(`run-${count}`, observed, "run");
-      if (workspace) await safely(() => workspace.remember(`run-${count}`, observed, "run"), undefined);
-      if (opts.signal.aborted) return finish("aborted");
-
-      lastVerdict = evaluateEvidence(result, { requireWorkspace });
-      core.setPhase("verify");
-      opts.onPhase?.(
-        "verify",
-        lastVerdict.passed
-          ? requireWorkspace ? "🔍 Verify • รันผ่าน + Neon อ่านกลับตรงกับ Sandbox" : "🔍 Verify • รันผ่าน"
-          : `🔍 Verify • ไม่ผ่าน: ${lastVerdict.reasons[0]}`,
-      );
+      let outcome = await executeSandboxAction(call, "execution", forcedCall === call ? opts.initialCallApproved : undefined);
+      if (!outcome) return opts.signal.aborted ? finish("aborted") : finish("limit");
+      let result = outcome.result;
+      let observed = outcome.observed;
+      lastVerdict = outcome.verdict;
       pendingVerified = lastVerdict.passed ? { call, result } : null;
       messages.push({ role: "user", content: observed });
 
-      // A user-entered command is already the requested action. Once that
-      // forced command passes the evidence gate, finish immediately instead
-      // of asking the model to generate the same <run> block again.
-      // Without this boundary a successful command could be replayed up to
-      // the full 11-run recovery budget.
+      if (!lastVerdict.passed) {
+        const diagnosis = planMissingToolInstall(result, call);
+        if (diagnosis) {
+          if (count >= max) {
+            lastVerdict = { passed: false, reasons: [...lastVerdict.reasons, "Run budget exhausted before the missing tool could be installed."] };
+          } else if (!autoInstallBudget.reserve(diagnosis.key)) {
+            const reason = autoInstallBudget.wasTried(diagnosis.key)
+              ? `Repair Engine will not repeat the failed/previous install for ${diagnosis.packageName}.`
+              : "Repair Engine reached the four-attempt automatic-install limit.";
+            lastVerdict = { passed: false, reasons: [...lastVerdict.reasons, reason] };
+          } else {
+            core.setPhase("analyze");
+            opts.onPhase?.("analyze", `🔎 Analyze • พบ ${diagnosis.requestedName} ขาดจาก error จริง`);
+            core.setPhase("fix");
+            opts.onPhase?.("fix", `🧰 Repair • ติดตั้ง ${diagnosis.packageName} แบบ bounded และไม่บันทึกลง manifest`);
+            const installOutcome = await executeSandboxAction(diagnosis.installCall, "auto-install");
+            if (opts.signal.aborted) return finish("aborted");
+            if (!installOutcome) {
+              lastVerdict = { passed: false, reasons: [...lastVerdict.reasons, "ไม่มี run budget สำหรับ auto-install"] };
+            } else {
+              messages.push({ role: "user", content: `AUTO-INSTALL RESULT (${diagnosis.packageName}):\n${installOutcome.observed}` });
+              if (!installCommandPassed(installOutcome.result)) {
+                lastVerdict = { passed: false, reasons: [...lastVerdict.reasons, ...installOutcome.verdict.reasons.map(reason => `Auto-install: ${reason}`)] };
+              } else if (count >= max) {
+                lastVerdict = { passed: false, reasons: [...lastVerdict.reasons, "Dependency installed, but no run budget remained to retry the requested command."] };
+              } else {
+                core.setPhase("analyze");
+                opts.onPhase?.("analyze", `🔎 Analyze • ตรวจ dependency แล้ว; รันคำสั่งเดิมซ้ำเพื่อยืนยัน`);
+                const retry = await executeSandboxAction(call, "execution", forcedCall === call ? opts.initialCallApproved : undefined);
+                if (opts.signal.aborted) return finish("aborted");
+                if (!retry) {
+                  lastVerdict = { passed: false, reasons: [...lastVerdict.reasons, "ไม่มี run budget สำหรับตรวจซ้ำหลังติดตั้ง"] };
+                } else {
+                  result = retry.result;
+                  observed = retry.observed;
+                  lastVerdict = retry.verdict;
+                  pendingVerified = lastVerdict.passed ? { call, result } : null;
+                  messages.push({ role: "user", content: `AUTO-INSTALL RETRY RESULT:\n${observed}` });
+                  const repeatedDiagnosis = !lastVerdict.passed ? planMissingToolInstall(result, call) : null;
+                  if (repeatedDiagnosis && autoInstallBudget.wasTried(repeatedDiagnosis.key)) {
+                    lastVerdict = { passed: false, reasons: [...lastVerdict.reasons, `Dependency ${repeatedDiagnosis.packageName} remained unavailable after its single automatic install; do not repeat it.`] };
+                    pendingVerified = null;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (opts.signal.aborted) return finish("aborted");
       if (lastVerdict.passed && forcedCall === call) {
         opts.onPhase?.("answer", "💬 Answer • คำสั่งผ่านการตรวจสอบแล้ว");
-        if (!raw.trim()) {
-          opts.onText(verifiedResultText(result, requireWorkspace));
-        }
+        if (!raw.trim()) opts.onText(verifiedResultText(result, requireWorkspace));
         return finish("verified");
       }
 
       if (!lastVerdict.passed) {
+        core.setPhase("analyze");
+        opts.onPhase?.("analyze", `🔎 Analyze • ${lastVerdict.reasons[0] ?? "ตรวจพบผลที่ยังไม่ผ่าน"}`);
         core.setPhase("fix");
-        opts.onPhase?.("fix", "🐛 Fix • พบปัญหา กำลังแก้แล้วรันใหม่");
-        const skipped = calls.length - index - 1;
+        opts.onPhase?.("fix", "🛠️ Repair • พบปัญหา กำลังแก้แล้วรันใหม่");
+        const skipped = routedCalls.length - index - 1;
         messages.push({
           role: "user",
-          content: `VERIFY FAILED:\n${lastVerdict.reasons.map(r => `- ${r}`).join("\n")}${skipped ? `\n${skipped} later sandbox block(s) in your message were NOT run.` : ""}\nFix the cause, run again, and verify before answering.`,
+          content: `VERIFY FAILED:\n${lastVerdict.reasons.map(reason => `- ${reason}`).join("\n")}${skipped ? `\n${skipped} later sandbox block(s) in your message were NOT run.` : ""}\nFix the cause, run again, and verify before answering.`,
         });
         break;
       }

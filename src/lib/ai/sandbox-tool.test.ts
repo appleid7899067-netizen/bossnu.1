@@ -81,7 +81,7 @@ test("loop returns actual output to the model while keeping tool traffic out of 
 });
 test("Python Safe block auto-runs, then waits for and observes its real result", async () => {
   let turns = 0, runs = 0;
-  await runAgentLoop({ messages: [{ role: "user", content: "Check this Python calculation" }], signal: new AbortController().signal, tools: true,
+  await runAgentLoop({ messages: [{ role: "user", content: "Run this Python calculation" }], signal: new AbortController().signal, tools: true,
     model: async (messages, emit) => {
       if (!turns++) emit(safeBlock);
       else { assert.match(messages.at(-1)!.content, /python-safe result/); emit("The calculation ran successfully."); }
@@ -93,7 +93,7 @@ test("Python Safe block auto-runs, then waits for and observes its real result",
 });
 test("loop caps executions at eleven", async () => {
   let runs = 0;
-  await runAgentLoop({ messages: [], signal: new AbortController().signal, tools: true, model: async (_, emit) => emit(block), execute: async () => { runs++; return { status: "success" }; }, onText: () => {} });
+  await runAgentLoop({ messages: [{ role: "user", content: "Run the command" }], signal: new AbortController().signal, tools: true, model: async (_, emit) => emit(block), execute: async () => { runs++; return { status: "success" }; }, onText: () => {} });
   assert.equal(runs, 11);
 });
 test("disabled tools and abort never execute", async () => {
@@ -105,8 +105,11 @@ test("disabled tools and abort never execute", async () => {
 });
 test("execution errors are surfaced and model can explain them", async () => {
   let turns = 0;
-  await runAgentLoop({ messages: [], signal: new AbortController().signal, tools: true,
-    model: async (messages, emit) => { if (!turns++) emit(block); else assert.match(messages.at(-1)!.content, /runner unavailable/); },
+  await runAgentLoop({ messages: [{ role: "user", content: "Run tests" }], signal: new AbortController().signal, tools: true,
+    model: async (messages, emit) => {
+      if (!turns++) emit(block);
+      else { assert.match(messages.at(-1)!.content, /runner unavailable/); emit("The runner failed; verification did not pass."); }
+    },
     execute: async () => { throw new Error("runner unavailable"); }, onText: () => {} });
 });
 test("stop interrupts a model that never finishes", async () => {

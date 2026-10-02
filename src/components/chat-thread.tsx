@@ -420,7 +420,7 @@ function LiveExecutionLog({ command, output, fallback }: { command?: string; out
 }
 
 function SaliWorkBars({ activities, live }: { activities: ChatActivity[]; live: boolean }) {
-  const phaseOrder = ["goal", "plan", "act", "run", "observe", "verify", "fix", "answer"];
+  const phaseOrder = ["goal", "plan", "discover", "select-tool", "act", "run", "observe", "analyze", "verify", "fix", "answer"];
   const phaseMap = new Map<string, Extract<ChatActivity, { kind: "phase" }>>();
   for (const activity of activities) {
     if (activity.kind === "phase") phaseMap.set(activity.phase, activity);
@@ -445,7 +445,7 @@ function SaliWorkBars({ activities, live }: { activities: ChatActivity[]; live: 
 }
 
 function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatActivity[]; live: boolean; liveText?: string }) {
-  const phaseOrder = ["goal", "plan", "act", "run", "observe", "verify", "fix", "answer"];
+  const phaseOrder = ["goal", "plan", "discover", "select-tool", "act", "run", "observe", "analyze", "verify", "fix", "answer"];
   const phaseMap = new Map<string, Extract<ChatActivity, { kind: "phase" }>>();
   for (const activity of activities) {
     if (activity.kind === "phase") phaseMap.set(activity.phase, activity);
@@ -453,10 +453,12 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
   const phases = phaseOrder
     .map(phase => phaseMap.get(phase))
     .filter((activity): activity is Extract<ChatActivity, { kind: "phase" }> => Boolean(activity))
-    .slice(-7);
+    .slice(-10);
   const latestCommand = [...activities].reverse().find((activity): activity is Extract<ChatActivity, { kind: "command" }> => activity.kind === "command");
   const fileActivity = [...activities].reverse().find(activity => activity.kind === "files");
   const skillActivity = [...activities].reverse().find(activity => activity.kind === "skill");
+  const recentEvidence = activities.filter((activity): activity is Extract<ChatActivity, { kind: "evidence" }> => activity.kind === "evidence").slice(-3);
+  const latestEvidence = recentEvidence.at(-1);
   const filteredOutput = (latestCommand?.output || liveText)
     .split("\n")
     .filter(line => line.trim())
@@ -465,20 +467,29 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
     .join("\n");
 
   const tokenForPhase = (phase: string) => phase.toUpperCase();
-  const statusToken = latestCommand
-    ? latestCommand.status === "success" ? "✓ RUN" : latestCommand.status === "running" ? "RUN" : "✕ RUN"
-    : fileActivity
-      ? "✓ EDIT"
-      : skillActivity
-        ? skillActivity.status === "saved" ? "✓ SKILL" : "✕ SKILL"
-        : live ? "RUN" : "✓ DONE";
+  const latestAnswerPhase = [...activities].reverse().find((activity): activity is Extract<ChatActivity, { kind: "phase" }> => activity.kind === "phase" && activity.phase === "answer");
+  const answerSignalsFailure = Boolean(latestAnswerPhase && /ไม่ผ่าน|unverified|ไม่มีหลักฐาน|ถึงขีดจำกัด|ไม่เชื่อมต่อ|ไม่รองรับ|ยังไม่ครบ|บล็อก/i.test(latestAnswerPhase.label));
+  const completionVerified = latestEvidence?.status === "verified";
+  const commandMissingEvidence = latestCommand?.status === "success" && !latestEvidence;
+  const completionFailed = answerSignalsFailure || commandMissingEvidence || Boolean(latestEvidence && latestEvidence.status !== "verified");
+  const statusToken = completionFailed
+    ? latestEvidence?.status === "failed" ? "✕ FAILED" : "! UNVERIFIED"
+    : latestEvidence
+      ? latestEvidence.status === "verified" ? "✓ VERIFIED" : latestEvidence.status === "failed" ? "✕ FAILED" : "! UNVERIFIED"
+      : latestCommand
+        ? latestCommand.status === "success" ? "✓ RUN" : latestCommand.status === "running" ? "RUN" : "✕ RUN"
+        : fileActivity
+          ? "✓ EDIT"
+          : skillActivity
+            ? skillActivity.status === "saved" ? "✓ SKILL" : "✕ SKILL"
+            : live ? "RUN" : latestAnswerPhase ? "✓ ANSWERED" : "✓ DONE";
 
   return (
     <section aria-label="SALI live stream" className={`sali-devlog mb-3${live ? " sali-devlog-live" : " sali-devlog-done"}`}>
       <div className="sali-devlog-head">
-        <span className="sali-devlog-title">{live ? "สลี่กำลังทำงาน" : "สลี่ทำงานเสร็จแล้ว"}</span><span className="sali-premium-badge">PREMIUM SANDBOX • E2B</span>
+        <span className="sali-devlog-title">{live ? "สลี่กำลังทำงาน" : completionFailed ? "สลี่หยุดที่การตรวจสอบ" : completionVerified ? "สลี่ทำงานเสร็จและตรวจแล้ว" : "สลี่ตอบแล้ว"}</span><span className="sali-premium-badge">SALI AGENT OS • ROUTED TOOLS</span>
         <span className="sali-devlog-headline" aria-hidden="true" />
-        {live ? <span className="sali-live-cursor" aria-label="กำลังทำงาน" /> : <span className="sali-summary-mark" aria-label="เสร็จแล้ว">✓</span>}
+        {live ? <span className="sali-live-cursor" aria-label="กำลังทำงาน" /> : <span className={`sali-summary-mark${completionFailed ? " is-failed" : ""}`} aria-label={completionFailed ? "ยังไม่ยืนยัน" : completionVerified ? "ยืนยันแล้ว" : "ตอบแล้ว"}>{completionFailed ? "!" : "✓"}</span>}
       </div>
       <div className="sali-devlog-body">
         <SaliWorkBars activities={activities} live={live} />
@@ -494,6 +505,24 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
             <span className={`sali-flow-token ${live ? "sali-flow-live" : "sali-flow-ok"}`}>{statusToken}{live ? <span className="sali-terminal-caret" /> : null}</span>
           </span>
         </div>
+        {recentEvidence.length ? (
+          <div className="grid gap-2" aria-label="Evidence Engine">
+            {recentEvidence.map(record => (
+              <article key={record.id} className="rounded-xl border border-border bg-elevated/70 px-3 py-2 text-xs">
+                <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className={record.status === "verified" ? "font-semibold text-emerald-400" : record.status === "failed" ? "font-semibold text-red-400" : "font-semibold text-amber-400"}>
+                    {record.status === "verified" ? "✓ VERIFIED" : record.status === "failed" ? "✕ FAILED" : "! UNVERIFIED"}
+                  </span>
+                  <span className="text-subtle">{record.tool.toUpperCase()} / {record.action}{record.stage === "auto-install" ? " • AUTO-INSTALL" : ""}</span>
+                  <span className="text-fg">{record.result}</span>
+                </div>
+                <p className="break-words text-fg"><strong>WHAT</strong> {record.what}</p>
+                <p className="break-words text-subtle"><strong>WHERE</strong> {record.where.join(", ")}</p>
+                <p className="break-words text-subtle"><strong>EVIDENCE</strong> {record.evidence.slice(0, 3).join(" • ")}</p>
+              </article>
+            ))}
+          </div>
+        ) : null}
         {live && (latestCommand || filteredOutput) ? (
           <LiveExecutionLog command={latestCommand?.command} output={filteredOutput} fallback="" />
         ) : null}

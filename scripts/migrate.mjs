@@ -6,8 +6,9 @@
  * in ../migrations to DATABASE_URL. Each file is applied in one transaction and
  * recorded in a `_migrations` table, so it runs once and is safe to re-run.
  *
- * The read is non-recursive, so the opt-in auth schema under migrations/auth/
- * is not applied to an app that never asked for sign-in.
+ * The read is non-recursive, so the canonical schema under migrations/auth/
+ * is not applied by itself. This auth-enabled workspace includes a top-level
+ * production copy at migrations/0002_auth_schema.sql.
  *
  * No DATABASE_URL (local / preview builds) -> skip; the PGLite fallback applies
  * the same files at startup instead (see src/lib/db.ts).

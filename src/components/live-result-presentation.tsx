@@ -45,11 +45,14 @@ function usefulOutput(output?: string) {
 const PHASE_LABELS: Record<PhaseActivity["phase"], string> = {
   goal: "GOAL",
   plan: "PLAN",
+  discover: "DISCOVER",
+  "select-tool": "SELECT TOOL",
   act: "ACT",
   run: "RUN",
   observe: "OBSERVE",
+  analyze: "ANALYZE",
   verify: "VERIFY",
-  fix: "FIX",
+  fix: "REPAIR",
   answer: "ANSWER",
 };
 
@@ -60,6 +63,8 @@ export function LiveResultPresentation({ activities, live }: Props) {
   const streams = latestStreams(activities);
   const packages = packageNames(command?.command, command?.output);
   const output = usefulOutput(command?.output);
+  const evidence = [...activities].reverse().find((activity): activity is Extract<ChatActivity, { kind: "evidence" }> => activity.kind === "evidence");
+  const answerFailed = Boolean(phase?.phase === "answer" && /ไม่ผ่าน|unverified|ไม่มีหลักฐาน|ถึงขีดจำกัด|ไม่เชื่อมต่อ|ไม่รองรับ|ยังไม่ครบ|บล็อก/i.test(phase.label));
 
   const phaseTrail = useMemo(() => {
     const phases = activities
@@ -75,20 +80,22 @@ export function LiveResultPresentation({ activities, live }: Props) {
 
   const success = command?.status === "success";
   const failed = command?.status === "error";
-  const syncVerified = Boolean(command?.sync?.verified && command.sync.complete);
+  const syncVerified = Boolean(command?.status === "success" && command.sync?.verified && command.sync.complete);
+  const verified = evidence?.status === "verified" || syncVerified;
+  const verificationFailed = answerFailed || Boolean(evidence && evidence.status !== "verified") || (success && !verified);
   const working = live && !failed;
-  const status = failed ? "ERROR" : syncVerified ? "VERIFIED" : working ? "LIVE" : "DONE";
+  const status = failed ? "ERROR" : verificationFailed ? "UNVERIFIED" : verified ? "VERIFIED" : working ? "LIVE" : "DONE";
 
   if (!command && !files.length && !phaseTrail.length && !streams.length) return null;
 
   return (
-    <section className={`sali-result-visual ${working ? "is-live" : ""} ${failed ? "is-error" : ""}`} aria-label="กระบวนการทำงานจริงของ Sali">
+    <section className={`sali-result-visual ${working ? "is-live" : ""} ${failed || verificationFailed ? "is-error" : ""}`} aria-label="กระบวนการทำงานจริงของ Sali">
       <div className="sali-result-visual-head">
         <div>
           <span className="sali-result-kicker">SALI / LIVE EXECUTION</span>
-          <strong>{working ? "กำลังแสดงกระบวนการจากงานจริง" : success ? "กระบวนการเสร็จและตรวจแล้ว" : failed ? "กระบวนการหยุดที่ Error" : "กระบวนการทำงาน"}</strong>
+          <strong>{working ? "กำลังแสดงกระบวนการจากงานจริง" : failed ? "กระบวนการหยุดที่ Error" : verificationFailed ? "สลี่หยุดที่การตรวจสอบ" : verified ? "กระบวนการเสร็จและตรวจแล้ว" : "กระบวนการทำงาน"}</strong>
         </div>
-        <span className={`sali-result-state ${failed ? "bad" : syncVerified ? "ok" : "work"}`}>{status}</span>
+        <span className={`sali-result-state ${failed || verificationFailed ? "bad" : verified ? "ok" : "work"}`}>{status}</span>
       </div>
 
       <div className="sali-result-flow" aria-live={working ? "polite" : "off"}>

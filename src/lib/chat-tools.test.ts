@@ -14,7 +14,11 @@ test("attachments: text and code files are accepted, binaries are not", () => {
 
 test("attachments: size, type and count limits are enforced with readable errors", async () => {
   const big = file("big.txt", "x".repeat(MAX_ATTACHMENT_BYTES + 1));
-  const { added, errors } = await readAttachments([file("a.ts", "const a = 1;"), file("x.png", "png", "image/png"), big], []);
+  const { added, errors } = await readAttachments([
+    file("a.ts", "const a = 1;"),
+    file("x.bin", "binary", "application/octet-stream"),
+    big,
+  ], []);
   assert.deepEqual(added.map((f) => f.name), ["a.ts"]);
   assert.equal(added[0].content, "const a = 1;");
   assert.equal(errors.length, 2);
