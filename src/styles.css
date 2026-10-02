@@ -445,6 +445,41 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius
   flex: 0 0 auto;
 }
 
+/* ChatGPT-like activity density: keep internal execution details compact and secondary. */
+.sali-devlog-flow {
+  scrollbar-width: none;
+}
+.sali-devlog-flow::-webkit-scrollbar { display: none; }
+.sali-devlog .sali-stream-output {
+  max-height: 132px;
+  border-color: color-mix(in srgb, var(--color-border) 72%, transparent);
+  border-radius: 12px;
+  box-shadow: none;
+}
+.sali-devlog .sali-stream-output-head {
+  min-height: 38px;
+  padding: 3px 7px;
+}
+.sali-devlog .sali-stream-tabs button {
+  padding: 5px 8px;
+  font-size: 11px;
+}
+.sali-devlog .sali-stream-actions button {
+  width: 30px;
+  height: 30px;
+}
+.sali-devlog .sali-stream-command {
+  padding: 6px 9px;
+  font-size: 10px;
+}
+.sali-devlog .sali-stream-log {
+  min-height: 54px;
+  max-height: 78px;
+  padding: 7px 9px 10px;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
 .sali-stream-output {
   margin: 0;
   overflow: hidden;
