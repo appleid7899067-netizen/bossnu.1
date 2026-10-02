@@ -352,7 +352,7 @@ export function AppShell({ search }: { search: Search }) {
             ? (result.workspaceFiles ?? []).find(file => file.path === htmlPath)
             : undefined;
           const htmlLooksRenderable = htmlWorkspaceFile
-            ? /<(?:body|main|div|section|canvas|svg|button|h[1-6]|p|script|style)\\b/i.test(String(htmlWorkspaceFile.content ?? ""))
+            ? /<(?:body|main|div|section|canvas|svg|button|h[1-6]|p|script|style)\b/i.test(String(htmlWorkspaceFile.content ?? ""))
             : true;
           if (htmlPath && htmlLooksRenderable) {
             try {
