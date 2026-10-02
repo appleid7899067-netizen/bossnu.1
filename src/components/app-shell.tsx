@@ -564,6 +564,12 @@ ${message}`); toast.error(message); }
     stopVoice();
   }
 
+  function sendToGpt() {
+    if (busyChat || !draft.trim() && !attachments.length) return;
+    store.setSelectedModel("gpt-5.6-luna");
+    void send(commandForTool(draft), activeChat?.id, undefined, false, attachments);
+  }
+
   async function emergencyFix() {
     const id = activeChat?.id;
     if (!id) return;
@@ -946,6 +952,7 @@ ${message}`); toast.error(message); }
                 onChange={setDraft}
                 onSubmit={() => void send(commandForTool(draft), activeChat?.id, undefined, false, attachments)}
                 onEmergency={() => void emergencyFix()}
+                onSendToGpt={() => void sendToGpt()}
                 attachments={attachments}
                 onAttachments={setAttachments}
                 inputRef={composerRef}
