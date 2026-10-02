@@ -63,6 +63,33 @@ async function getPuter() {
   return mod.default;
 }
 
+export async function enrichMediaContext(messages: { role: "user" | "assistant"; content: string }[], attachments: Array<{ name: string; size: number; content: string; mimeType?: string; kind?: "text" | "image" | "audio" }>) {
+  if (!attachments.length || typeof window === "undefined") return messages;
+  const media = attachments.filter((file) => file.kind === "image" || file.kind === "audio" || file.mimeType?.startsWith("image/") || file.mimeType?.startsWith("audio/"));
+  if (!media.length) return messages;
+  const puter = await ensurePuterSignedIn();
+  const analyses: string[] = [];
+  for (const file of media.slice(0, 4)) {
+    try {
+      if (file.kind === "audio" || file.mimeType?.startsWith("audio/")) {
+        const result = await puter.ai.speech2txt(file.content, { model: "gpt-4o-mini-transcribe" });
+        const text = typeof result === "string" ? result : String((result as Record<string, unknown>)?.text ?? "");
+        analyses.push("AUDIO TRANSCRIPT [" + file.name + "]:\\n" + (text.trim() || "[ไม่มีข้อความที่ตรวจพบ]"));
+      } else {
+        const result = await puter.ai.chat("วิเคราะห์รูปภาพนี้เพื่อช่วยตอบผู้ใช้ ระบุสิ่งที่เห็น ข้อความสำคัญ และรายละเอียดที่เกี่ยวข้องแบบกระชับ", file.content, { model: "gemini-3.8-flash", stream: false, normalize: true });
+        const text = typeof result === "string" ? result : String((result as Record<string, unknown>)?.message?.content ?? (result as Record<string, unknown>)?.text ?? result);
+        analyses.push("IMAGE ANALYSIS [" + file.name + "]:\\n" + text.trim());
+      }
+    } catch (error) {
+      analyses.push("MEDIA ANALYSIS [" + file.name + "]: ยังวิเคราะห์ไฟล์นี้ไม่ได้ (" + (error instanceof Error ? error.message : "unknown error") + ")");
+    }
+  }
+  if (!analyses.length) return messages;
+  const index = [...messages].reverse().findIndex((m) => m.role === "user");
+  const target = index < 0 ? messages.length - 1 : messages.length - 1 - index;
+  return messages.map((m, i) => i === target ? { ...m, content: m.content + "\\n\\n" + analyses.join("\\n\\n") } : m);
+}
+
 export async function ensurePuterSignedIn() {
   const puter = await getPuter();
   if (!puter.auth.isSignedIn()) await puter.auth.signIn();
