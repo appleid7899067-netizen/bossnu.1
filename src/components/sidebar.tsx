@@ -36,7 +36,7 @@ export function Sidebar({ view, onView, conversations, maps, activeChatId, activ
     </div>
     <nav className="mt-4 flex flex-col gap-1 px-3">
       <NavItem active={view === "chat"} icon={MessageSquare} label="แชต" onClick={() => onView("chat")} />
-      <NavItem active={view === "maps"} icon={GitBranch} label="แผนผังความคิด" onClick={() => onView("maps")} />
+      <NavItem active={view === "maps"} icon={GitBranch} label="แผนที่ดาวเทียม" onClick={() => onView("maps")} />
       <NavItem active={view === "studio"} icon={ImageIcon} label="สตูดิโอรูปภาพ" onClick={() => onView("studio")} />
       <NavItem active={view === "builder"} icon={Bot} label="AI Builder" onClick={() => onView("builder")} />
       <NavItem active={view === "files"} icon={FileStack} label="ไฟล์โปรเจ็ค" onClick={() => onView("files")} />
