@@ -367,22 +367,25 @@ function ContextualReplyActions({ onAction }: { text: string; onAction: (action:
 }
 
 
-function LiveExecutionLog({ command, output, fallback }: { command?: string; output?: string; fallback?: string }) {
+function LiveExecutionLog({ command, output, fallback, status = "running" }: { command?: string; output?: string; fallback?: string; status?: string }) {
   const logRef = useRef<HTMLPreElement>(null);
-  const [tab, setTab] = useState<"preview" | "code">("preview");
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const text = output?.trimEnd() || fallback?.trimEnd() || "กำลังรอข้อมูลจาก Sandbox…";
-  const visibleText = tab === "code" && command ? command : text;
+  const visibleText = text.length <= 20000
+    ? text
+    : text.slice(0, 9000) + "\n\n… [output ยาวเกินพื้นที่ แสดงส่วนต้นและส่วนท้าย] …\n\n" + text.slice(-11000);
+  const isRunning = status === "running";
+  const runtime = /^(?:npm|pnpm|yarn|bun)\b/i.test(command ?? "") ? "NODE / BASH" : /^(?:python|python3)\b/i.test(command ?? "") ? "PYTHON / BASH" : "BASH";
 
   useEffect(() => {
     const element = logRef.current;
-    if (element && tab === "preview") element.scrollTop = element.scrollHeight;
-  }, [text, tab]);
+    if (element && isRunning) element.scrollTop = element.scrollHeight;
+  }, [visibleText, isRunning]);
 
   async function copyLog() {
     try {
-      await navigator.clipboard.writeText(visibleText);
+      await navigator.clipboard.writeText(command ? `$ ${command}\n\n${text}` : text);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1400);
     } catch {
@@ -391,30 +394,42 @@ function LiveExecutionLog({ command, output, fallback }: { command?: string; out
   }
 
   function downloadLog() {
-    const blob = new Blob([visibleText], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob([command ? `$ ${command}\n\n${text}` : text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = tab === "code" ? "sali-command.sh" : "sali-live-output.log";
+    anchor.download = "sali-terminal.log";
     anchor.click();
     URL.revokeObjectURL(url);
   }
 
   return (
-    <div className={`sali-stream-output${expanded ? " sali-stream-expanded" : ""}`} aria-label="บันทึกการทำงานสด" aria-live="polite">
-      <div className="sali-stream-output-head">
-        <div className="sali-stream-tabs">
-          <button type="button" data-active={tab === "preview"} onClick={() => setTab("preview")}>ตัวอย่าง</button>
-          <button type="button" data-active={tab === "code"} onClick={() => setTab("code")}>โค้ด</button>
-        </div>
+    <div className={`sali-stream-output sali-arena-terminal${expanded ? " sali-stream-expanded" : ""}`} aria-label="SALI Agent Terminal" aria-live="polite">
+      <div className="sali-arena-browserbar">
+        <span className="sali-arena-dot" /><span className="sali-arena-dot" /><span className="sali-arena-dot" />
+        <span className="sali-arena-location">arena.ai / agent / SALI</span>
         <div className="sali-stream-actions">
           <button type="button" onClick={() => void copyLog()} aria-label="คัดลอก">{copied ? <Check /> : <Copy />}</button>
           <button type="button" onClick={downloadLog} aria-label="ดาวน์โหลด"><Download /></button>
           <button type="button" onClick={() => setExpanded(value => !value)} aria-label={expanded ? "ย่อ" : "ขยาย"}>{expanded ? <Minimize2 /> : <Maximize2 />}</button>
         </div>
       </div>
-      {tab === "preview" && command ? <div className="sali-stream-command"><span>$</span>{command}</div> : null}
-      <pre ref={logRef} className="sali-stream-log"><code>{visibleText}</code>{tab === "preview" ? <span className="sali-terminal-caret" /> : null}</pre>
+      <div className="sali-arena-terminal-head">
+        <span className="sali-arena-prompt">›_</span>
+        <span>{isRunning ? "RUNNING" : "COMPLETED"} {runtime}</span>
+        <span className={`sali-arena-status ${isRunning ? "is-running" : "is-done"}`}>{isRunning ? "●" : status === "success" ? "✓" : "!"}</span>
+      </div>
+      {command ? (
+        <div className="sali-stream-command">
+          <span>$</span><code>{command}</code>
+        </div>
+      ) : null}
+      <div className="sali-arena-section-label">STDOUT</div>
+      <pre ref={logRef} className="sali-stream-log"><code>{visibleText}</code>{isRunning ? <span className="sali-terminal-caret" /> : null}</pre>
+      <div className="sali-arena-footer">
+        <span>{isRunning ? "กำลังรับ output จาก Sandbox…" : "การรันสิ้นสุดแล้ว"}</span>
+        <span>{status === "success" ? "✓ VERIFIED PATH" : isRunning ? "LIVE" : "CHECK EVIDENCE"}</span>
+      </div>
     </div>
   );
 }
@@ -463,7 +478,6 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
     .split("\n")
     .filter(line => line.trim())
     .filter(line => !/^\s*(npm notice|npm warn|warning|deprecated|up to date|found \d+ vulnerabilities|exitCode|workspace sync|workspaceSync|process exited)/i.test(line))
-    .slice(-12)
     .join("\n");
 
   const tokenForPhase = (phase: string) => phase.toUpperCase();
@@ -523,8 +537,13 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
             ))}
           </div>
         ) : null}
-        {live && (latestCommand || filteredOutput) ? (
-          <LiveExecutionLog command={latestCommand?.command} output={filteredOutput} fallback="" />
+        {(latestCommand || filteredOutput) ? (
+          <LiveExecutionLog
+            command={latestCommand?.command}
+            output={filteredOutput}
+            fallback=""
+            status={latestCommand?.status ?? (live ? "running" : "success")}
+          />
         ) : null}
       </div>
     </section>
