@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from "react";
+import { useMemo } from "react";
 import type { ChatActivity } from "@/lib/types";
 
 type Props = { activities: ChatActivity[]; live: boolean };
@@ -69,6 +69,11 @@ export function LiveResultPresentation({ activities, live }: Props) {
   const streams = latestStreams(activities);
   const packages = packageNames(command?.command, command?.output);
   const output = usefulOutput(command?.output);
+  const streamLines = streams.map((item) => {
+    const source = item.source === "sandbox" ? "SANDBOX" : item.source.toUpperCase();
+    const state = item.status === "error" ? "✕" : item.status === "done" ? "✓" : "●";
+    return `[${source}] ${state} ${item.text || "กำลังรับ stream..."}`;
+  });
   const evidence = [...activities].reverse().find((activity): activity is Extract<ChatActivity, { kind: "evidence" }> => activity.kind === "evidence");
   const answerFailed = Boolean(phase?.phase === "answer" && /ไม่ผ่าน|unverified|ไม่มีหลักฐาน|ถึงขีดจำกัด|ไม่เชื่อมต่อ|ไม่รองรับ|ยังไม่ครบ|บล็อก/i.test(phase.label));
 
@@ -118,40 +123,36 @@ export function LiveResultPresentation({ activities, live }: Props) {
       </div>
 
       <div className="sali-result-stage">
-        {streams.map((item, index) => (
-          <div key={item.id} className="sali-result-stack sali-result-stream" style={{ "--sali-delay": `${index * 70}ms` } as CSSProperties}>
-            <div className="sali-result-stream-head">
-              <div className="sali-result-stack-title">{item.source === "sandbox" ? "SALI ↔ SANDBOX" : item.source.toUpperCase() + " STREAM"}</div>
-              <span className={item.status === "error" ? "bad" : item.status === "done" ? "ok" : "live"}>
-                {item.status === "error" ? "ERROR" : item.status === "done" ? "✓ DONE" : "● LIVE"}
-              </span>
-            </div>
-            <div className="sali-result-stream-status">
-              <span>{item.text || "กำลังรอข้อมูล..."}</span>
-              {item.chars ? <span>{item.chars.toLocaleString()} chars</span> : null}
-            </div>
+        <div className="sali-result-terminal sali-result-terminal-unified" aria-label="SALI Unified Terminal">
+          <div className="sali-result-terminal-top">
+            <div className="sali-result-terminal-title"><span>›_</span> SALI / TERMINAL</div>
+            <span className={failed || verificationFailed ? "bad" : verified ? "ok" : working ? "live" : "ok"}>
+              {failed ? "✕ ERROR" : verificationFailed ? "UNVERIFIED" : verified ? "✓ VERIFIED" : working ? "● LIVE" : "✓ DONE"}
+            </span>
           </div>
-        ))}
 
-        {command ? (
-          <div className="sali-result-terminal">
-            <div className="sali-result-terminal-top">
-              <div className="sali-result-terminal-title"><span>›_</span> RUN / REAL COMMAND</div>
-              <span className={command.status === "running" ? "live" : command.status === "success" ? "ok" : "bad"}>
-                {command.status === "running" ? "● RUNNING" : command.status === "success" ? "✓ DONE" : "✕ ERROR"}
-              </span>
-            </div>
-            <div className="sali-result-command sali-result-terminal-command" title={command.command}>
-              <span>›</span><code>{command.command}</code>
-            </div>
-            <div className="sali-result-terminal-label">REAL OUTPUT</div>
-            <pre className="sali-result-terminal-output" aria-live={working ? "polite" : "off"}>{output.length ? output.join("\n") : "กำลังรอ REAL OUTPUT จาก Sandbox…"}</pre>
-            <div className="sali-result-terminal-foot">
-              <span>{command.status === "running" ? "กำลังรับ output จาก E2B…" : "สตรีมจบ"}</span>
-              <span>{command.output ? command.output.length.toLocaleString() + " chars" : "LIVE"}</span>
-            </div>
+          <div className="sali-result-terminal-output sali-result-unified-log" aria-live={working ? "polite" : "off"}>
+            {streamLines.map((line, index) => <div key={`stream-${index}`} className="sali-result-output-line">{line}</div>)}
+            {command ? (
+              <>
+                <div className="sali-result-terminal-label">REAL COMMAND</div>
+                <div className="sali-result-command sali-result-terminal-command" title={command.command}>
+                  <span>›</span><code>{command.command}</code>
+                </div>
+                <div className="sali-result-terminal-label">REAL OUTPUT</div>
+                {output.length
+                  ? output.map((line, index) => <div key={`output-${index}`} className="sali-result-output-line">{line}</div>)
+                  : <div className="sali-result-output-line">กำลังรอ REAL OUTPUT จาก Sandbox…</div>}
+              </>
+            ) : null}
+            {!streamLines.length && !command ? <div className="sali-result-output-line">กำลังเตรียม stream จาก Agent…</div> : null}
           </div>
-        ) : null}
+
+          <div className="sali-result-terminal-foot">
+            <span>{working ? "Puter + Sandbox stream อยู่ใน Terminal เดียว" : "สตรีมจบ"}</span>
+            <span>{command?.output ? command.output.length.toLocaleString() + " chars" : streams.length ? `${streams.length} stream` : "LIVE"}</span>
+          </div>
+        </div>
 
         {packages.length ? (
           <div className="sali-result-stack">
@@ -176,18 +177,7 @@ export function LiveResultPresentation({ activities, live }: Props) {
               </div>
             ))}
           </div>
-        ) : null}
-
-        {output.length ? (
-          <div className="sali-result-output">
-            <div className="sali-result-stack-title">REAL OUTPUT</div>
-            {output.map((line, index) => <div key={index} className="sali-result-output-line">{line}</div>)}
-          </div>
-        ) : null}
-
-        {working && !command && !streams.length ? (
-          <div className="sali-result-empty">กำลังเตรียมขั้นตอนถัดไปจาก Agent จริง...</div>
-        ) : null}
+        )}
       </div>
     </section>
   );
