@@ -35,6 +35,10 @@ export const PUTER_MODELS: PuterModelOption[] = [
   { id: "qwen/qwen-2.5-coder-32b-instruct", label: "Qwen2.5 Coder 32B Instruct", provider: "Qwen", role: "coding" },
   { id: "qwen/qwen-2.5-7b-instruct", label: "Qwen2.5 7B Instruct", provider: "Qwen", role: "fast" },
   { id: "qwen/qwen-2.5-72b-instruct", label: "Qwen2.5 72B Instruct", provider: "Qwen", role: "balanced" },
+  { id: "qwen/qwen3.8-27b:free", label: "Qwen3.8 27B • FREE", provider: "Qwen", role: "balanced" },
+  { id: "qwen/qwen3.8-2.4t-a95b", label: "Qwen3.8 2.4T A95B", provider: "Qwen", role: "reasoning" },
+  { id: "qwen/qwen3.5-plus-2026-04-20", label: "Qwen3.5 Plus • 2026-04-20", provider: "Qwen", role: "balanced" },
+  { id: "qwen/qwen3.5-plus-2026-02-15", label: "Qwen3.5 Plus • 2026-02-15", provider: "Qwen", role: "balanced" },
 
   { id: "deepseek/deepseek-v4-flash-vision-exp", label: "DeepSeek V4 Flash Vision • Experimental", provider: "DeepSeek", role: "balanced" },
   { id: "deepseek/deepseek-ocr", label: "DeepSeek OCR", provider: "DeepSeek", role: "fast" },
