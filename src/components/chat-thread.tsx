@@ -448,15 +448,14 @@ function SaliWorkBars({ activities, live }: { activities: ChatActivity[]; live: 
 }
 
 function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatActivity[]; live: boolean; liveText?: string }) {
-  const phaseOrder = ["goal", "plan", "discover", "select-tool", "act", "run", "observe", "analyze", "verify", "fix", "answer"];
-  const phaseMap = new Map<string, Extract<ChatActivity, { kind: "phase" }>>();
-  for (const activity of activities) {
-    if (activity.kind === "phase") phaseMap.set(activity.phase, activity);
-  }
-  const phases = phaseOrder
-    .map(phase => phaseMap.get(phase))
-    .filter((activity): activity is Extract<ChatActivity, { kind: "phase" }> => Boolean(activity))
-    .slice(-10);
+  // Keep the live trace in the order events actually happened. Repeated
+  // identical adjacent phases are collapsed so retries don't clutter the row.
+  const phaseEvents = activities.filter(
+    (activity): activity is Extract<ChatActivity, { kind: "phase" }> => activity.kind === "phase",
+  );
+  const phases = phaseEvents.filter((activity, index) =>
+    index === 0 || phaseEvents[index - 1]?.phase !== activity.phase
+  ).slice(-10);
   const latestCommand = [...activities].reverse().find((activity): activity is Extract<ChatActivity, { kind: "command" }> => activity.kind === "command");
   const fileActivity = [...activities].reverse().find(activity => activity.kind === "files");
   const skillActivity = [...activities].reverse().find(activity => activity.kind === "skill");
@@ -470,6 +469,12 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
     .join("\n");
 
   const tokenForPhase = (phase: string) => phase.toUpperCase();
+  const htmlPreviewRequested = /\\bhtml\\b|\\.html\\b|html core|preview/i.test([
+    latestCommand?.command ?? "",
+    latestCommand?.output ?? "",
+    liveText,
+    ...activities.filter(activity => activity.kind === "files").map(activity => JSON.stringify(activity)),
+  ].join("\\n"));
   const latestAnswerPhase = [...activities].reverse().find((activity): activity is Extract<ChatActivity, { kind: "phase" }> => activity.kind === "phase" && activity.phase === "answer");
   const answerSignalsFailure = Boolean(latestAnswerPhase && /ไม่ผ่าน|unverified|ไม่มีหลักฐาน|ถึงขีดจำกัด|ไม่เชื่อมต่อ|ไม่รองรับ|ยังไม่ครบ|บล็อก/i.test(latestAnswerPhase.label));
   const completionVerified = latestEvidence?.status === "verified";
@@ -507,6 +512,12 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
             {phases.length ? <span className="sali-flow-arrow" aria-hidden="true">→</span> : null}
             <span className={`sali-flow-token ${live ? "sali-flow-live" : "sali-flow-ok"}`}>{statusToken}{live ? <span className="sali-terminal-caret" /> : null}</span>
           </span>
+          {htmlPreviewRequested ? (
+            <span className="sali-flow-item sali-flow-html-preview">
+              <span className="sali-flow-arrow" aria-hidden="true">»</span>
+              <span className="sali-flow-token">HTML CORE / PREVIEW</span>
+            </span>
+          ) : null}
         </div>
         {recentEvidence.length ? (
           <div className="grid gap-2" aria-label="Evidence Engine">
