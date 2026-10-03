@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "node scripts/with-app-env.mjs vite dev --host 0.0.0.0 --port 8080",
-    "build": "node scripts/with-app-env.mjs vite build && npm run db:migrate",
+    "build": "node scripts/with-app-env.mjs vite build",
     "db:migrate": "node scripts/migrate.mjs",
     "build:dev": "node scripts/with-app-env.mjs vite build --mode development",
     "preview": "node scripts/with-app-env.mjs vite preview",
@@ -22,7 +22,8 @@
     "start": "node .output/server/index.mjs",
     "build:render": "RENDER=true npm run build",
     "test:production": "node scripts/sandbox-production-e2e.mjs",
-    "test:render": "node scripts/sandbox-production-e2e.mjs --render"
+    "test:render": "node scripts/sandbox-production-e2e.mjs --render",
+    "db:migrate:deploy": "node scripts/migrate.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
