@@ -32,7 +32,7 @@ import { conversationToMarkdown } from "@/lib/store";
 import { useAppearance } from "@/lib/use-appearance";
 import { cn, uid } from "@/lib/utils";
 import { assessSandboxRisk, detectSandboxInput, shouldExecuteSandboxInput } from "@/lib/sandbox/detect";
-import { hasGithubIntent } from "@/lib/ai/tool-router";
+import { hasGithubIntent, routeAgentTools } from "@/lib/ai/tool-router";
 import { sandboxClient } from "@/lib/sandbox-client";
 import { sandboxPreviewDocument } from "@/lib/sandbox/preview";
 import { PUTER_MODELS } from "@/lib/ai/models";
@@ -163,7 +163,8 @@ export function AppShell({ search }: { search: Search }) {
     if (!content && !files.length) return;
     const detection = detectSandboxInput(content);
     const sandboxIntent = shouldExecuteSandboxInput(content, detection);
-    const executionRequested = forceExecution || sandboxIntent || hasGithubIntent(content);
+    const agentRoute = routeAgentTools(content, { sandbox: true, github: true }, { sandboxIntent });
+    const executionRequested = forceExecution || sandboxIntent || hasGithubIntent(content) || agentRoute.selected.includes("github");
     if (detection.command && detection.dangerous && !allowDangerous) {
       setDangerousApproval({ content, chatId, mode, attachments: files, reason: detection.riskReason ?? "คำสั่งนี้อาจกระทบไฟล์" });
       return;
