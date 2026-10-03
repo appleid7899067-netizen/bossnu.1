@@ -70,7 +70,7 @@ async function handle(request: Request): Promise<Response> {
   return new Response(stream, { status: 200, headers: corsHeaders() });
 }
 
-export const Route = createFileRoute("/api/sandbox/stream")({
+export const Route = createFileRoute("/api/sandbox.stream")({
   server: {
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: corsHeaders() }),
