@@ -1420,3 +1420,49 @@ textarea{font-size:13px!important;line-height:1.55!important}
   .sali-devlog{font-size:11px!important}
 }
 @media(pointer:coarse){button{min-height:36px}}
+
+/* HTML Core is the destination of the verified Sali workflow. */
+.sali-command-preview{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  margin:3px 0 0 2px;
+  padding:6px 10px;
+  border:1px solid rgba(192,132,252,.42);
+  border-radius:999px;
+  background:linear-gradient(120deg,rgba(168,85,247,.18),rgba(192,132,252,.07));
+  color:#e9d5ff;
+  box-shadow:0 0 18px rgba(168,85,247,.10),inset 0 0 12px rgba(168,85,247,.05);
+  font-size:9px;
+  letter-spacing:.045em;
+  white-space:nowrap;
+}
+.sali-command-preview i{
+  color:#c084fc;
+  font-style:normal;
+  font-size:15px;
+  line-height:1;
+}
+.sali-command-preview b{font-weight:650}
+@media (max-width:640px){
+  .sali-command-preview{font-size:8px;padding:5px 8px;gap:5px}
+}
+@media (prefers-reduced-motion:reduce){
+  .sali-command-preview{scroll-behavior:auto}
+}
+
+.sali-flow-html-preview .sali-flow-token{
+  color:#e9d5ff;
+  border:1px solid rgba(192,132,252,.42);
+  border-radius:999px;
+  padding:4px 8px;
+  background:linear-gradient(120deg,rgba(168,85,247,.18),rgba(192,132,252,.07));
+  box-shadow:0 0 14px rgba(168,85,247,.10);
+  white-space:nowrap;
+  font-size:9px;
+}
+.sali-flow-html-preview .sali-flow-arrow{
+  color:#c084fc;
+  font-size:14px;
+}
