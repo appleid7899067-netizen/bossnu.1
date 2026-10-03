@@ -469,12 +469,12 @@ function ActivityFeed({ activities, live, liveText = "" }: { activities: ChatAct
     .join("\n");
 
   const tokenForPhase = (phase: string) => phase.toUpperCase();
-  const htmlPreviewRequested = /\\bhtml\\b|\\.html\\b|html core|preview/i.test([
+  const htmlPreviewRequested = /\bhtml\b|\.html\b|html core|preview/i.test([
     latestCommand?.command ?? "",
     latestCommand?.output ?? "",
     liveText,
     ...activities.filter(activity => activity.kind === "files").map(activity => JSON.stringify(activity)),
-  ].join("\\n"));
+  ].join("\n"));
   const latestAnswerPhase = [...activities].reverse().find((activity): activity is Extract<ChatActivity, { kind: "phase" }> => activity.kind === "phase" && activity.phase === "answer");
   const answerSignalsFailure = Boolean(latestAnswerPhase && /ไม่ผ่าน|unverified|ไม่มีหลักฐาน|ถึงขีดจำกัด|ไม่เชื่อมต่อ|ไม่รองรับ|ยังไม่ครบ|บล็อก/i.test(latestAnswerPhase.label));
   const completionVerified = latestEvidence?.status === "verified";
