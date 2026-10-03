@@ -53,9 +53,9 @@ test("every possible chunk size preserves protocol", () => {
 test("prose survives streaming", () => assert.equal(scan("hello\nworld", 1).map(e => e.type === "text" ? e.text : "").join(""), "hello\nworld"));
 test("fenced examples never execute", () => assert.equal(scan('```xml\n' + block + '```\n', 1).some(e => e.type === "run"), false));
 test("legacy shell fences execute only when the fenced body is clearly shell", () => {
-  const shell = "```\\ncd /home/user/project\\necho SHELL_OK\\nfind . -maxdepth 1 -type f\\n```\\n";
-  assert.deepEqual(scan(shell, 1), [{ type: "run", call: { language: "bash", command: "cd /home/user/project\\necho SHELL_OK\\nfind . -maxdepth 1 -type f" } }]);
-  assert.equal(scan("```\\nconst value = 1;\\nconsole.log(value);\\n```\\n", 1).some(e => e.type === "run"), false);
+  const shell = "```\ncd /home/user/project\necho SHELL_OK\nfind . -maxdepth 1 -type f\n```\n";
+  assert.deepEqual(scan(shell, 1), [{ type: "run", call: { language: "bash", command: "cd /home/user/project\necho SHELL_OK\nfind . -maxdepth 1 -type f" } }]);
+  assert.equal(scan("```\nconst value = 1;\nconsole.log(value);\n```\n", 1).some(e => e.type === "run"), false);
 });
 test("tilde fences never execute", () => assert.equal(scan('~~~~\n' + block + '~~~~\n').some(e => e.type === "run"), false));
 test("incomplete blocks never execute", () => assert.equal(scan('<run lang="bash">\necho hello').some(e => e.type === "run"), false));
