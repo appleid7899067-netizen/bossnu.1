@@ -583,7 +583,7 @@ export function AppShell({ search }: { search: Search }) {
               else if (event.type === "error") failure = event.error;
             },
           });
-
+        },
       });
       if (!reply && !ac.signal.aborted) append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
     } catch (error) {
