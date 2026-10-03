@@ -304,7 +304,8 @@ export async function streamChat(opts: {
             stream: true,
             temperature: opts.mode === "think" ? 0.6 : 0.7,
             max_tokens: /(?:<!doctype\\s+html|<html(?:\\s|>)|```\\s*html\\b|สร้าง(?:\\s+|)html|เว็บ(?:ไซต์)?|website|live preview)/i.test(latestUser)
-              ? (opts.mode === "think" ? 9000 : 8000)\n              : (opts.mode === "think" ? 5000 : 3500),
+              ? (opts.mode === "think" ? 9000 : 8000)
+              : (opts.mode === "think" ? 5000 : 3500),
             reasoning_effort: opts.mode === "think" ? "low" : "low",
             normalize: true,
           },
