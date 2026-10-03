@@ -53,6 +53,8 @@ export class RunScanner {
   private github: GithubCall | null = null;
   private dsml: { language: RunCall["language"]; command: string } | null = null;
   private dsmlParameter = false;
+  private markdownFenceBuffer = "";
+  private markdownFenceLanguage: RunCall["language"] | null = null;
   push(chunk: string): ScanEvent[] {
     this.pending += chunk;
     const events: ScanEvent[] = [];
@@ -80,8 +82,20 @@ export class RunScanner {
       this.dsmlParameter = false;
       events.push({ type: "text", text: "\n[Incomplete DSML terminal request — not executed]\n" });
     }
+    if (this.fence) {
+      this.fence = "";
+      this.markdownFenceBuffer = "";
+      this.markdownFenceLanguage = null;
+    }
     return events;
   }
+  private looksLikeShell(value: string) {
+    const lines = value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    if (!lines.length) return false;
+    const shellLine = /^(?:cd|pwd|ls|cat|echo|printf|find|grep|rg|sed|awk|head|tail|mkdir|touch|cp|mv|npm|npx|pnpm|yarn|git|node|python3?|bash|sh|chmod|test|which|whoami|uname|env|export|set|if|for|while|do|done|then|fi|\.|source)\b/;
+    return lines.every(line => shellLine.test(line) || /(?:&&|\|\||[|><]|\$\(|\$\{)/.test(line));
+  }
+
   private line(line: string): ScanEvent[] {
     const trimmed = line.trim();
     if (this.github) {
@@ -109,10 +123,33 @@ export class RunScanner {
       this.run.command += line;
       return [];
     }
-    const fence = trimmed.match(/^(`{3,}|~{3,})/);
+    const fence = trimmed.match(/^(`{3,}|~{3,})(?:\s*([a-zA-Z0-9_-]+))?\s*$/);
+    if (this.fence) {
+      if (fence && fence[1][0] === this.fence[0] && fence[1].length >= this.fence.length) {
+        const buffer = this.markdownFenceBuffer.trim();
+        const language = this.markdownFenceLanguage;
+        this.fence = "";
+        this.markdownFenceBuffer = "";
+        this.markdownFenceLanguage = null;
+        if (buffer && (language || this.looksLikeShell(buffer))) {
+          const call = { language: language ?? "bash", command: buffer };
+          if (call.command.length <= 32000) return [{ type: "run", call }];
+        }
+        return [{ type: "text", text: line }];
+      }
+      this.markdownFenceBuffer += line;
+      return [];
+    }
     if (fence) {
-      if (!this.fence) this.fence = fence[1];
-      else if (fence[1][0] === this.fence[0] && fence[1].length >= this.fence.length && /^(`+|~+)\s*$/.test(trimmed)) this.fence = "";
+      this.fence = fence[1];
+      const lang = fence[2]?.toLowerCase();
+      this.markdownFenceLanguage =
+        lang === "bash" || lang === "sh" || lang === "shell" ? "bash"
+        : lang === "node" || lang === "javascript" || lang === "typescript" ? "node"
+        : lang === "python" ? "python"
+        : null;
+      this.markdownFenceBuffer = "";
+      return [];
     }
     if (!this.fence) {
       // Some Puter models emit the older DSML tool-call envelope instead of
