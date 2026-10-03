@@ -23,6 +23,7 @@ const LOCAL_WORK_INTENT = /(?:sandbox|workspace|terminal|shell|\brun\b|\bexecute
 const FILE_WRITE_INTENT = /(?:\bwrite\b|\bedit\b|\bupdate\b|\bchange\b|\bmodify\b|\bpatch\b|\bfix\b|\bport\b|\bapply\b|\bimplement\b|\bcreate\s+(?:a\s+)?(?:file|module|component|config|page)\b|เขียน|แก้|ปรับ|เปลี่ยน|อัปเดต|อัพเดต|สร้างไฟล์|นำ.*เข้า|พอร์ต)/iu;
 const DELETE_INTENT = /(?:\bdelete\b|\bremove\b|ลบ|เอาออก)/iu;
 const BRANCH_INTENT = /(?:\bcreate\s+(?:a\s+)?branch\b|\bnew\s+branch\b|\bbranch\b.*\bcreate\b|สร้าง(?:สาขา|branch)|เปิดสาขาใหม่)/iu;
+const PROJECT_GIT_WORKFLOW_INTENT = /(?:สร้าง|เขียน|แก้|ปรับ|เปลี่ยน|อัปเดต|อัพเดต)\s*(?:ไฟล์|file)|\b(?:create|write|edit|update|modify)\s+(?:a\s+)?file/iu;
 const CREATE_PR_INTENT = /(?:\bcreate\s+(?:a\s+)?(?:pull request|pr)\b|\bopen\s+(?:a\s+)?(?:pull request|pr)\b|สร้าง\s*(?:pull request|pr)|เปิด\s*(?:pull request|pr))/iu;
 const UNSUPPORTED_GITHUB_INTENT = /(?:\b(?:push|merge|rebase)\s+(?:(?:my|the|these|current)\s+)?(?:changes|branch|commits|code|pull\s+requests?|prs?)\b|\bcommit\s+(?:(?:my|the|these|all|this)\s+)?(?:changes|files|code|patch)\b|\bgit\s+commit\b|\bcommit\s+(?:to|on)\s+(?:github|(?:the\s+)?repo(?:sitory)?)\b|พุช|คอมมิต|รวมโค้ด)/iu;
 const READ_ONLY_OVERRIDE = /(?:\bread-only\b|\b(?:only|just)\s+(?:read|inspect|review|list|check)\b|\b(?:read|inspect|review|list|check)\b.{0,48}\bonly\b|\b(?:do not|don't|dont|never)\s+(?:edit|write|update|change|modify|patch|fix|delete|remove|commit|push|merge|rebase|create)\b|(?:อ่าน|ดู|ตรวจ|รีวิว).{0,24}(?:อย่างเดียว|เท่านั้น)|(?:ไม่ต้อง|ห้าม|อย่า)(?:\s+\S+){0,2}(?:แก้|เขียน|ปรับ|เปลี่ยน|อัปเดต|อัพเดต|ลบ|เอาออก|สร้าง|เปิด|คอมมิต|พุช))/iu;
@@ -44,7 +45,8 @@ export function routeAgentTools(
   options: { sandboxIntent?: boolean } = {},
 ): AgentToolRoute {
   const normalized = goal.normalize("NFKC").trim();
-  const wantsGithub = hasGithubIntent(normalized);
+  const projectGitWorkflow = PROJECT_GIT_WORKFLOW_INTENT.test(normalized) && /(?:\bbranch\b|\bcommit\b|สาขา|คอมมิต)/iu.test(normalized) && /(?:ห้าม|อย่า|ไม่ต้อง|\bdo not\b|\bdon't\b).*?(?:main|master)/iu.test(normalized);
+  const wantsGithub = hasGithubIntent(normalized) || projectGitWorkflow;
   const wantsLocalWork = Boolean(options.sandboxIntent) || LOCAL_WORK_INTENT.test(normalized);
   const selected: AgentToolId[] = [];
   const unavailable: AgentToolId[] = [];
@@ -76,7 +78,7 @@ export function routeAgentTools(
   const readOnlyOverride = READ_ONLY_OVERRIDE.test(normalized);
   const fileWriteIntent = !readOnlyOverride && FILE_WRITE_INTENT.test(normalized);
   const deleteIntent = !readOnlyOverride && DELETE_INTENT.test(normalized);
-  const branchIntent = !readOnlyOverride && BRANCH_INTENT.test(normalized);
+  const branchIntent = !readOnlyOverride && (BRANCH_INTENT.test(normalized) || projectGitWorkflow);
   const createPrIntent = !readOnlyOverride && CREATE_PR_INTENT.test(normalized);
   const githubMutationsAllowed = wantsGithub && (fileWriteIntent || deleteIntent || branchIntent || createPrIntent);
   const allowedGithubActions: GithubCall["action"][] = selected.includes("github")
