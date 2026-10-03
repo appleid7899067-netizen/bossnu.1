@@ -5,6 +5,7 @@ import { selectSkills } from "../skills/index.ts";
 import { failureSignature, parseFailureMemory, type FailureMemory } from "./memory-ledger.ts";
 import { MAX_TOOL_ROUTE_REJECTIONS, routeAgentTools } from "./tool-router.ts";
 import { AutoInstallBudget, installCommandPassed, planMissingToolInstall } from "./repair-engine.ts";
+import { extractSkillLesson, learnedSkillDocument } from "./sali-auto-skill.ts";
 import { buildGithubEvidence, buildSandboxEvidence, evaluateGithubEvidence, type AgentEvidence } from "./evidence-engine.ts";
 import {
   MAX_GATE_REJECTIONS,
@@ -287,19 +288,32 @@ export async function runAgentLoop(opts: {
 
   const finish = async (status: AgentLoopStatus): Promise<AgentLoopSummary> => {
     if (status === "verified" || status === "answered") {
-      // Skill persistence is intentionally delayed until the final gate.
+      // A verified run becomes a Sali candidate skill. Promotion to
+      // project/skills/verified is deliberately a separate verification step.
       if (status === "verified" && pendingVerified && pendingVerified.result.workspaceSync?.verified && pendingVerified.result.workspaceSync.complete && workspace) {
-        const skill = buildVerifiedSkill(goal, pendingVerified.call, pendingVerified.result);
-        const saved = await safely(async () => {
-          await workspace.writeFile(skill.path, skill.content);
-          return true;
-        }, false);
-        if (saved) {
-          const memoryValue = `Verified reusable skill saved at ${skill.path}. Project snapshot: ${pendingVerified.result.workspaceSync.expectedCount ?? 0} files, manifest ${pendingVerified.result.workspaceSync.manifestHash ?? "unavailable"}.`;
-          await safely(() => workspace.remember(`verified skill ${skill.path}`, memoryValue, "run"), undefined);
-          opts.onSkillSaved?.(skill.path, true);
-        } else {
-          opts.onSkillSaved?.(skill.path, false);
+        const evidence = evidenceRecords.filter(item => item.status === "verified").map(item => ({
+          tool: item.tool,
+          command: item.action,
+          result: item.result,
+          verified: true,
+        }));
+        const learned = extractSkillLesson({
+          scenario: goal,
+          evidence,
+          repaired: evidenceRecords.some(item => item.stage === "repair" || item.stage === "auto-install"),
+        });
+        if (learned) {
+          const path = `project/skills/candidates/${learned.id}/SKILL.md`;
+          const saved = await safely(async () => {
+            await workspace.writeFile(path, learnedSkillDocument(learned));
+            return true;
+          }, false);
+          if (saved) {
+            await safely(() => workspace.remember(`candidate skill ${path}`, JSON.stringify(learned), "run"), undefined);
+            opts.onSkillSaved?.(path, true);
+          } else {
+            opts.onSkillSaved?.(path, false);
+          }
         }
       }
       core.complete();
