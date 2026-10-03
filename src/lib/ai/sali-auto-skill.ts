@@ -60,3 +60,23 @@ export function mergeLearnedSkill(existing: LearnedSkill | undefined, incoming: 
     status: existing.status === "archived" ? "candidate" : existing.status,
   };
 }
+
+export function learnedSkillDocument(skill: LearnedSkill): string {
+  const lessons = skill.lessons.map((lesson) => `- ${lesson}`).join("\n");
+  return `# ${skill.name}
+
+id: ${skill.id}
+source: ${skill.source}
+status: ${skill.status}
+uses: ${skill.uses}
+successes: ${skill.successes}
+repairs: ${skill.repairs}
+last-used: ${skill.lastUsed}
+
+## Scenario
+${skill.scenario}
+
+## Verified Lessons
+${lessons}
+`;
+}
