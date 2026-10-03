@@ -1420,3 +1420,91 @@ textarea{font-size:13px!important;line-height:1.55!important}
   .sali-devlog{font-size:11px!important}
 }
 @media(pointer:coarse){button{min-height:36px}}
+
+/* Arena-style terminal chrome for the unified Sali execution view. */
+.sali-arena-terminal {
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, #292929);
+  border-radius: 16px;
+  background: #0b0b0d;
+  box-shadow: 0 14px 40px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.03);
+}
+.sali-arena-browserbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #25252a;
+  background: #111116;
+}
+.sali-arena-dot { width: 6px; height: 6px; border-radius: 999px; background: #555; flex: 0 0 auto; }
+.sali-arena-location {
+  min-width: 0;
+  flex: 1;
+  margin-left: 4px;
+  padding: 5px 9px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #09090b;
+  color: #777;
+  font: 500 9px/1.2 "Fira Code","JetBrains Mono",ui-monospace,monospace;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sali-arena-browserbar .sali-stream-actions { margin-left: auto; }
+.sali-arena-browserbar .sali-stream-actions button { width: 27px; height: 27px; }
+.sali-arena-terminal-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 10px;
+  color: #c9c9cf;
+  font: 700 10px/1 "Fira Code","JetBrains Mono",ui-monospace,monospace;
+  letter-spacing: .04em;
+}
+.sali-arena-prompt { color: #b879ff; font-size: 14px; }
+.sali-arena-status { margin-left: auto; font-size: 10px; }
+.sali-arena-status.is-running { color: #00ff9d; animation: sali-live-pulse 1.2s ease-in-out infinite; }
+.sali-arena-status.is-done { color: var(--color-success); }
+.sali-arena-terminal .sali-stream-command {
+  margin: 0 8px;
+  padding: 8px 9px;
+  border: 1px solid #24242a;
+  border-radius: 8px;
+  background: #101014;
+  font-style: normal;
+}
+.sali-arena-terminal .sali-stream-command code { color: #c8ffd9; }
+.sali-arena-section-label {
+  padding: 8px 10px 4px;
+  color: #7b7b83;
+  font: 700 8px/1 "Fira Code","JetBrains Mono",ui-monospace,monospace;
+  letter-spacing: .09em;
+}
+.sali-arena-terminal .sali-stream-log {
+  min-height: 150px;
+  max-height: min(48vh, 460px);
+  margin: 0 8px;
+  padding: 9px 10px 16px;
+  border-radius: 9px;
+  background: #09090b;
+  color: #d8d8dd;
+  font-style: normal;
+  font-size: 9.5px;
+  line-height: 1.6;
+}
+.sali-arena-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px 9px;
+  color: #66666f;
+  font: 600 8px/1.3 "Fira Code","JetBrains Mono",ui-monospace,monospace;
+}
+.sali-arena-footer span:last-child { color: #8c8c96; }
+@media (max-width: 640px) {
+  .sali-arena-terminal { border-radius: 14px; }
+  .sali-arena-terminal .sali-stream-log { min-height: 145px; max-height: 46vh; font-size: 9px; }
+  .sali-arena-location { font-size: 8px; }
+}
