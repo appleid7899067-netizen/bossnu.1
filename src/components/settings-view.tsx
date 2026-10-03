@@ -6,9 +6,8 @@ import {
   Sparkles, Trash2, Upload, UserRound, Volume2, WandSparkles, Zap, BookMarked,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { FontScale, PersonalitySettings, ThemeMode } from "@/lib/types";
+import type { FontScale, PersonalitySettings } from "@/lib/types";
 import { exportBackup, useAppStore } from "@/lib/store";
-import { ACCENTS } from "@/lib/use-appearance";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -160,11 +159,11 @@ printf %s ${quote(sandboxInput)} > stdin.txt
 
   return <section className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y">
     <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="aurora mb-6 flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-border bg-elevated/60 px-5 py-5">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3 rounded-[28px] bg-surface px-6 py-6">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">BOSS CONTROL</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">ตั้งค่าตัวแทนและสมอง</h1>
-          <p className="mt-1 text-sm text-muted">หน้าตา • บุคลิก • สกิล • ความจำ • เสียง • Sandbox</p>
+          <p className="m3-label-md text-primary">BOSS CONTROL</p>
+          <h1 className="m3-headline-sm mt-1">ตั้งค่าตัวแทนและสมอง</h1>
+          <p className="m3-body-md mt-1 text-muted">หน้าตา • บุคลิก • สกิล • ความจำ • เสียง • Sandbox</p>
         </div>
         {saved ? (
           <span className="anim-pop inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1.5 text-xs font-medium text-success">
@@ -183,16 +182,16 @@ printf %s ${quote(sandboxInput)} > stdin.txt
               onClick={() => setTab(id)}
               aria-current={tab === id}
               className={cn(
-                "group flex h-10 shrink-0 items-center gap-2.5 rounded-xl px-3 text-sm font-medium transition-all duration-200 md:w-full",
+                "group flex h-10 shrink-0 items-center gap-3 rounded-full px-4 text-sm font-medium transition-colors duration-200 md:w-full",
                 tab === id
-                  ? "bg-elevated text-fg shadow-[var(--shadow-border)] md:bg-primary/10 md:shadow-none"
-                  : "text-muted hover:bg-hover hover:text-fg",
+                  ? "bg-secondary-container text-on-secondary-container"
+                  : "text-muted hover:bg-[var(--state-hover)] hover:text-fg",
               )}
             >
-              <Icon className={cn("size-4 shrink-0 transition-colors", tab === id ? "text-primary" : "text-subtle group-hover:text-muted")} strokeWidth={1.9} />
+              <Icon className="size-[18px] shrink-0" strokeWidth={1.9} />
               <span className="whitespace-nowrap">{label}</span>
-              {id === "skills" ? <span className={cn("ml-auto hidden rounded-full px-1.5 py-0.5 text-[10px] tabular-nums md:inline", tab === id ? "bg-primary/15 text-primary" : "bg-clay text-subtle")}>{enabledCount}</span> : null}
-              {id === "prompts" ? <span className={cn("ml-auto hidden rounded-full px-1.5 py-0.5 text-[10px] tabular-nums md:inline", tab === id ? "bg-primary/15 text-primary" : "bg-clay text-subtle")}>{store.quickPrompts.length}</span> : null}
+              {id === "skills" ? <span className={cn("ml-auto hidden rounded-full px-1.5 py-0.5 text-[10px] tabular-nums md:inline", tab === id ? "bg-primary-container text-on-primary-container" : "bg-hover text-subtle")}>{enabledCount}</span> : null}
+              {id === "prompts" ? <span className={cn("ml-auto hidden rounded-full px-1.5 py-0.5 text-[10px] tabular-nums md:inline", tab === id ? "bg-primary-container text-on-primary-container" : "bg-hover text-subtle")}>{store.quickPrompts.length}</span> : null}
             </button>
           ))}
         </div>
@@ -222,85 +221,38 @@ printf %s ${quote(sandboxInput)} > stdin.txt
 
 /* ---------------------------------- Appearance ---------------------------------- */
 
-const THEMES: { id: ThemeMode; label: string; hint: string }[] = [
-  { id: "light", label: "สว่าง", hint: "สำหรับกลางวัน" },
-  { id: "dark", label: "มืด", hint: "สบายตากลางคืน" },
-  { id: "system", label: "อัตโนมัติ", hint: "ตามเครื่อง" },
-];
-
 const FONT_SCALES: { id: FontScale; label: string }[] = [
   { id: "compact", label: "กระชับ" },
   { id: "normal", label: "ปกติ" },
   { id: "large", label: "ใหญ่" },
 ];
 
+const M3_ROLES: { name: string; varName: string; on?: string }[] = [
+  { name: "primary", varName: "--color-primary", on: "--color-primary-fg" },
+  { name: "primary container", varName: "--color-primary-container", on: "--color-on-primary-container" },
+  { name: "secondary container", varName: "--color-secondary-container", on: "--color-on-secondary-container" },
+  { name: "tertiary", varName: "--color-tertiary", on: "--color-on-tertiary" },
+  { name: "surface", varName: "--color-bg", on: "--color-fg" },
+  { name: "surface container", varName: "--color-elevated", on: "--color-fg" },
+];
+
 function AppearancePanel() {
   const ui = useAppStore((s) => s.ui);
   const updateUi = useAppStore((s) => s.updateUi);
-  const accent = ACCENTS.find((a) => a.id === ui.accent) ?? ACCENTS[0];
 
   return <div className="grid gap-4">
-    <Panel title="ธีมสี" icon={Palette} hint="เปลี่ยนได้ทันที ไม่ต้องรีเฟรช">
-      <div className="grid grid-cols-3 gap-2.5">
-        {THEMES.map((theme) => (
-          <button
-            key={theme.id}
-            type="button"
-            onClick={() => updateUi({ theme: theme.id })}
-            className={cn(
-              "card-lift group relative overflow-hidden rounded-2xl border p-3 text-left",
-              ui.theme === theme.id ? "border-primary bg-primary/5 shadow-[0_0_0_3px_var(--accent-soft)]" : "border-border bg-clay/60 hover:border-primary/30",
-            )}
-          >
-            {/* Mini window preview */}
-            <span className={cn("block h-16 w-full overflow-hidden rounded-lg border", theme.id === "dark" ? "border-white/10 bg-[#0d1015]" : theme.id === "light" ? "border-black/10 bg-[#f6f7f9]" : "border-black/10")}>
-              {theme.id === "system" ? (
-                <span className="flex h-full">
-                  <span className="h-full w-1/2 bg-[#f6f7f9]" />
-                  <span className="h-full w-1/2 bg-[#0d1015]" />
-                </span>
-              ) : (
-                <span className="flex h-full flex-col gap-1.5 p-2">
-                  <span className="flex gap-1"><span className="size-1.5 rounded-full" style={{ background: accent.swatch }} /><span className={cn("size-1.5 rounded-full", theme.id === "dark" ? "bg-white/20" : "bg-black/15")} /><span className={cn("size-1.5 rounded-full", theme.id === "dark" ? "bg-white/20" : "bg-black/15")} /></span>
-                  <span className={cn("h-1.5 w-3/4 rounded-full", theme.id === "dark" ? "bg-white/15" : "bg-black/10")} />
-                  <span className="h-1.5 w-1/2 rounded-full" style={{ background: accent.swatch, opacity: 0.55 }} />
-                  <span className={cn("mt-auto h-4 w-full rounded-md", theme.id === "dark" ? "bg-white/10" : "bg-black/5")} />
-                </span>
-              )}
-            </span>
-            <span className="mt-2.5 flex items-center justify-between">
-              <span>
-                <span className="block text-sm font-semibold">{theme.label}</span>
-                <span className="block text-[11px] text-subtle">{theme.hint}</span>
-              </span>
-              {ui.theme === theme.id ? <span className="grid size-5 place-items-center rounded-full bg-primary text-primary-fg"><Check className="size-3" strokeWidth={3} /></span> : null}
-            </span>
-          </button>
+    <Panel title="Material You (MATA)" icon={Palette} hint="ลุคเดียวล็อกทั้งระบบ — ไม่ต้องสลับธีมหรือสีเน้น">
+      <p className="m3-body-md leading-relaxed text-muted">
+        ทั้งแอปใช้ดีไซน์ซิสเต็ม Material Design 3 โหมดมืดโทนเดียว: พื้นผิวแบบ tonal, ปุ่มทรง pill,
+        การ์ดมุม 12–28dp, สวิตช์และชิปแบบ M3 พร้อม state layer ตอนโฮเวอร์/กด จึงได้หน้าตาที่นิ่งและสม่ำเสมอทุกหน้า
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {M3_ROLES.map((role) => (
+          <span key={role.name} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted">
+            <span className="size-5 rounded-full" style={{ background: `var(${role.varName})` }} />
+            {role.name}
+          </span>
         ))}
-      </div>
-    </Panel>
-
-    <Panel title="สีหลักของแอป" icon={Zap} hint="สีที่ใช้กับปุ่ม ลิงก์ และไอคอนเด่น">
-      <div className="flex flex-wrap gap-2.5">
-        {ACCENTS.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            onClick={() => updateUi({ accent: option.id })}
-            aria-label={option.label}
-            title={option.label}
-            className={cn(
-              "group relative grid size-11 place-items-center rounded-full transition-transform duration-200 hover:scale-110 active:scale-95",
-              ui.accent === option.id && "shadow-[0_0_0_3px_var(--accent-soft)]",
-            )}
-          >
-            <span className="size-7 rounded-full" style={{ background: option.swatch, boxShadow: ui.accent === option.id ? `0 4px 14px ${option.swatch}66` : undefined }} />
-            {ui.accent === option.id
-              ? <span className="absolute inset-0 grid place-items-center"><Check className="size-4 text-white drop-shadow" strokeWidth={3.2} /></span>
-              : null}
-          </button>
-        ))}
-        <span className="ml-1 self-center text-sm text-muted">{accent.label}</span>
       </div>
     </Panel>
 
@@ -311,7 +263,7 @@ function AppearancePanel() {
           value={ui.fontScale}
           onChange={(id) => updateUi({ fontScale: id as FontScale })}
         />
-        <div className="flex items-baseline gap-2 rounded-xl bg-clay px-3.5 py-2.5 text-muted">
+        <div className="flex items-baseline gap-2 rounded-full bg-hover px-4 py-2.5 text-muted">
           <span className="text-[13px]">ตัวอักษร</span>
           <span className="text-[15px] font-medium text-fg">สวัสดีค่ะ</span>
           <span className="text-[17px] font-semibold text-fg">สลี่</span>
@@ -320,7 +272,7 @@ function AppearancePanel() {
     </Panel>
 
     <Panel title="อนิเมชัน" icon={Sparkles} hint="ปิดได้ถ้าอยากให้แอปเร็วและนิ่งขึ้น">
-      <Switch label="เปิดอนิเมชันและเอฟเฟกต์" description="เอฟเฟกต์การเคลื่อนไหวอ่อน ๆ ทั่วทั้งแอป เช่น การเฟดเข้า สไลด์ และเกลอว์" value={ui.animations} onChange={(v) => updateUi({ animations: v })} />
+      <Switch label="เปิดอนิเมชันและเอฟเฟกต์" description="การเคลื่อนไหวแบบ M3 emphasized easing ทั่วทั้งแอป เช่น การเฟดเข้า สไลด์ และ state layer" value={ui.animations} onChange={(v) => updateUi({ animations: v })} />
     </Panel>
   </div>;
 }
@@ -345,7 +297,7 @@ function PersonalityPanel({ save }: { save: (patch: Partial<PersonalitySettings>
   return <div className="grid gap-4 md:grid-cols-2">
     <Panel title="บุคลิกหลัก" icon={Sparkles}>
       <label className="block text-sm text-muted">ชื่อผู้ช่วย
-        <input value={personality.name} onChange={e => save({ name: e.target.value })} className="mt-1 w-full rounded-xl border border-border bg-clay px-3 py-2.5 outline-none transition-all focus:border-primary/50 focus:bg-surface focus:shadow-[0_0_0_3px_var(--accent-soft)]" />
+        <input value={personality.name} onChange={e => save({ name: e.target.value })} className="mt-1 w-full rounded-lg border border-border bg-transparent px-4 py-3 outline-none transition-all focus:border-primary focus:shadow-[0_0_0_1px_var(--color-primary)]" />
       </label>
       <div className="mt-3 text-sm text-muted">
         <div className="mb-1.5 flex items-center justify-between">
@@ -360,12 +312,12 @@ function PersonalityPanel({ save }: { save: (patch: Partial<PersonalitySettings>
               onClick={() => save({ tone: preset.tone })}
               className={cn(
                 "rounded-full border px-2.5 py-1 text-xs transition-all",
-                personality.tone === preset.tone ? "border-primary/60 bg-primary/10 text-primary" : "border-border bg-clay text-muted hover:border-primary/30 hover:text-fg",
+                personality.tone === preset.tone ? "border-transparent bg-secondary-container text-on-secondary-container" : "border-border bg-transparent text-muted hover:bg-[var(--state-hover)] hover:text-fg",
               )}
             >{preset.label}</button>
           ))}
         </div>
-        <textarea value={personality.tone} onChange={e => save({ tone: e.target.value })} rows={4} className="w-full resize-none rounded-xl border border-border bg-clay px-3 py-2.5 outline-none transition-all focus:border-primary/50 focus:bg-surface focus:shadow-[0_0_0_3px_var(--accent-soft)]" />
+        <textarea value={personality.tone} onChange={e => save({ tone: e.target.value })} rows={4} className="w-full resize-none rounded-lg border border-border bg-transparent px-4 py-3 outline-none transition-all focus:border-primary focus:shadow-[0_0_0_1px_var(--color-primary)]" />
         <Button className="mt-3 w-full" onClick={rememberSaliSettings}><Brain className="size-4" />บันทึกเข้าความจำสลี่</Button>
       </div>
     </Panel>
@@ -417,14 +369,14 @@ function PromptsPanel() {
           onChange={(e) => setTitle(e.target.value)}
           placeholder="ชื่อ เช่น สรุปข่าวเช้า"
           maxLength={60}
-          className="w-full rounded-xl border border-border bg-clay px-3 py-2.5 text-sm outline-none transition-all placeholder:text-subtle focus:border-primary/50 focus:bg-surface focus:shadow-[0_0_0_3px_var(--accent-soft)]"
+          className="w-full rounded-lg border border-border bg-transparent px-4 py-3 text-sm outline-none transition-all placeholder:text-subtle focus:border-primary focus:shadow-[0_0_0_1px_var(--color-primary)]"
         />
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           rows={3}
           placeholder="เนื้อหาพรอมป์ที่จะให้สลี่ทำ…"
-          className="w-full resize-none rounded-xl border border-border bg-clay px-3 py-2.5 text-sm outline-none transition-all placeholder:text-subtle focus:border-primary/50 focus:bg-surface focus:shadow-[0_0_0_3px_var(--accent-soft)]"
+          className="w-full resize-none rounded-lg border border-border bg-transparent px-4 py-3 text-sm outline-none transition-all placeholder:text-subtle focus:border-primary focus:shadow-[0_0_0_1px_var(--color-primary)]"
         />
         <div className="flex gap-2">
           {editingId ? (
@@ -437,11 +389,11 @@ function PromptsPanel() {
 
     <Panel title={`คลังพรอมป์ • ${prompts.length}`} icon={WandSparkles}>
       {prompts.length === 0 ? (
-        <p className="rounded-xl bg-clay p-4 text-sm leading-relaxed text-muted">ยังไม่มีพรอมป์บันทึกไว้เลย — เพิ่มอันแรกด้านบนได้เลยค่ะ</p>
+        <p className="rounded-xl bg-hover p-4 text-sm leading-relaxed text-muted">ยังไม่มีพรอมป์บันทึกไว้เลย — เพิ่มอันแรกด้านบนได้เลยค่ะ</p>
       ) : (
         <ul className="grid gap-2 md:grid-cols-2">
           {prompts.map((item) => (
-            <li key={item.id} className="card-lift group rounded-2xl border border-border bg-clay/60 p-3.5">
+            <li key={item.id} className="card-lift group rounded-2xl border border-border bg-elevated p-3.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{item.title}</p>
@@ -470,7 +422,7 @@ function SkillsPanel() {
   return <Panel title={`สกิลที่ใช้งาน • ${enabledCount}/${skills.length}`} icon={WandSparkles} hint="สกิลที่ปิดจะไม่ถูกใช้ตอนทำงานอัตโนมัติ">
     <div className="grid gap-2 md:grid-cols-2">
       {skills.map(skill => (
-        <div key={skill.id} className="card-lift flex items-center justify-between gap-3 rounded-xl border border-border bg-clay/60 p-3">
+        <div key={skill.id} className="card-lift flex items-center justify-between gap-3 rounded-xl border border-border bg-elevated p-3">
           <div className="min-w-0">
             <p className="text-sm font-medium">{skill.name}</p>
             <p className="text-xs leading-relaxed text-muted">{skill.description}</p>
@@ -495,7 +447,7 @@ function AgentsPanel({ newAgent, setNewAgent }: { newAgent: string; setNewAgent:
     </div>
     <div className="grid gap-3 md:grid-cols-2">
       {store.agentProfiles.map(agent => (
-        <div key={agent.id} className="rounded-2xl border border-border bg-clay/60 p-4">
+        <div key={agent.id} className="rounded-2xl border border-border bg-elevated p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <input value={agent.name} onChange={e => store.updateAgentProfile(agent.id, { name: e.target.value })} className="w-full rounded-lg bg-transparent px-1 font-semibold outline-none transition-colors hover:bg-hover focus:bg-hover" />
@@ -503,7 +455,7 @@ function AgentsPanel({ newAgent, setNewAgent }: { newAgent: string; setNewAgent:
             </div>
             <button type="button" onClick={() => store.deleteAgentProfile(agent.id)} aria-label="ลบตัวแทน" className="grid size-8 place-items-center rounded-lg text-subtle hover:bg-danger/10 hover:text-danger"><Trash2 className="size-4" /></button>
           </div>
-          <textarea value={agent.instructions} onChange={e => store.updateAgentProfile(agent.id, { instructions: e.target.value })} rows={4} className="mt-3 w-full resize-none rounded-xl bg-bg/50 p-3 text-sm text-muted outline-none transition-all focus:text-fg focus:shadow-[0_0_0_3px_var(--accent-soft)]" placeholder="เขียน system instructions ของตัวแทน..." />
+          <textarea value={agent.instructions} onChange={e => store.updateAgentProfile(agent.id, { instructions: e.target.value })} rows={4} className="mt-3 w-full resize-none rounded-lg bg-hover p-3 text-sm text-muted outline-none transition-all focus:text-fg focus:shadow-[0_0_0_1px_var(--color-primary)]" placeholder="เขียน system instructions ของตัวแทน..." />
           <p className="mt-2 text-[11px] text-subtle">สกิลที่เปิดใช้: {agent.skills.length ? agent.skills.length + " สกิล" : "ยังไม่ได้เลือก"}</p>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {skills.map(skill => (
@@ -514,7 +466,7 @@ function AgentsPanel({ newAgent, setNewAgent }: { newAgent: string; setNewAgent:
       ))}
     </div>
     <div className="mt-4 flex gap-2">
-      <input value={newAgent} onChange={e => setNewAgent(e.target.value)} placeholder="ชื่อตัวแทนใหม่" className="min-w-0 flex-1 rounded-xl border border-border bg-clay px-3 py-2.5 outline-none transition-all placeholder:text-subtle focus:border-primary/50 focus:bg-surface focus:shadow-[0_0_0_3px_var(--accent-soft)]" />
+      <input value={newAgent} onChange={e => setNewAgent(e.target.value)} placeholder="ชื่อตัวแทนใหม่" className="min-w-0 flex-1 rounded-lg border border-border bg-transparent px-4 py-3 outline-none transition-all placeholder:text-subtle focus:border-primary focus:shadow-[0_0_0_1px_var(--color-primary)]" />
       <Button onClick={() => { if (newAgent.trim()) { store.addAgentProfile({ id: crypto.randomUUID(), name: newAgent.trim(), role: "Custom Agent", instructions: "รับเป้าหมาย วางแผน ลงมือทำ ตรวจผล และสรุปสั้น ๆ หากพบงานอันตรายให้ขออนุญาตก่อน", skills: skills.filter(x => x.enabled).map(x => x.id), createdAt: Date.now() }); setNewAgent(""); } }}><Plus className="size-4" />เพิ่ม</Button>
     </div>
   </Panel>;
@@ -527,16 +479,16 @@ function MemoryPanel({ newMemory, setNewMemory }: { newMemory: string; setNewMem
   return <Panel title="สมองความจำ" icon={Brain} hint="ความจำจะถูกใส่เป็นบริบทในการสนทนาครั้งต่อไป">
     <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm leading-relaxed text-muted">ความจำชุดนี้เก็บในเครื่องและถูกใช้เป็นบริบทของสลี่ในการสนทนาครั้งต่อไป</div>
     <div className="space-y-2">
-      {memory.length === 0 ? <p className="rounded-xl bg-clay p-4 text-sm leading-relaxed text-muted">ยังไม่มีความจำ — ใส่สิ่งที่อยากให้สลี่จดจำ เช่น สไตล์การทำงานหรือความชอบ</p> : null}
+      {memory.length === 0 ? <p className="rounded-xl bg-hover p-4 text-sm leading-relaxed text-muted">ยังไม่มีความจำ — ใส่สิ่งที่อยากให้สลี่จดจำ เช่น สไตล์การทำงานหรือความชอบ</p> : null}
       {memory.map(item => (
-        <div key={item.id} className="group flex items-start gap-3 rounded-xl border border-border bg-clay/60 p-3">
+        <div key={item.id} className="group flex items-start gap-3 rounded-xl border border-border bg-elevated p-3">
           <div className="min-w-0 flex-1"><p className="text-sm">{item.content}</p><p className="mt-1 text-[11px] text-subtle">{new Date(item.createdAt).toLocaleString("th-TH")}</p></div>
           <button type="button" onClick={() => deleteMemory(item.id)} aria-label="ลบความจำ" className="grid size-8 shrink-0 place-items-center rounded-lg text-subtle opacity-0 transition hover:bg-danger/10 hover:text-danger group-hover:opacity-100 max-md:opacity-100"><Trash2 className="size-4" /></button>
         </div>
       ))}
     </div>
     <div className="mt-4 flex gap-2">
-      <input value={newMemory} onChange={e => setNewMemory(e.target.value)} placeholder="เช่น ชอบ UI แบบกว้างและเรียบ" className="min-w-0 flex-1 rounded-xl border border-border bg-clay px-3 py-2.5 outline-none transition-all placeholder:text-subtle focus:border-primary/50 focus:bg-surface focus:shadow-[0_0_0_3px_var(--accent-soft)]" onKeyDown={(e) => { if (e.key === "Enter" && newMemory.trim()) { addMemory(newMemory.trim()); setNewMemory(""); } }} />
+      <input value={newMemory} onChange={e => setNewMemory(e.target.value)} placeholder="เช่น ชอบ UI แบบกว้างและเรียบ" className="min-w-0 flex-1 rounded-lg border border-border bg-transparent px-4 py-3 outline-none transition-all placeholder:text-subtle focus:border-primary focus:shadow-[0_0_0_1px_var(--color-primary)]" onKeyDown={(e) => { if (e.key === "Enter" && newMemory.trim()) { addMemory(newMemory.trim()); setNewMemory(""); } }} />
       <Button onClick={() => { if (newMemory.trim()) { addMemory(newMemory.trim()); setNewMemory(""); } }}><Plus className="size-4" />จำ</Button>
     </div>
   </Panel>;
@@ -547,13 +499,13 @@ function ProfilesPanel() {
   return <Panel title="แฟ้มโปรไฟล์ตัวแทน" icon={FolderOpen}>
     <div className="grid gap-3 md:grid-cols-2">
       {profiles.map(agent => (
-        <div key={agent.id} className="card-lift rounded-2xl border border-border bg-clay/60 p-4">
+        <div key={agent.id} className="card-lift rounded-2xl border border-border bg-elevated p-4">
           <div className="flex items-center gap-3">
             <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Bot className="size-5" /></div>
             <div className="min-w-0"><p className="truncate font-medium">{agent.name}</p><p className="truncate text-xs text-muted">{agent.role}</p></div>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted"><span>สกิล {agent.skills.length}</span><span>สร้าง {new Date(agent.createdAt).toLocaleDateString("th-TH")}</span></div>
-          <div className="mt-3 max-h-28 overflow-y-auto rounded-xl bg-bg/50 p-3 text-xs leading-relaxed text-muted">{agent.instructions}</div>
+          <div className="mt-3 max-h-28 overflow-y-auto rounded-lg bg-hover p-3 text-xs leading-relaxed text-muted">{agent.instructions}</div>
         </div>
       ))}
     </div>
@@ -604,7 +556,7 @@ function VoicePanel({ supported, settings, onChange }: { supported: boolean; set
             <button key={voice.id} type="button"
               onClick={() => selectMode(voice.id)}
               aria-pressed={settings.mode === voice.id}
-              className={cn("rounded-xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40", settings.mode === voice.id ? "border-primary bg-primary/10 shadow-[0_0_0_2px_var(--accent-soft)]" : "border-border bg-clay/60")}>
+              className={cn("rounded-2xl border p-3 text-left transition-colors", settings.mode === voice.id ? "border-transparent bg-secondary-container text-on-secondary-container" : "border-border bg-transparent hover:bg-[var(--state-hover)]")}>
               <span className="flex items-center justify-between gap-2 text-sm font-medium"><span>{voice.label}</span>{settings.mode === voice.id ? <Check className="size-4 text-primary" /> : null}</span>
               <span className="mt-1 block text-xs text-muted">{voice.description}</span>
             </button>
@@ -614,7 +566,7 @@ function VoicePanel({ supported, settings, onChange }: { supported: boolean; set
       {deviceVoices.length ? (
         <label className="block text-sm">
           <span className="mb-2 block">เสียงจากอุปกรณ์</span>
-          <select value={settings.voiceName} onChange={(event) => onChange({ voiceName: event.target.value, source: "device" })} className="w-full rounded-xl border border-border bg-clay px-3 py-2.5 text-sm outline-none focus:border-primary/50">
+          <select value={settings.voiceName} onChange={(event) => onChange({ voiceName: event.target.value, source: "device" })} className="w-full rounded-lg border border-border bg-transparent px-4 py-3 text-sm outline-none focus:border-primary/50">
             <option value="">อัตโนมัติ — เลือกเสียงภาษาไทยที่เหมาะสม</option>
             {deviceVoices.map((voice) => <option key={`${voice.name}-${voice.lang}`} value={voice.name}>{voice.name} ({voice.lang})</option>)}
           </select>
@@ -624,7 +576,7 @@ function VoicePanel({ supported, settings, onChange }: { supported: boolean; set
       <SliderRow label="ความเร็วเสียง" value={`${settings.rate.toFixed(2)}×`} min="0.75" max="1.50" step="0.05" current={settings.rate} onChange={(rate) => onChange({ rate, source: "device" })} />
       <SliderRow label="โทนสูง–ต่ำ" value={settings.pitch.toFixed(2)} min="0.65" max="1.35" step="0.05" current={settings.pitch} onChange={(pitch) => onChange({ pitch, source: "device" })} />
       <SliderRow label="ระดับเสียง" value={`${Math.round(settings.volume * 100)}%`} min="0" max="1" step="0.05" current={settings.volume} onChange={(volume) => onChange({ volume, source: "device" })} />
-      <button type="button" onClick={testVoice} disabled={!supported} className="accent-gradient w-full rounded-xl px-4 py-2.5 text-sm font-medium text-primary-fg shadow-lg transition-transform hover:scale-[1.01] active:scale-[.99] disabled:opacity-40">🔊 ทดลองเสียงสลี่</button>
+      <button type="button" onClick={testVoice} disabled={!supported} className="accent-gradient h-10 w-full rounded-full px-6 text-sm font-medium transition-colors hover:bg-primary-hover disabled:opacity-40">🔊 ทดลองเสียงสลี่</button>
       {!supported ? <p className="text-center text-[11px] text-subtle">Browser นี้ไม่รองรับ SpeechSynthesis</p> : null}
     </div>
   </Panel>;
@@ -647,7 +599,7 @@ function SandboxPanel({ language, code, input, output, busy, preview, setPreview
   return <Panel title="แซนด์บ็อกซ์รันโค้ด" icon={Play} hint="ลองโค้ดจริงก่อนใช้งานจริง">
     <div className="mb-4 flex flex-wrap items-center gap-2">
       {SANDBOX_LANGUAGES.map(lang => (
-        <button key={lang.id} type="button" onClick={() => onLanguage(lang.id)} className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-all", language === lang.id ? "border-primary/60 bg-primary/10 text-primary" : "border-border bg-clay text-muted hover:border-primary/30 hover:text-fg")}>
+        <button key={lang.id} type="button" onClick={() => onLanguage(lang.id)} className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-all", language === lang.id ? "border-primary/60 bg-primary/10 text-primary" : "border-border bg-transparent text-muted hover:bg-[var(--state-hover)] hover:text-fg")}>
           {lang.id === "python-safe" ? <ShieldCheck className="size-3.5" /> : null}{lang.label}
         </button>
       ))}
@@ -660,15 +612,15 @@ function SandboxPanel({ language, code, input, output, busy, preview, setPreview
         </div>
         <textarea value={code} onChange={e => onCode(e.target.value)} spellCheck={false} className="min-h-[330px] w-full resize-y bg-transparent p-4 font-mono text-sm leading-6 text-white outline-none" />
       </div>
-      <div className="flex min-h-[330px] flex-col rounded-2xl border border-border bg-clay/60">
+      <div className="flex min-h-[330px] flex-col rounded-2xl border border-border bg-elevated">
         <div className="border-b border-border px-3 py-2 text-xs font-medium">Output / Console</div>
         <textarea value={input} onChange={e => onInput(e.target.value)} placeholder="stdin (ถ้ามี)" className="m-3 min-h-16 rounded-xl bg-bg p-3 font-mono text-xs outline-none" />
         <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-3 pb-3 font-mono text-xs leading-5 text-muted">{output}</pre>
         {language === "html" ? <button type="button" onClick={() => setPreview(!preview)} className="mx-3 mb-3 rounded-xl bg-bg px-3 py-2 text-xs text-muted hover:text-fg">{preview ? "ซ่อน Live Preview" : "เปิด Live Preview"}</button> : null}
-        <div className="p-3"><Button className="accent-gradient w-full border-0 text-primary-fg" disabled={busy} onClick={onRun}><Play className="size-4" />{busy ? "กำลังรัน…" : "Run code"}</Button></div>
+        <div className="p-3"><Button className="accent-gradient w-full border-0" disabled={busy} onClick={onRun}><Play className="size-4" />{busy ? "กำลังรัน…" : "Run code"}</Button></div>
       </div>
     </div>
-    {language === "html" && preview ? <div className="anim-pop mt-4 overflow-hidden rounded-2xl border border-border bg-clay/60"><div className="border-b border-border px-3 py-2 text-xs font-medium">Live Preview</div><iframe title="HTML Live Preview" sandbox="allow-scripts" srcDoc={code} className="h-[420px] w-full bg-white" /></div> : null}
+    {language === "html" && preview ? <div className="anim-pop mt-4 overflow-hidden rounded-2xl border border-border bg-elevated"><div className="border-b border-border px-3 py-2 text-xs font-medium">Live Preview</div><iframe title="HTML Live Preview" sandbox="allow-scripts" srcDoc={code} className="h-[420px] w-full bg-white" /></div> : null}
     <p className="mt-3 text-xs leading-relaxed text-subtle">Python (Safe) = ส่งโค้ดดิบเข้า Aether AST guard ผ่าน stdin โดยไม่ผ่าน shell • HTML = Preview ใน sandboxed iframe • JSON ตรวจ syntax ในเครื่อง</p>
   </Panel>;
 }
@@ -730,7 +682,7 @@ function DataPanel() {
       <Panel title="ข้อมูลบนอุปกรณ์นี้ (แคช)" icon={Database}>
         <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {stats.map(([label, value]) => (
-            <div key={label} className="card-lift rounded-xl border border-border bg-clay/60 p-3"><dt className="text-[11px] text-muted">{label}</dt><dd className="mt-1 text-lg font-semibold tabular-nums">{value}</dd></div>
+            <div key={label} className="card-lift rounded-xl border border-border bg-elevated p-3"><dt className="text-[11px] text-muted">{label}</dt><dd className="mt-1 text-lg font-semibold tabular-nums">{value}</dd></div>
           ))}
         </dl>
         <p className="mt-3 text-xs leading-relaxed text-subtle">ข้อมูลสำคัญซิงก์กับ Workspace บน Neon แล้ว • เบราว์เซอร์เก็บไว้เฉพาะแคชเพื่อให้เปิดแอปได้เร็ว • ล้างข้อมูลเบราว์เซอร์แล้วข้อมูลใน Workspace ยังอยู่</p>
@@ -742,7 +694,7 @@ function DataPanel() {
               <span className="text-[10px] font-medium tabular-nums text-muted">{day.count || ""}</span>
               <div className="flex w-full flex-1 flex-col justify-end overflow-hidden rounded-md bg-clay/70">
                 <div
-                  className={cn("w-full rounded-md transition-all duration-500", day.count ? "accent-gradient" : "")}
+                  className={cn("w-full rounded-[4px] transition-all duration-500", day.count ? "bg-primary" : "bg-hover")}
                   style={{ height: `${day.count ? Math.max(10, (day.count / peak) * 100) : 0}%` }}
                 />
               </div>
@@ -755,8 +707,8 @@ function DataPanel() {
     </div>
     <Panel title="สำรอง • กู้คืน • ล้าง" icon={Download}>
       <div className="grid gap-2 md:grid-cols-2">
-        <button type="button" onClick={download} className="card-lift flex w-full items-center gap-3 rounded-xl border border-border bg-clay/60 p-3 text-left"><Download className="size-4 shrink-0 text-primary" /><span><span className="block text-sm font-medium">ส่งออกไฟล์สำรอง (JSON)</span><span className="block text-xs text-muted">แชต แผนผัง ความจำ บุคลิก พรอมป์ และการตั้งค่า</span></span></button>
-        <label className="card-lift flex w-full cursor-pointer items-center gap-3 rounded-xl border border-border bg-clay/60 p-3 text-left"><Upload className="size-4 shrink-0 text-primary" /><span><span className="block text-sm font-medium">นำเข้าไฟล์สำรอง</span><span className="block text-xs text-muted">รวมกับข้อมูลเดิม ไม่เขียนทับแชตที่มีอยู่</span></span><input type="file" accept="application/json,.json" className="hidden" onChange={e => { void restore(e.target.files?.[0]); e.target.value = ""; }} /></label>
+        <button type="button" onClick={download} className="card-lift flex w-full items-center gap-3 rounded-xl border border-border bg-elevated p-3 text-left"><Download className="size-4 shrink-0 text-primary" /><span><span className="block text-sm font-medium">ส่งออกไฟล์สำรอง (JSON)</span><span className="block text-xs text-muted">แชต แผนผัง ความจำ บุคลิก พรอมป์ และการตั้งค่า</span></span></button>
+        <label className="card-lift flex w-full cursor-pointer items-center gap-3 rounded-xl border border-border bg-elevated p-3 text-left"><Upload className="size-4 shrink-0 text-primary" /><span><span className="block text-sm font-medium">นำเข้าไฟล์สำรอง</span><span className="block text-xs text-muted">รวมกับข้อมูลเดิม ไม่เขียนทับแชตที่มีอยู่</span></span><input type="file" accept="application/json,.json" className="hidden" onChange={e => { void restore(e.target.files?.[0]); e.target.value = ""; }} /></label>
       </div>
       {confirmReset ? (
         <div className="anim-pop mt-2 rounded-xl border border-danger/40 bg-danger/10 p-3">
@@ -772,12 +724,12 @@ function DataPanel() {
 /* ---------------------------------- Shared UI ---------------------------------- */
 
 function Panel({ title, icon: Icon, hint, children }: { title: string; icon: typeof Sparkles; hint?: string; children: React.ReactNode }) {
-  return <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-elevated p-4 shadow-[var(--shadow-border)] sm:p-5">
-    <div className="mb-4 flex items-center gap-2.5">
-      <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Icon className="size-4" /></span>
+  return <div className="min-w-0 overflow-hidden rounded-2xl bg-surface p-5">
+    <div className="mb-4 flex items-center gap-3">
+      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-secondary-container text-on-secondary-container"><Icon className="size-5" /></span>
       <div className="min-w-0">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        {hint ? <p className="text-[11px] leading-snug text-subtle">{hint}</p> : null}
+        <h2 className="m3-title-md">{title}</h2>
+        {hint ? <p className="m3-body-sm mt-0.5 leading-snug text-subtle">{hint}</p> : null}
       </div>
     </div>
     {children}

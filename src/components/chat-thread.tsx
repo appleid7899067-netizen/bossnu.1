@@ -75,7 +75,7 @@ export function ChatThread({
   }
 
   return (
-    <div ref={scroller} onScroll={onScroll} className="chat-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-[#0b0712]">
+    <div ref={scroller} onScroll={onScroll} className="chat-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-bg">
       <div className="mx-auto flex w-full max-w-[980px] min-w-0 flex-col gap-4 px-3 py-4 sm:gap-5 sm:px-6 sm:py-5 lg:px-8">
         {messages.length === 0 ? (
           <section className="sali-command-center lumina-rise" aria-label="ห้องแชทหลักของสลี่">
@@ -165,7 +165,7 @@ function MessageBubble({
       };
       return (
         <div className="lumina-rise flex justify-end">
-          <div className="w-full max-w-[min(92%,48rem)] rounded-[20px] bg-elevated p-2.5 shadow-[var(--shadow-border)]">
+          <div className="w-full max-w-[min(92%,48rem)] rounded-2xl bg-elevated p-2.5">
             <textarea
               autoFocus
               value={draft}
@@ -176,12 +176,12 @@ function MessageBubble({
               }}
               rows={Math.min(8, Math.max(2, draft.split("\n").length))}
               aria-label="แก้ไขข้อความ"
-              className="block w-full resize-y rounded-xl bg-bg px-3 py-2 text-[13px] leading-[1.5] text-fg outline-none focus:ring-1 focus:ring-ring"
+              className="block w-full resize-y rounded-lg bg-container-lowest px-3 py-2 text-sm leading-[1.5] text-fg outline-none focus:ring-1 focus:ring-primary"
             />
             <div className="mt-2 flex items-center justify-end gap-2">
               <span className="mr-auto px-1 text-[11px] text-subtle">คำตอบหลังข้อความนี้จะถูกสร้างใหม่</span>
-              <button type="button" onClick={() => { setEditing(false); setDraft(message.content); }} className="rounded-lg px-3 py-1.5 text-xs text-muted hover:bg-hover hover:text-fg">ยกเลิก</button>
-              <button type="button" onClick={save} disabled={busy} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-fg hover:bg-primary-hover disabled:opacity-50">ส่งใหม่</button>
+              <button type="button" onClick={() => { setEditing(false); setDraft(message.content); }} className="h-8 rounded-full px-4 text-xs font-medium text-primary transition-colors hover:bg-[var(--state-hover)]">ยกเลิก</button>
+              <button type="button" onClick={save} disabled={busy} className="h-8 rounded-full bg-primary px-4 text-xs font-medium text-primary-fg transition-colors hover:bg-primary-hover disabled:opacity-50">ส่งใหม่</button>
             </div>
           </div>
         </div>
@@ -196,7 +196,7 @@ function MessageBubble({
                 type="button"
                 onClick={() => { setDraft(message.content); setEditing(true); }}
                 disabled={busy}
-                className="grid size-7 place-items-center rounded-lg text-subtle transition hover:bg-hover hover:text-fg disabled:opacity-40"
+                className="grid size-8 place-items-center rounded-full text-subtle transition hover:bg-[var(--state-hover)] hover:text-fg disabled:opacity-40"
                 aria-label="แก้ไขข้อความ"
                 title="แก้ไขแล้วส่งใหม่"
               >
@@ -206,7 +206,7 @@ function MessageBubble({
             <button
               type="button"
               onClick={onDelete}
-              className="grid size-7 place-items-center rounded-lg text-subtle transition hover:bg-hover hover:text-danger"
+              className="grid size-8 place-items-center rounded-full text-subtle transition hover:bg-danger/10 hover:text-danger"
               aria-label="ลบข้อความ"
               title="ลบข้อความ"
             >
@@ -214,11 +214,11 @@ function MessageBubble({
             </button>
           </div>
           <div className="min-w-0">
-            <div className="rounded-[20px] rounded-br-md bg-primary/[0.08] px-3.5 py-2.5 text-[12px] leading-[1.5] shadow-[var(--shadow-border)] ring-1 ring-primary/10 max-md:bg-primary max-md:text-primary-fg max-md:ring-primary/40">
+            <div className="rounded-2xl rounded-br-xs bg-primary-container px-4 py-3 text-sm leading-[1.6] text-on-primary-container">
               {message.attachments?.length ? (
                 <ul className="mb-2 flex flex-wrap gap-1.5">
                   {message.attachments.map((file, index) => (
-                    <li key={`${file.name}-${index}`} className="flex max-w-full items-center gap-1.5 rounded-lg bg-bg/60 px-2 py-1 text-[11px]">
+                    <li key={`${file.name}-${index}`} className="flex max-w-full items-center gap-1.5 rounded-lg bg-[color-mix(in_srgb,var(--color-on-primary-container)_14%,transparent)] px-2 py-1 text-[11px]">
                       <FileText className="size-3 shrink-0 text-primary" aria-hidden="true" />
                       <span className="truncate font-medium">{file.name}</span>
                       <span className="text-subtle">{formatBytes(file.size)}</span>
@@ -239,7 +239,7 @@ function MessageBubble({
 
   return (
     <div className="lumina-rise group w-full">
-      <div className="min-w-0 w-full break-words text-[13px] pl-0 sm:pl-0 leading-[1.6] [overflow-wrap:anywhere] sm:text-[12.5px] sm:leading-[1.55]">
+      <div className="m3-body-md min-w-0 w-full break-words [overflow-wrap:anywhere]">
         {(live || message.activities?.length) ? <ActivityFeed activities={message.activities ?? []} live={live} liveText={live ? message.content : ""} /> : null}
         {message.activities?.length ? <LiveResultPresentation activities={message.activities} live={live} /> : null}
         {empty && !live && !message.activities?.length ? (
@@ -267,7 +267,7 @@ function MessageBubble({
                 type="button"
                 onClick={onRegenerate}
                 disabled={busy}
-                className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-fg disabled:opacity-40"
+                className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-subtle transition-colors hover:bg-[var(--state-hover)] hover:text-fg disabled:opacity-40"
                 aria-label="สร้างคำตอบใหม่"
                 title="สร้างคำตอบใหม่"
               >
@@ -278,7 +278,7 @@ function MessageBubble({
             <button
               type="button"
               onClick={onDelete}
-              className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-danger"
+              className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-subtle transition-colors hover:bg-danger/10 hover:text-danger"
               aria-label="ลบข้อความ"
               title="ลบข้อความ"
             >
@@ -317,7 +317,7 @@ function SandboxHtmlPreview({ html, path }: { html: string; path?: string }) {
         {path ? <span className="ml-auto truncate text-[10px] text-subtle">{path}</span> : null}
         <span className="sali-summary-mark">✓</span>
       </div>
-      <div className="overflow-hidden rounded-xl border border-primary/20 bg-white">
+      <div className="overflow-hidden rounded-xl border border-border bg-white">
         <iframe
           title="Sandbox HTML preview"
           srcDoc={html}
@@ -341,7 +341,7 @@ function CopyLine({ text }: { text: string }) {
       // Clipboard access can be unavailable in embedded or non-secure contexts.
     }
   }
-  return <button type="button" onClick={() => void copy()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-fg" aria-label={copied ? "คัดลอกแล้ว" : "คัดลอกคำตอบ"} title={copied ? "คัดลอกแล้ว" : "คัดลอกคำตอบ"}>
+  return <button type="button" onClick={() => void copy()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-subtle transition-colors hover:bg-[var(--state-hover)] hover:text-fg" aria-label={copied ? "คัดลอกแล้ว" : "คัดลอกคำตอบ"} title={copied ? "คัดลอกแล้ว" : "คัดลอกคำตอบ"}>
     {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
     {copied ? "คัดลอกแล้ว" : "คัดลอก"}
   </button>;
@@ -354,7 +354,7 @@ function ListenLine({ text }: { text: string }) {
     setListening(true);
     try { await speakNow(text); } finally { setListening(false); }
   }
-  return <button type="button" onClick={() => void listen()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-fg" aria-label={listening ? "หยุดอ่าน" : "ฟังคำตอบ"} title={listening ? "หยุดอ่าน" : "ฟังคำตอบ"}>
+  return <button type="button" onClick={() => void listen()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-subtle transition-colors hover:bg-[var(--state-hover)] hover:text-fg" aria-label={listening ? "หยุดอ่าน" : "ฟังคำตอบ"} title={listening ? "หยุดอ่าน" : "ฟังคำตอบ"}>
     <Volume2 className="size-3.5" />{listening ? "หยุด" : "ฟัง"}
   </button>;
 }
@@ -362,7 +362,7 @@ function ListenLine({ text }: { text: string }) {
 function ContextualReplyActions({ onAction }: { text: string; onAction: (action: string) => void }) {
   const actions = [{ id: "shorter", label: "สั้นลง" }, { id: "expand", label: "ขยาย" }, { id: "simplify", label: "อธิบายง่ายๆ" }];
   return <div className="mt-3 flex items-center gap-1">
-    {actions.map((action) => <button key={action.id} type="button" onClick={() => onAction(action.id)} className="inline-flex h-8 items-center rounded-lg px-2 text-xs font-medium text-subtle transition-colors hover:bg-hover hover:text-fg" aria-label={action.label} title={action.label}>{action.label}</button>)}
+    {actions.map((action) => <button key={action.id} type="button" onClick={() => onAction(action.id)} className="inline-flex h-8 items-center rounded-full px-3 text-xs font-medium text-muted transition-colors hover:bg-[var(--state-hover)] hover:text-fg" aria-label={action.label} title={action.label}>{action.label}</button>)}
   </div>;
 }
 

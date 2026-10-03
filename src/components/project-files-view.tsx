@@ -158,7 +158,7 @@ export function ProjectFilesView({ workspaceId, initialPath }: { workspaceId: st
 
   return <div className="flex min-h-0 flex-1 flex-col bg-bg">
     <header className="flex min-h-14 items-center gap-3 border-b border-border px-4 sm:px-6">
-      <div className="flex size-9 items-center justify-center rounded-xl bg-clay text-primary"><FileStack className="size-4" /></div>
+      <div className="flex size-10 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container"><FileStack className="size-5" /></div>
       <div className="min-w-0"><h1 className="truncate text-sm font-semibold">ไฟล์โปรเจ็ค</h1><p className="truncate text-xs text-muted">สร้าง → เปิด → แก้ → บันทึก → ดูผลได้ทันที</p></div>
       <div className="ml-auto flex items-center gap-1">
         <Button variant="ghost" size="icon-sm" onClick={() => void load(false)} disabled={loading} title="รีเฟรช"><RefreshCw className={cn("size-4", loading && "animate-spin")} /></Button>

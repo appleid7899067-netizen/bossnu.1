@@ -8,10 +8,10 @@ import { cn } from "@/lib/utils";
 
 const TONE: Record<MapBranch["tone"], string> = {
   sage: "var(--color-primary)",
-  ink: "var(--color-ink-soft)",
-  clay: "var(--color-sand)",
-  sky: "var(--color-sky)",
-  sand: "var(--color-sand)",
+  ink: "var(--color-on-surface-variant)",
+  clay: "var(--color-tertiary)",
+  sky: "var(--color-secondary)",
+  sand: "var(--color-tertiary-container)",
 };
 
 type LaidOut = {
@@ -142,7 +142,7 @@ export function MindMapView({
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="mx-auto w-full max-w-3xl px-4 pt-6 sm:pt-8">
         <p className="text-sm font-medium text-muted">Mind maps</p>
-        <h1 className="mt-1 font-display text-3xl font-medium tracking-tight">
+        <h1 className="m3-headline-md mt-1">
           See the shape of an idea
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
@@ -168,14 +168,14 @@ export function MindMapView({
 
       {busy && !active ? (
         <div className="mx-auto mt-8 w-full max-w-3xl px-4">
-          <div className="h-48 rounded-2xl bg-clay/70 lumina-rise" />
+          <div className="h-48 rounded-2xl bg-elevated lumina-rise" />
         </div>
       ) : null}
 
       {laid && active ? (
         <div className="mt-6 min-h-0 flex-1 overflow-auto px-3 pb-8">
           <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 lg:flex-row">
-            <div className="min-w-0 flex-1 overflow-x-auto rounded-2xl bg-elevated p-3 shadow-[var(--shadow-border)]">
+            <div className="min-w-0 flex-1 overflow-x-auto rounded-2xl bg-elevated p-3">
               <svg
                 viewBox={`0 0 ${laid.width} ${laid.height}`}
                 className="h-auto w-full min-w-[720px]"
@@ -192,7 +192,7 @@ export function MindMapView({
                         key={`e-${n.id}`}
                         d={connector(parent, n)}
                         fill="none"
-                        stroke="var(--color-border-strong)"
+                        stroke="var(--color-border)"
                         strokeWidth="1.4"
                       />
                     );
@@ -213,11 +213,11 @@ export function MindMapView({
                         rx={n.kind === "root" ? 16 : 12}
                         fill={
                           n.kind === "root"
-                            ? "var(--color-primary)"
-                            : "var(--color-surface)"
+                            ? "var(--color-primary-container)"
+                            : "var(--color-clay)"
                         }
                         stroke={
-                          isSel ? TONE[n.tone] : "var(--color-border-strong)"
+                          isSel ? TONE[n.tone] : "var(--color-border)"
                         }
                         strokeWidth={isSel ? 2 : 1}
                       />
@@ -227,7 +227,7 @@ export function MindMapView({
                         textAnchor="middle"
                         fill={
                           n.kind === "root"
-                            ? "var(--color-primary-fg)"
+                            ? "var(--color-on-primary-container)"
                             : "var(--color-fg)"
                         }
                         fontSize={n.kind === "root" ? 14 : 12}
@@ -241,11 +241,11 @@ export function MindMapView({
                 })}
               </svg>
             </div>
-            <aside className="w-full shrink-0 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] lg:w-72">
+            <aside className="w-full shrink-0 rounded-2xl bg-surface p-4 lg:w-72">
               <p className="text-xs font-medium tracking-[0.08em] text-subtle uppercase">
                 {selectedNode?.kind === "root" ? "Overview" : "Branch"}
               </p>
-              <h2 className="mt-1 font-display text-xl font-medium">
+              <h2 className="m3-title-lg mt-1">
                 {selectedNode?.label ?? active.data.topic}
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -284,8 +284,7 @@ export function MindMapView({
               type="button"
               onClick={() => onSelect(m.id)}
               className={cn(
-                "rounded-2xl bg-elevated px-4 py-4 text-left shadow-[var(--shadow-border)]",
-                "transition-[box-shadow] duration-150 hover:shadow-[var(--shadow-border-hover)]",
+                "m3-card-elevated rounded-2xl px-4 py-4 text-left",
               )}
             >
               <p className="font-medium">{m.data.topic}</p>
@@ -306,7 +305,7 @@ export function MindMapView({
                 key={ex.id}
                 type="button"
                 onClick={() => onExample(ex.data)}
-                className="rounded-2xl bg-elevated px-4 py-4 text-left shadow-[var(--shadow-border)] transition-[box-shadow] duration-150 hover:shadow-[var(--shadow-border-hover)]"
+                className="m3-card-elevated rounded-2xl px-4 py-4 text-left"
               >
                 <p className="font-medium">{ex.data.topic}</p>
                 <p className="mt-1 line-clamp-2 text-sm text-muted">

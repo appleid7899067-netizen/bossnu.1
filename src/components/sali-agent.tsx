@@ -195,7 +195,7 @@ export function SaliAgent({
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           {leading}
-          <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+          <div className="grid size-10 shrink-0 place-items-center rounded-full bg-secondary-container text-on-secondary-container">
             <SquareTerminal className="size-5" strokeWidth={1.8} />
           </div>
           <div className="min-w-0">
@@ -379,7 +379,7 @@ export function SaliAgent({
                       className={cn(
                         "h-7 rounded-md px-2.5 text-[11px] font-medium transition-colors",
                         typeHint === opt.id
-                          ? "bg-bg text-fg shadow-[var(--shadow-border)]"
+                          ? "bg-secondary-container text-on-secondary-container"
                           : "text-muted hover:text-fg",
                       )}
                     >
@@ -388,7 +388,7 @@ export function SaliAgent({
                   ))}
                 </div>
                 {activeSkill ? (
-                  <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-primary/10 pr-1 pl-2.5 text-[11px] font-medium text-primary">
+                  <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-secondary-container pr-1 pl-2.5 text-[11px] font-medium text-on-secondary-container">
                     {activeSkill.name}
                     <button
                       type="button"
@@ -412,7 +412,7 @@ export function SaliAgent({
                     placeholder="ข้อมูลที่โปรแกรมอ่านผ่าน input() หรือ stdin" />
                 </label>
               )}
-              <div className="flex items-end gap-2 rounded-2xl bg-elevated p-2 shadow-[var(--shadow-border)] focus-within:shadow-[0_0_0_2px_var(--color-primary)]">
+              <div className="flex items-end gap-2 rounded-[28px] bg-elevated p-2 transition-shadow focus-within:shadow-[var(--shadow-prompt-focus)]">
                 <textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
@@ -518,7 +518,7 @@ function SkillsPanel({
                     title={skill.shortDescription ?? skill.description}
                     className={cn(
                       "flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors",
-                      activeId === skill.id ? "bg-primary/10 text-fg" : "hover:bg-hover",
+                      activeId === skill.id ? "bg-secondary-container text-on-secondary-container" : "hover:bg-[var(--state-hover)]",
                     )}
                   >
                     <span className="mt-px text-base leading-none">{skill.emoji}</span>
@@ -557,7 +557,7 @@ function EmptyState({
 }) {
   return (
     <div className="lumina-rise flex flex-col items-center px-2 pt-8 text-center sm:pt-14">
-      <div className="mb-4 grid size-12 place-items-center rounded-full bg-primary/10 text-primary">
+      <div className="mb-4 grid size-14 place-items-center rounded-2xl bg-primary-container text-on-primary-container">
         <SquareTerminal className="size-6" strokeWidth={1.7} />
       </div>
       <h2 className="text-[24px] font-semibold tracking-[-0.03em] sm:text-[28px]">
@@ -576,7 +576,7 @@ function EmptyState({
             key={ex.label}
             type="button"
             onClick={() => onExample(ex)}
-            className="rounded-2xl border border-border bg-bg p-3.5 text-left transition hover:border-primary/40 hover:bg-elevated"
+            className="rounded-2xl border border-border bg-surface p-3.5 text-left transition-colors hover:bg-[var(--state-hover)]"
           >
             <p className="text-[13px] font-semibold">{ex.label}</p>
             <p className="mt-1 line-clamp-2 font-mono text-[11px] text-muted">{ex.cmd}</p>
@@ -605,7 +605,7 @@ function EmptyState({
 function UserBubble({ message }: { message: Extract<AgentMessage, { role: "user" }> }) {
   return (
     <div className="lumina-rise flex justify-end">
-      <div className="max-w-[min(90%,42rem)] rounded-[20px] rounded-br-md bg-elevated px-3.5 py-2.5 shadow-[var(--shadow-border)]">
+      <div className="max-w-[min(90%,42rem)] rounded-2xl rounded-br-xs bg-primary-container px-4 py-3 text-on-primary-container">
         <pre className="whitespace-pre-wrap break-words font-mono text-[12.5px] leading-[1.5] [overflow-wrap:anywhere]">
           {message.text}
         </pre>
@@ -647,7 +647,7 @@ function FlowStatus({ skill }: { skill: SkillInfo | null }) {
 
   return (
     <div className="lumina-rise flex gap-3">
-      <div className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs text-primary">
+      <div className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-secondary-container text-xs text-on-secondary-container">
         ✦
       </div>
       <div className="w-full max-w-[640px] rounded-2xl bg-elevated p-3">
@@ -665,7 +665,7 @@ function FlowStatus({ skill }: { skill: SkillInfo | null }) {
                     ? "bg-emerald-100 text-emerald-700"
                     : i === index
                       ? "bg-primary text-primary-fg"
-                      : "bg-bg text-subtle shadow-[var(--shadow-border)]",
+                      : "bg-elevated text-subtle",
                 )}
               >
                 {i < index ? "✓" : i === index ? "•" : i + 1}
@@ -794,7 +794,7 @@ function ResultCard({
                   key={id}
                   type="button"
                   onClick={() => onSuggest(id)}
-                  className="rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary hover:bg-primary/15"
+                  className="rounded-full bg-secondary-container px-2.5 py-1 font-medium text-on-secondary-container hover:brightness-110"
                 >
                   {id}
                 </button>
@@ -943,7 +943,7 @@ function Chip({
   mono?: boolean;
 }) {
   const tones: Record<string, string> = {
-    primary: "bg-primary/10 text-primary",
+    primary: "bg-secondary-container text-on-secondary-container",
     emerald: "bg-emerald-50 text-emerald-700",
     rose: "bg-rose-50 text-rose-700",
     amber: "bg-amber-50 text-amber-700",
@@ -953,7 +953,7 @@ function Chip({
     <span
       className={cn(
         "inline-flex h-6 items-center rounded-md px-2 text-[10.5px] font-medium",
-        tone ? tones[tone] : "bg-bg text-muted shadow-[var(--shadow-border)]",
+        tone ? tones[tone] : "bg-elevated text-muted",
         mono && "font-mono",
       )}
     >

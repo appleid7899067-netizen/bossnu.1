@@ -2,7 +2,6 @@ import { Trash2 } from "lucide-react";
 import { Composer } from "@/components/composer";
 import { Button } from "@/components/ui/button";
 import type { StudioImage } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 const ASPECTS = ["1:1", "4:3", "3:4", "16:9"] as const;
 
@@ -38,7 +37,7 @@ export function StudioView({
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <header className="mx-auto w-full max-w-2xl px-4 pt-6 sm:pt-8">
         <p className="text-sm font-medium text-muted">Studio</p>
-        <h1 className="mt-1 font-display text-3xl font-medium tracking-tight">
+        <h1 className="m3-headline-md mt-1">
           Make a picture
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
@@ -58,13 +57,8 @@ export function StudioView({
                     key={a}
                     type="button"
                     onClick={() => onAspect(a)}
-                    className={cn(
-                      "h-8 rounded-lg px-2.5 text-xs font-medium",
-                      "transition-[background-color,color] duration-150",
-                      aspect === a
-                        ? "bg-primary text-primary-fg"
-                        : "text-muted hover:bg-fg/6 hover:text-fg",
-                    )}
+                    data-active={aspect === a}
+                    className="m3-chip !h-8 !px-3 !text-xs"
                   >
                     {a}
                   </button>
@@ -80,7 +74,7 @@ export function StudioView({
               key={s}
               type="button"
               onClick={() => onPrompt(s)}
-              className="rounded-full bg-clay px-3 py-1.5 text-xs font-medium text-clay-fg transition-[background-color] duration-150 hover:bg-sand"
+              className="m3-chip !h-8 !text-xs"
             >
               {s}
             </button>
@@ -90,12 +84,12 @@ export function StudioView({
 
       <div className="mx-auto mt-8 grid w-full max-w-4xl grid-cols-1 gap-3 px-4 pb-10 sm:grid-cols-2">
         {busy ? (
-          <div className="aspect-square rounded-2xl bg-clay/80 lumina-rise" />
+          <div className="aspect-square rounded-2xl bg-elevated lumina-rise" />
         ) : null}
         {images.map((img) => (
           <figure
             key={img.id}
-            className="overflow-hidden rounded-2xl bg-elevated shadow-[var(--shadow-border)]"
+            className="overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-e1)] transition-shadow hover:shadow-[var(--shadow-e2)]"
           >
             <img
               src={img.url}

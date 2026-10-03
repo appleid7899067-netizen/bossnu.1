@@ -181,19 +181,19 @@ export function Composer({
       onDrop={onDrop}
     >
       <div className={cn(
-        "relative rounded-[28px] bg-surface p-2.5 shadow-[var(--shadow-prompt)] transition-[box-shadow,transform] duration-200",
+        "relative rounded-[28px] bg-elevated p-2.5 transition-[box-shadow,background-color] duration-200",
         "focus-within:shadow-[var(--shadow-prompt-focus)]",
         dragging && "ring-2 ring-primary",
       )}>
         {dragging ? (
-          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-[20px] bg-surface/90 text-sm font-medium text-primary">
+          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-[24px] bg-elevated/95 text-sm font-medium text-primary">
             วางไฟล์ข้อความหรือโค้ดที่นี่
           </div>
         ) : null}
         {files.length ? (
           <ul className="flex flex-wrap gap-1.5 px-1 pt-1" aria-label="ไฟล์แนบ">
             {files.map((file, index) => (
-              <li key={`${file.name}-${index}`} className="flex max-w-full items-center gap-1.5 rounded-xl bg-clay py-1.5 pr-1 pl-2.5 text-xs">
+              <li key={`${file.name}-${index}`} className="flex max-w-full items-center gap-1.5 rounded-lg bg-secondary-container py-1.5 pr-1 pl-2.5 text-xs text-on-secondary-container">
                 <FileText className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
                 <span className="max-w-[12rem] truncate font-medium">{file.name}</span>
                 <span className="text-subtle">{formatBytes(file.size)}</span>
@@ -201,7 +201,7 @@ export function Composer({
                   type="button"
                   aria-label={`เอา ${file.name} ออก`}
                   onClick={() => onAttachments?.(files.filter((_, i) => i !== index))}
-                  className="grid size-6 place-items-center rounded-lg text-muted hover:bg-hover hover:text-fg"
+                  className="grid size-6 place-items-center rounded-full text-on-secondary-container hover:bg-[var(--state-hover)]"
                 >
                   <X className="size-3" />
                 </button>
@@ -219,7 +219,7 @@ export function Composer({
                 onClick={() => onToolAction?.(tool.id)}
                 className={cn(
                   "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-                  activeTool === tool.id ? "bg-bg text-fg shadow-[var(--shadow-border)]" : "text-muted hover:text-fg",
+                  activeTool === tool.id ? "bg-secondary-container text-on-secondary-container" : "text-muted hover:text-fg",
                 )}
               >
                 {tool.label.split("•")[0]?.replace(/^[^\p{L}\p{N}]+/u, "").trim()}
@@ -249,7 +249,7 @@ export function Composer({
                 type="button"
                 onClick={() => onContextAction?.(action)}
                 disabled={busy}
-                className="shrink-0 rounded-full bg-clay px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-hover hover:text-fg disabled:opacity-50"
+                className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-[var(--state-hover)] hover:text-fg disabled:opacity-50"
               >
                 {action}
               </button>
@@ -272,7 +272,7 @@ export function Composer({
                 aria-label="แนบไฟล์"
                 title="แนบไฟล์ข้อความ/โค้ด (ลากวางหรือวางได้)"
                 onClick={() => fileRef.current?.click()}
-                className="grid size-10 shrink-0 place-items-center rounded-xl text-muted transition-colors hover:bg-hover hover:text-fg"
+                className="m3-icon-btn shrink-0"
               >
                 <Paperclip className="size-4" />
               </button>
@@ -288,8 +288,8 @@ export function Composer({
                 title={activeToolLabel ?? "เลือกเครื่องมือ"}
                 onClick={() => setToolsOpen((open) => !open)}
                 className={cn(
-                  "flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-muted transition-colors hover:bg-hover hover:text-fg",
-                  activeTool && activeTool !== "auto" && "bg-primary/10 text-primary",
+                  "flex h-10 items-center gap-1.5 rounded-full px-2.5 text-muted transition-colors hover:bg-[var(--state-hover)] hover:text-fg",
+                  activeTool && activeTool !== "auto" && "bg-secondary-container text-on-secondary-container",
                 )}
               >
                 <Wrench className="size-4" />
@@ -298,8 +298,8 @@ export function Composer({
                 ) : null}
               </button>
               {toolsOpen ? (
-                <div role="menu" className="anim-pop absolute bottom-12 left-0 z-30 w-72 overflow-hidden rounded-2xl border border-border bg-elevated p-1.5 shadow-2xl">
-                  <p className="px-2.5 pt-1.5 pb-1 text-[0.7rem] font-medium tracking-[0.08em] text-subtle uppercase">เครื่องมือ</p>
+                <div role="menu" className="anim-pop absolute bottom-12 left-0 z-30 w-72 overflow-hidden rounded-md bg-elevated p-1.5 shadow-[var(--shadow-e2)]">
+                  <p className="m3-label-sm px-3 pt-1.5 pb-1 text-subtle">เครื่องมือ</p>
                   {toolActions.map((tool) => (
                     <button
                       key={tool.id}
@@ -307,7 +307,7 @@ export function Composer({
                       role="menuitemradio"
                       aria-checked={activeTool === tool.id}
                       onClick={() => { onToolAction?.(tool.id); setToolsOpen(false); }}
-                      className="flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-sm text-fg transition-colors hover:bg-hover"
+                      className="flex w-full items-center justify-between gap-2 rounded-full px-3 py-2 text-left text-sm text-fg transition-colors hover:bg-[var(--state-hover)]"
                     >
                       <span className="truncate">{tool.label}</span>
                       {activeTool === tool.id ? <Check className="size-4 shrink-0 text-primary" /> : null}
@@ -327,15 +327,15 @@ export function Composer({
                 title="คลังพรอมป์ที่บันทึกไว้"
                 onClick={() => { setLibraryOpen((open) => !open); setLibraryQuery(""); }}
                 className={cn(
-                  "grid size-10 place-items-center rounded-xl text-muted transition-colors hover:bg-hover hover:text-fg",
-                  libraryOpen && "bg-primary/10 text-primary",
+                  "m3-icon-btn",
+                  libraryOpen && "bg-secondary-container text-on-secondary-container",
                 )}
               >
                 <BookMarked className="size-4" />
               </button>
               {libraryOpen ? (
-                <div role="menu" aria-label="คลังพรอมป์" className="anim-pop absolute bottom-12 left-0 z-30 w-80 overflow-hidden rounded-2xl border border-border bg-elevated p-1.5 shadow-2xl">
-                  <p className="px-2.5 pt-1.5 pb-1 text-[0.7rem] font-medium tracking-[0.08em] text-subtle uppercase">คลังพรอมป์ • {quickPrompts.length}</p>
+                <div role="menu" aria-label="คลังพรอมป์" className="anim-pop absolute bottom-12 left-0 z-30 w-80 overflow-hidden rounded-md bg-elevated p-1.5 shadow-[var(--shadow-e2)]">
+                  <p className="m3-label-sm px-3 pt-1.5 pb-1 text-subtle">คลังพรอมป์ • {quickPrompts.length}</p>
                   {quickPrompts.length > 4 ? (
                     <label className="relative mx-1 mb-1 block">
                       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-subtle" aria-hidden="true" />
@@ -346,7 +346,7 @@ export function Composer({
                         onChange={(e) => setLibraryQuery(e.target.value)}
                         placeholder="ค้นหาพรอมป์…"
                         aria-label="ค้นหาพรอมป์"
-                        className="h-9 w-full rounded-xl bg-clay pr-2 pl-8 text-sm outline-none placeholder:text-subtle focus:ring-1 focus:ring-primary/40"
+                        className="h-9 w-full rounded-full bg-hover pr-3 pl-8 text-sm outline-none placeholder:text-subtle focus:ring-1 focus:ring-primary/60"
                       />
                     </label>
                   ) : null}
@@ -359,14 +359,14 @@ export function Composer({
                         type="button"
                         role="menuitem"
                         onClick={() => { onInsertPrompt(prompt.prompt); setLibraryOpen(false); setLibraryQuery(""); ref.current?.focus(); }}
-                        className="w-full rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-hover"
+                        className="w-full rounded-full px-3 py-2 text-left transition-colors hover:bg-[var(--state-hover)]"
                       >
                         <span className="block truncate text-sm font-medium text-fg">{prompt.title}</span>
                         <span className="mt-0.5 block line-clamp-1 text-xs text-muted">{prompt.prompt}</span>
                       </button>
                     ))}
                   </div>
-                  <p className="border-t border-border px-2.5 py-1.5 text-[10px] text-subtle">เพิ่ม/แก้ไขพรอมป์ได้ที่ ตั้งค่า → คลังพรอมป์</p>
+                  <p className="m3-body-sm border-t border-border px-3 py-1.5 text-subtle">เพิ่ม/แก้ไขพรอมป์ได้ที่ ตั้งค่า → คลังพรอมป์</p>
                 </div>
               ) : null}
             </div>
@@ -380,7 +380,7 @@ export function Composer({
                 onChange={(e) => onModelChange(e.target.value)}
                 disabled={busy}
                 title="เลือกโมเดล Puter"
-                className="h-9 max-w-full rounded-xl bg-clay px-2 text-[11px] font-medium text-muted outline-none transition-colors hover:text-fg focus:ring-1 focus:ring-primary disabled:opacity-50"
+                className="h-9 max-w-full rounded-full bg-hover px-3 text-[11px] font-medium text-muted outline-none transition-colors hover:text-fg focus:ring-1 focus:ring-primary disabled:opacity-50"
               >
                 {modelOptions.map((model) => (
                   <option key={model.id} value={model.id}>
@@ -398,7 +398,7 @@ export function Composer({
               title={speech.listening ? "หยุดพิมพ์ด้วยเสียง" : "พิมพ์ด้วยเสียง (ภาษาไทย)"}
               onClick={toggleDictation}
               className={cn(
-                "grid size-10 shrink-0 place-items-center rounded-xl text-muted transition-colors hover:bg-hover hover:text-fg",
+                "m3-icon-btn shrink-0",
                 speech.listening && "bg-danger/15 text-danger hover:text-danger animate-pulse",
               )}
             >
@@ -406,12 +406,12 @@ export function Composer({
             </button>
           ) : null}
           {onSendToGpt ? (
-            <button type="button" aria-label="ส่งงานให้ GPT" title="ส่งงานนี้ให้ GPT ตรวจและทำต่อ" onClick={onSendToGpt} disabled={disabled || busy} className="grid size-10 shrink-0 place-items-center rounded-xl text-muted transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-40">
+            <button type="button" aria-label="ส่งงานให้ GPT" title="ส่งงานนี้ให้ GPT ตรวจและทำต่อ" onClick={onSendToGpt} disabled={disabled || busy} className="m3-icon-btn shrink-0 disabled:opacity-40 hover:bg-[var(--state-active)] hover:text-primary">
               <span className="text-[11px] font-bold tracking-tight">GPT</span>
             </button>
           ) : null}
           {onEmergency ? (
-            <button type="button" aria-label="แก้ด่วนฉุกเฉิน" title={busy ? "หยุดงานที่ค้าง แล้วให้สลี่ตรวจ แก้ รัน และ Verify ใหม่" : "ปลุกสลี่: ตรวจ แก้ รัน และ Verify ใหม่"} onClick={onEmergency} className={cn("grid size-10 shrink-0 place-items-center rounded-xl text-muted transition-colors hover:bg-danger/10 hover:text-danger", busy && "bg-danger/10 text-danger animate-pulse")}>
+            <button type="button" aria-label="แก้ด่วนฉุกเฉิน" title={busy ? "หยุดงานที่ค้าง แล้วให้สลี่ตรวจ แก้ รัน และ Verify ใหม่" : "ปลุกสลี่: ตรวจ แก้ รัน และ Verify ใหม่"} onClick={onEmergency} className={cn("m3-icon-btn shrink-0 hover:bg-danger/10 hover:text-danger", busy && "bg-danger/10 text-danger animate-pulse")}>
               <span className="text-[13px] font-bold leading-none">!</span>
             </button>
           ) : null}
@@ -421,7 +421,7 @@ export function Composer({
               aria-label={voiceEnabled ? "ปิดเสียงสลี่" : "เปิดเสียงสลี่"}
               title={voiceEnabled ? "ปิดเสียงสลี่" : "เปิดเสียงสลี่"}
               onClick={onToggleVoice}
-              className="grid size-10 shrink-0 place-items-center rounded-xl text-muted transition-colors hover:bg-hover hover:text-fg"
+              className="m3-icon-btn shrink-0"
             >
               {voiceEnabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
             </button>
@@ -439,9 +439,8 @@ export function Composer({
               aria-label="ส่ง"
               disabled={disabled || !hasContent}
               className={cn(
-                "accent-gradient size-11 rounded-full border-0 text-primary-fg shadow-lg transition-all duration-200",
-                "enabled:hover:scale-105 enabled:active:scale-95",
-                hasContent && "glow-breathe",
+                "size-12 rounded-2xl border-0 bg-primary-container text-on-primary-container shadow-[var(--shadow-e1)] transition-all duration-200",
+                "enabled:hover:shadow-[var(--shadow-e2)] enabled:active:scale-95",
               )}
             >
               <ArrowUp className="size-5" strokeWidth={2.4} />

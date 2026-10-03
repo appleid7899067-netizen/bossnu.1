@@ -115,7 +115,7 @@ export function AppBuilderView({ project, workspaceId, onProject, onReset }: { p
 
   return <div className="flex min-h-0 flex-1 flex-col bg-bg">
     <header className="flex min-h-14 items-center gap-3 border-b border-border px-4 sm:px-6">
-      <div className="flex size-9 items-center justify-center rounded-xl bg-clay text-primary"><Sparkles className="size-4" /></div>
+      <div className="flex size-10 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container"><Sparkles className="size-5" /></div>
       <div className="min-w-0"><h1 className="truncate text-sm font-semibold">AI Builder</h1><p className="truncate text-xs text-muted">Build, preview, iterate, export</p></div>
       <div className="ml-auto flex items-center gap-1">
         {(["desktop","tablet","mobile"] as const).map((d) => <button key={d} type="button" aria-label={d} title={d} onClick={()=>setDevice(d)} className={cn("hidden size-9 place-items-center sm:grid rounded-lg text-muted hover:bg-hover hover:text-fg", device===d && "bg-elevated text-fg")}>{d==="desktop"?<Monitor className="size-4"/>:d==="tablet"?<Tablet className="size-4"/>:<Smartphone className="size-4"/>}</button>)}
@@ -150,7 +150,7 @@ export function AppBuilderView({ project, workspaceId, onProject, onReset }: { p
               {error?<p className="mt-2 text-xs text-red-400">{error}</p>:null}
               <div className="mt-3 flex items-center justify-between"><span className="text-[11px] text-subtle">Ctrl/⌘ + Enter to build</span><Button onClick={()=>void build()} disabled={busy||!prompt.trim()}>{busy?<RefreshCw className="size-4 animate-spin"/>:<Send className="size-4"/>}{busy?"Building…":"Build app"}</Button></div>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">{["Landing page","SaaS dashboard","AI chat app","Mobile-first store"].map((x)=><button key={x} type="button" onClick={()=>setPrompt("Build a polished "+x.toLowerCase()+" with responsive UI, realistic sample data, useful interactions, and a complete working preview.")} className="rounded-xl bg-surface px-3 py-3 text-left text-xs text-muted shadow-[var(--shadow-border)] hover:bg-hover hover:text-fg">{x}</button>)}</div>
+            <div className="mt-3 grid grid-cols-2 gap-2">{["Landing page","SaaS dashboard","AI chat app","Mobile-first store"].map((x)=><button key={x} type="button" onClick={()=>setPrompt("Build a polished "+x.toLowerCase()+" with responsive UI, realistic sample data, useful interactions, and a complete working preview.")} className="rounded-xl bg-elevated px-3 py-3 text-left text-xs text-muted transition-colors hover:bg-[var(--state-hover)] hover:text-fg">{x}</button>)}</div>
           </div>
         </div>
       </aside>

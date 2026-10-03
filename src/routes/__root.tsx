@@ -10,13 +10,9 @@ const APP_NAME = "Lumina";
  * first paint so dark-mode users never see a light flash while React hydrates.
  * Must stay tiny and dependency-free — it runs before hydration.
  */
-const APPEARANCE_BOOT = `(function(){var d=document.documentElement;d.dataset.theme="dark";d.dataset.accent="violet";d.dataset.font="normal";d.dataset.motion="on";
+const APPEARANCE_BOOT = `(function(){var d=document.documentElement;d.dataset.theme="dark";d.style.colorScheme="dark";d.dataset.font="normal";d.dataset.motion="on";
 try{var s=JSON.parse(localStorage.getItem("bossnu-silelo-v1")||"{}").state||{};
-var ui=s.ui||{},p=s.personality||{};
-var theme=ui.theme||(p.darkMode===false?"light":"dark");
-if(theme==="system")theme=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
-d.dataset.theme=theme;d.style.colorScheme=theme;
-if(ui.accent)d.dataset.accent=ui.accent;
+var ui=s.ui||{};
 if(ui.fontScale)d.dataset.font=ui.fontScale;
 if(ui.animations===false)d.dataset.motion="off";
 }catch(e){}})();`;
@@ -31,7 +27,7 @@ export const Route = createRootRoute({
         name: "description",
         content: "A calm place to think, map ideas, and make pictures.",
       },
-      { name: "theme-color", content: "#f3efe6" },
+      { name: "theme-color", content: "#141218" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
@@ -46,7 +42,7 @@ export const Route = createRootRoute({
       },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+Thai:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap",
       },
     ],
   }),
