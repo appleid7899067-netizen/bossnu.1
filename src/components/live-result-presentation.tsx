@@ -37,9 +37,15 @@ function packageNames(command?: string, output?: string) {
 }
 
 function usefulOutput(output?: string) {
-  return (output ?? "").split("\n").map(x => x.trim()).filter(Boolean)
-    .filter(x => !/^(npm notice|npm warn|warning|deprecated|up to date|found \d+ vulnerabilities|exitCode|workspace sync|workspaceSync|process exited)/i.test(x))
-    .slice(-6);
+  const lines = (output ?? "").split("\n").filter(Boolean)
+    .filter(x => !/^(npm notice|npm warn|warning|deprecated|up to date|found \d+ vulnerabilities|exitCode|workspace sync|workspaceSync|process exited)/i.test(x));
+  const joined = lines.join("\n");
+  if (joined.length <= 20000) return lines;
+  return [
+    joined.slice(0, 9000),
+    "… [REAL OUTPUT ยาวเกินพื้นที่ แสดงส่วนต้นและส่วนท้าย] …",
+    joined.slice(-11000),
+  ].join("\n").split("\n");
 }
 
 const PHASE_LABELS: Record<PhaseActivity["phase"], string> = {
@@ -128,11 +134,21 @@ export function LiveResultPresentation({ activities, live }: Props) {
         ))}
 
         {command ? (
-          <div className="sali-result-stack">
-            <div className="sali-result-stack-title">RUN / REAL COMMAND</div>
-            <div className="sali-result-command" title={command.command}>
+          <div className="sali-result-terminal">
+            <div className="sali-result-terminal-top">
+              <div className="sali-result-terminal-title"><span>›_</span> RUN / REAL COMMAND</div>
+              <span className={command.status === "running" ? "live" : command.status === "success" ? "ok" : "bad"}>
+                {command.status === "running" ? "● RUNNING" : command.status === "success" ? "✓ DONE" : "✕ ERROR"}
+              </span>
+            </div>
+            <div className="sali-result-command sali-result-terminal-command" title={command.command}>
               <span>›</span><code>{command.command}</code>
-              <em>{command.status === "running" ? "running" : command.status}</em>
+            </div>
+            <div className="sali-result-terminal-label">REAL OUTPUT</div>
+            <pre className="sali-result-terminal-output" aria-live={working ? "polite" : "off"}>{output.length ? output.join("\n") : "กำลังรอ REAL OUTPUT จาก Sandbox…"}</pre>
+            <div className="sali-result-terminal-foot">
+              <span>{command.status === "running" ? "กำลังรับ output จาก E2B…" : "สตรีมจบ"}</span>
+              <span>{command.output ? command.output.length.toLocaleString() + " chars" : "LIVE"}</span>
             </div>
           </div>
         ) : null}
