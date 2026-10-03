@@ -177,7 +177,7 @@ export function LiveResultPresentation({ activities, live }: Props) {
               </div>
             ))}
           </div>
-        )}
+        ) : null}
       </div>
     </section>
   );
