@@ -44,7 +44,7 @@ export function SignInButtons() {
             setBusy(false);
           });
         }}
-        className="w-full cursor-pointer rounded-md border border-neutral-300 px-4 py-2 hover:bg-neutral-100 disabled:cursor-wait disabled:opacity-60 dark:border-neutral-700 dark:hover:bg-neutral-900"
+        className="w-full cursor-pointer rounded-xl border border-[#c4a7ff]/25 bg-[#c4a7ff]/10 px-4 py-3 font-medium text-[#e8ddff] shadow-[0_8px_30px_rgba(196,167,255,0.08)] transition-all hover:border-[#c4a7ff]/45 hover:bg-[#c4a7ff]/15 hover:text-white disabled:cursor-wait disabled:opacity-60"
       >
         {busy ? "กำลังเชื่อมต่อ Puter…" : "เข้าสู่ระบบด้วย Puter"}
       </button>
