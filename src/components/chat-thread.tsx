@@ -86,12 +86,15 @@ export function ChatThread({
               <p>คุย สร้าง แก้ไฟล์ รัน และตรวจผลใน Workspace เดียวกัน</p>
             </div>
             <div className="sali-command-flow" aria-label="วงจรการทำงาน">
-              {["GOAL","PLAN","READ","ANALYZE","EDIT","RUN","OBSERVE","VERIFY","OK"].map((step, index) => (
+              {["GOAL","PLAN","READ","ANALYZE","EDIT","RUN","VERIFY","OK"].map((step, index) => (
                 <span key={step} className="sali-command-step">
                   {index > 0 ? <i aria-hidden="true">→</i> : null}
                   <b>{step}</b>
                 </span>
               ))}
+              <span className="sali-command-preview" aria-label="ผลลัพธ์หลังตรวจสอบผ่าน">
+                <i aria-hidden="true">»</i><b>HTML CORE / PREVIEW</b>
+              </span>
             </div>
             <div className="sali-command-hint">
               <span className="sali-command-live-dot" />
