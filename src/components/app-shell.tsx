@@ -499,7 +499,7 @@ export function AppShell({ search }: { search: Search }) {
               updateStreamLog(streamLogId, "puter", "running", streamPreview, streamChars);
             } else if (event.type === "text") {
               streamChars += event.text.length;
-              streamPreview = (streamPreview + event.text).slice(-240);
+              streamPreview = (streamPreview + event.text).slice(-64000);
               append(event.text);
               updateStreamLog(streamLogId, "puter", "running", streamPreview, streamChars);
             } else if (event.type === "done") {
