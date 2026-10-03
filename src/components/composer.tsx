@@ -180,6 +180,24 @@ export function Composer({
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); }}
       onDrop={onDrop}
     >
+      {toolActions?.length ? (
+        <div className="sali-mobile-runtime-tabs no-scrollbar flex items-center gap-1 overflow-x-auto pb-2 sm:hidden" aria-label="เลือกประเภทรัน">
+          {toolActions.map((tool) => (
+            <button
+              key={tool.id}
+              type="button"
+              aria-pressed={activeTool === tool.id}
+              onClick={() => onToolAction?.(tool.id)}
+              className={cn(
+                "shrink-0 rounded-full px-3.5 py-2 text-xs font-medium transition-colors",
+                activeTool === tool.id ? "bg-[#171022] text-fg shadow-[0_0_0_1px_rgba(167,110,255,.18)]" : "text-muted hover:text-fg",
+              )}
+            >
+              {tool.label.split("•")[0]?.replace(/^[^\p{L}\p{N}]+/u, "").trim()}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className={cn(
         "relative rounded-[28px] bg-surface p-2.5 shadow-[var(--shadow-prompt)] transition-[box-shadow,transform] duration-200",
         "focus-within:shadow-[var(--shadow-prompt-focus)]",
@@ -209,24 +227,6 @@ export function Composer({
             ))}
           </ul>
         ) : null}
-        {toolActions?.length ? (
-          <div className="no-scrollbar flex items-center gap-1 overflow-x-auto px-1 pb-2 sm:hidden" aria-label="เลือกประเภทรัน">
-            {toolActions.map((tool) => (
-              <button
-                key={tool.id}
-                type="button"
-                aria-pressed={activeTool === tool.id}
-                onClick={() => onToolAction?.(tool.id)}
-                className={cn(
-                  "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-                  activeTool === tool.id ? "bg-bg text-fg shadow-[var(--shadow-border)]" : "text-muted hover:text-fg",
-                )}
-              >
-                {tool.label.split("•")[0]?.replace(/^[^\p{L}\p{N}]+/u, "").trim()}
-              </button>
-            ))}
-          </div>
-        ) : null}
         <textarea
           ref={ref}
           value={value}
@@ -241,7 +241,7 @@ export function Composer({
           className="block min-h-9 w-full resize-none bg-transparent px-2.5 py-1.5 text-[14px] leading-[1.4] text-fg placeholder:text-subtle outline-none disabled:opacity-60"
         />
         {contextualActions?.length ? (
-          <div className="flex items-center gap-1.5 overflow-x-auto px-1 pb-1 pt-0.5 no-scrollbar">
+          <div className="flex items-center gap-1.5 overflow-x-auto px-1 pb-1 pt-0.5 no-scrollbar sm:hidden">
             <Sparkles className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
             {contextualActions.slice(0, 4).map((action) => (
               <button
