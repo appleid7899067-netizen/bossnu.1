@@ -79,8 +79,14 @@ export function detectSandboxInput(input: string): SandboxDetection {
   if (/(^|\n)\s*[.#]?[a-zA-Z][^{]*\{[\s\S]*:[^;{}]+;[\s\S]*\}/.test(value)) {
     return { runtime: "css", label: "CSS", code: value, confidence: "high", webPreview: true, dangerous: false };
   }
+  const fencedHtml = value.match(/\`{3,}\\s*(?:html?|xhtml)\\s*\\n([\\s\\S]*?)\\n?\\s*\`{3,}/i);
+  if (fencedHtml?.[1]?.trim()) {
+    return { runtime: "html", label: "HTML / Web", code: fencedHtml[1].trim(), confidence: "high", webPreview: true, dangerous: false };
+  }
   if (htmlDocument(value)) {
-    return { runtime: "html", label: "HTML / Web", code: value, confidence: "high", webPreview: true, dangerous: false };
+    const start = value.search(/<!doctype\\s+html|<html(?:\\s|>)/i);
+    const code = start >= 0 ? value.slice(start).trim() : value;
+    return { runtime: "html", label: "HTML / Web", code, confidence: "high", webPreview: true, dangerous: false };
   }
   if (/^(?:const|let|var|function|class)\s+/m.test(value) || /(?:document|window)\.[A-Za-z_$]/.test(value)) {
     return { runtime: "javascript", label: "JavaScript", code: value, confidence: "high", webPreview: true, dangerous: false };
