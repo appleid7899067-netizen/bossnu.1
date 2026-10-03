@@ -104,7 +104,7 @@ export async function ensurePuterSignedIn() {
   return puter;
 }
 
-const CONTEXT_CHAR_BUDGET = 24_000;
+const CONTEXT_CHAR_BUDGET = 32_000;
 const CONTEXT_RECENT_MESSAGES = 10;
 const RETRY_DELAYS_MS = [250, 600];
 
@@ -143,10 +143,14 @@ export function manageStreamContext(messages: { role: "user" | "assistant"; cont
     const removed = kept.shift();
     used -= removed?.content.length ?? 0;
   }
+  const isCodeHeavy = /(?:^|\\n)\\s*\`{3,}\\s*(?:html?|xhtml|css|javascript|js|tsx?|jsx)\\b/i.test(newest.content)
+    || /<!doctype\\s+html|<html(?:\\s|>)/i.test(newest.content);
   const newestContent = newest.content.length > newestBudget
-    ? newest.content.slice(0, Math.floor(newestBudget * 0.7)) +
-      "\n\n[...ตัดเนื้อหากลางไฟล์/บริบทเพื่อไม่ให้เกิน context...]\n\n" +
-      newest.content.slice(-Math.floor(newestBudget * 0.3))
+    ? isCodeHeavy
+      ? newest.content.slice(0, newestBudget)
+      : newest.content.slice(0, Math.floor(newestBudget * 0.7)) +
+        "\n\n[...ตัดเนื้อหากลางบริบทเพื่อไม่ให้เกิน context...]\n\n" +
+        newest.content.slice(-Math.floor(newestBudget * 0.3))
     : newest.content;
   return [...kept, { role: newest.role, content: newestContent }];
 }
@@ -299,7 +303,7 @@ export async function streamChat(opts: {
             model: primaryModel,
             stream: true,
             temperature: opts.mode === "think" ? 0.6 : 0.7,
-            max_tokens: opts.mode === "think" ? 5000 : 3500,
+            max_tokens: /(?:<!doctype\\s+html|<html(?:\\s|>)|```\\s*html\\b|สร้าง(?:\\s+|)html|เว็บ(?:ไซต์)?|website|live preview)/i.test(latestUser)\n              ? (opts.mode === "think" ? 9000 : 8000)\n              : (opts.mode === "think" ? 5000 : 3500),
             reasoning_effort: opts.mode === "think" ? "low" : "low",
             normalize: true,
           },
