@@ -1452,3 +1452,17 @@ textarea{font-size:13px!important;line-height:1.55!important}
   .sali-command-preview{scroll-behavior:auto}
 }
 
+.sali-flow-html-preview .sali-flow-token{
+  color:#e9d5ff;
+  border:1px solid rgba(192,132,252,.42);
+  border-radius:999px;
+  padding:4px 8px;
+  background:linear-gradient(120deg,rgba(168,85,247,.18),rgba(192,132,252,.07));
+  box-shadow:0 0 14px rgba(168,85,247,.10);
+  white-space:nowrap;
+  font-size:9px;
+}
+.sali-flow-html-preview .sali-flow-arrow{
+  color:#c084fc;
+  font-size:14px;
+}
