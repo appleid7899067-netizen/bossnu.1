@@ -88,6 +88,19 @@ test("unsupported push/commit requests do not authorize a file write", () => {
   assert.equal(commit.unsupportedGithubActions.length, 1);
 });
 
+test("guarded project file workflows route to GitHub without authorizing main", () => {
+  const route = routeAgentTools(
+    "สร้างไฟล์ sali-e2e-test.txt ในโปรเจกต์นี้ เขียน SALI_GITHUB_E2E_OK ลงไป แล้วอ่านกลับมา VERIFY เนื้อหาให้ตรงกัน จากนั้นรายงาน branch และ commit จริง ห้ามแก้ main",
+    { sandbox: true, github: true },
+  );
+  assert.ok(route.selected.includes("github"));
+  assert.ok(route.allowedGithubActions.includes("write_file"));
+  assert.ok(route.allowedGithubActions.includes("create_branch"));
+  assert.ok(route.requiredGithubActions.includes("write_file"));
+  assert.ok(route.requiredGithubActions.includes("create_branch"));
+  assert.equal(route.allowedGithubActions.includes("delete_file"), false);
+});
+
 test("router reports unavailable tools instead of pretending they are connected", () => {
   const route = routeAgentTools("ตรวจ GitHub PR #29", { sandbox: true, github: false });
   assert.deepEqual(route.selected, []);
