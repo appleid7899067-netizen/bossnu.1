@@ -396,9 +396,22 @@ export function AppShell({ search }: { search: Search }) {
         throw error;
       }
     };
-    const initialCall = detection.command
-      ? { language: isRunnerRuntime(detection.runtime) ? detection.runtime : "bash", command: detection.command } as RunCall
+    const htmlSandboxCommand = detection.runtime === "html" && detection.code
+      ? (() => {
+          const bytes = new TextEncoder().encode(detection.code);
+          let binary = "";
+          for (let i = 0; i < bytes.length; i += 0x8000) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+          }
+          const encoded = btoa(binary);
+          return `node -e "require('fs').writeFileSync('index.html',Buffer.from('${encoded}','base64'))"`;
+        })()
       : undefined;
+    const initialCall = htmlSandboxCommand
+      ? ({ language: "bash", command: htmlSandboxCommand } as RunCall)
+      : detection.command
+        ? { language: isRunnerRuntime(detection.runtime) ? detection.runtime : "bash", command: detection.command } as RunCall
+        : undefined;
     const executeGithub = async (call: GithubCall): Promise<ToolResult> => {
       const response = await fetch("/api/github", {
         method: "POST",
@@ -560,29 +573,16 @@ export function AppShell({ search }: { search: Search }) {
         model: async (messages, onText) => {
           let failure = "";
           const streamLogId = startStreamLog("agent", "Agent → Puter • รอ token แรก…");
-          let streamChars = 0;
-          let streamPreview = "";
+          // In execution mode, the visible live stream belongs to the real
+          // Sandbox execution. Puter still supplies model tokens, but its token
+          // transport is not rendered as a second terminal activity.
           await streamChat({ messages, mode: chatMode, signal: ac.signal, tools, latestUser: content, model: store.selectedModel,
             onEvent: event => {
               if (ac.signal.aborted) return;
-              if (event.type === "thinking") {
-                streamPreview = "กำลังคิด • " + event.text;
-                updateStreamLog(streamLogId, "agent", "running", streamPreview, streamChars);
-              } else if (event.type === "text") {
-                streamChars += event.text.length;
-                streamPreview = (streamPreview + event.text).slice(-240);
-                onText(event.text);
-                updateStreamLog(streamLogId, "agent", "running", streamPreview, streamChars);
-              } else if (event.type === "done") {
-                updateStreamLog(streamLogId, "agent", "done", "สตรีมจบ • รับ " + streamChars.toLocaleString() + " ตัวอักษร", streamChars);
-              } else if (event.type === "error") {
-                failure = event.error;
-                updateStreamLog(streamLogId, "agent", "error", event.error, streamChars);
-              }
+              if (event.type === "text") onText(event.text);
+              else if (event.type === "error") failure = event.error;
             },
           });
-          if (failure) throw new Error(failure);
-        },
 
       });
       if (!reply && !ac.signal.aborted) append("ยังตอบไม่สำเร็จ กรุณาลองอีกครั้งค่ะ");
@@ -854,7 +854,7 @@ ${message}`); toast.error(message); }
     if (activeTool === "node") return `node - <<'NODE'\n${value}\nNODE`;
     if (activeTool === "python") return `python3 - <<'PY'\n${value}\nPY`;
     if (activeTool === "html") return `\`\`\`html\n${value}\n\`\`\``;
-    if (activeTool === "json") return `\`\`\`json\n${value}\n\`\`\``;
+    if (activeTool === "html") return value;
     return value;
   };
   const showDiscover = view === "chat" && !activeChat?.messages.length;
@@ -1057,7 +1057,7 @@ ${message}`); toast.error(message); }
                 modelOptions={PUTER_MODELS}
                 onModelChange={store.setSelectedModel}
                 onChange={setDraft}
-                onSubmit={() => void send(commandForTool(draft), activeChat?.id, undefined, false, attachments)}
+                 onSubmit={() => void send(commandForTool(draft), activeChat?.id, undefined, false, attachments, activeTool !== "auto")}
                 onEmergency={() => void emergencyFix()}
                 onSendToGpt={() => void sendToGpt()}
                 attachments={attachments}
