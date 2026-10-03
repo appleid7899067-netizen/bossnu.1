@@ -250,7 +250,7 @@ export function AppShell({ search }: { search: Search }) {
       if (!pending) return;
       streamLogPending.delete(activityId);
       const current = useAppStore.getState().conversations.find(chat => chat.id === id)?.messages.find(message => message.id === assistantId)?.activities ?? [];
-      store.patchAssistant(id, assistantId, { activities: current.map(activity => activity.id === activityId ? { ...activity, ...pending, text: pending.text.slice(-240) } as ChatActivity : activity) });
+      store.patchAssistant(id, assistantId, { activities: current.map(activity => activity.id === activityId ? { ...activity, ...pending, text: pending.text.slice(-64000) } as ChatActivity : activity) });
     };
     const updateStreamLog = (activityId: string, source: Extract<ChatActivity, { kind: "stream" }>["source"], status: Extract<ChatActivity, { kind: "stream" }>["status"], text: string, chars: number) => {
       streamLogPending.set(activityId, { source, status, text, chars });
